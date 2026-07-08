@@ -6,6 +6,8 @@ import { OpenCashSessionDto } from '../../application/commands/open-cash-session
 import { OpenCashSessionCommand } from '../../application/commands/open-cash-session/open-cash-session.command';
 import { CloseCashSessionDto } from '../../application/commands/close-cash-session/close-cash-session.dto';
 import { CloseCashSessionCommand } from '../../application/commands/close-cash-session/close-cash-session.command';
+import { RegisterExpenseDto } from '../../application/commands/register-expense/register-expense.dto';
+import { RegisterExpenseCommand } from '../../application/commands/register-expense/register-expense.command';
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
 
 @Controller('sales')
@@ -56,6 +58,22 @@ export class SalesController {
         tenantId,
         id,
         dto.closingBalance,
+      ),
+    );
+  }
+
+  @Post('expenses')
+  async registerExpense(
+    @CurrentUser('tenantId') tenantId: string,
+    @Body() dto: RegisterExpenseDto,
+  ) {
+    return this.commandBus.execute(
+      new RegisterExpenseCommand(
+        tenantId,
+        dto.branchId,
+        dto.description,
+        dto.amount,
+        dto.category,
       ),
     );
   }
