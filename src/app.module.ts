@@ -35,6 +35,9 @@ import { AuthModule } from './modules/auth/auth.module';
 import { ProductsModule } from './modules/products/products.module';
 import { SalesModule } from './modules/sales/sales.module';
 import { UsersModule } from './modules/users/users.module';
+import { Supplier } from './modules/purchases/domain/entities/supplier.entity';
+import { PurchaseOrder } from './modules/purchases/domain/entities/purchase-order.entity';
+import { PurchasesModule } from './modules/purchases/purchases.module';
 
 @Module({
   imports: [
@@ -64,6 +67,8 @@ import { UsersModule } from './modules/users/users.module';
         Expense,
         Refund,
         RefundItem,
+        Supplier,
+        PurchaseOrder,
       ],
       synchronize: false,
       logging: process.env.DB_LOGGING === 'true',
@@ -73,6 +78,7 @@ import { UsersModule } from './modules/users/users.module';
     ProductsModule,
     SalesModule,
     UsersModule,
+    PurchasesModule,
   ],
   controllers: [AppController],
   providers: [

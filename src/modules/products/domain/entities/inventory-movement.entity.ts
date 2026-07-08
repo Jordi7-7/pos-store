@@ -35,6 +35,9 @@ export class InventoryMovement extends BaseEntity {
   @JoinColumn({ name: 'variant_id' })
   variant: ProductVariant;
 
+  @Column({ name: 'purchase_order_id', type: 'uuid', nullable: true })
+  purchaseOrderId: string | null;
+
   @Column({
     type: 'numeric',
     precision: 10,
