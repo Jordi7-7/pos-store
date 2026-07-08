@@ -8,6 +8,8 @@ import { CloseCashSessionDto } from '../../application/commands/close-cash-sessi
 import { CloseCashSessionCommand } from '../../application/commands/close-cash-session/close-cash-session.command';
 import { RegisterExpenseDto } from '../../application/commands/register-expense/register-expense.dto';
 import { RegisterExpenseCommand } from '../../application/commands/register-expense/register-expense.command';
+import { ProcessRefundDto } from '../../application/commands/process-refund/process-refund.dto';
+import { ProcessRefundCommand } from '../../application/commands/process-refund/process-refund.command';
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
 
 @Controller('sales')
@@ -74,6 +76,23 @@ export class SalesController {
         dto.description,
         dto.amount,
         dto.category,
+      ),
+    );
+  }
+
+  @Post('refunds')
+  async processRefund(
+    @CurrentUser('tenantId') tenantId: string,
+    @Body() dto: ProcessRefundDto,
+  ) {
+    return this.commandBus.execute(
+      new ProcessRefundCommand(
+        tenantId,
+        dto.branchId,
+        dto.saleId,
+        dto.cashSessionId,
+        dto.reason,
+        dto.items,
       ),
     );
   }
