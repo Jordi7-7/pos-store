@@ -1,7 +1,8 @@
-import { Entity, Column, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
+import { Entity, Column, ManyToOne, JoinColumn, OneToMany, ManyToMany, JoinTable } from 'typeorm';
 import { BaseEntity } from '../../../../common/database/base.entity';
 import { Tenant } from '../../../tenants/domain/entities/tenant.entity';
 import { ProductVariant } from './product-variant.entity';
+import { ProductImage } from './product-image.entity';
 
 @Entity('products')
 export class Product extends BaseEntity {
@@ -20,4 +21,12 @@ export class Product extends BaseEntity {
 
   @OneToMany(() => ProductVariant, (variant) => variant.product, { cascade: true })
   variants: ProductVariant[];
+
+  @ManyToMany(() => ProductImage)
+  @JoinTable({
+    name: 'product_image_mappings',
+    joinColumn: { name: 'product_id', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'product_image_id', referencedColumnName: 'id' },
+  })
+  images: ProductImage[];
 }

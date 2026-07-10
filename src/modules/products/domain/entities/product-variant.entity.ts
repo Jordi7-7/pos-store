@@ -4,6 +4,7 @@ import { Product } from './product.entity';
 import { AttributeValue } from './attribute-value.entity';
 import { ColumnNumericTransformer } from '../../../../common/database/numeric-transformer';
 import { ProductStock } from './product-stock.entity';
+import { ProductImage } from './product-image.entity';
 
 @Entity('product_variants')
 export class ProductVariant extends BaseEntity {
@@ -48,6 +49,14 @@ export class ProductVariant extends BaseEntity {
     inverseJoinColumn: { name: 'attribute_value_id', referencedColumnName: 'id' },
   })
   attributeValues: AttributeValue[];
+
+  @ManyToMany(() => ProductImage)
+  @JoinTable({
+    name: 'product_variant_image_mappings',
+    joinColumn: { name: 'product_variant_id', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'product_image_id', referencedColumnName: 'id' },
+  })
+  images: ProductImage[];
 
   @OneToMany(() => ProductStock, (stock) => stock.variant, { cascade: true })
   stocks: ProductStock[];

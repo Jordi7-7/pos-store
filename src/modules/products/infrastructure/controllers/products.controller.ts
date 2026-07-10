@@ -26,7 +26,7 @@ export class ProductsController {
     @Body() dto: CreateProductDto,
   ) {
     return this.commandBus.execute(
-      new CreateProductCommand(tenantId, dto.name, dto.description, dto.variants),
+      new CreateProductCommand(tenantId, dto.name, dto.description, dto.variants, dto.imageIds),
     );
   }
 
@@ -70,7 +70,7 @@ export class ProductsController {
     @Body() dto: UpdateProductDto,
   ) {
     return this.commandBus.execute(
-      new UpdateProductCommand(tenantId, id, dto.name, dto.description),
+      new UpdateProductCommand(tenantId, id, dto.name, dto.description, dto.imageIds),
     );
   }
 

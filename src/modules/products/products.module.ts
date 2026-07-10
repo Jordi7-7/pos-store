@@ -7,6 +7,7 @@ import { Attribute } from './domain/entities/attribute.entity';
 import { AttributeValue } from './domain/entities/attribute-value.entity';
 import { ProductStock } from './domain/entities/product-stock.entity';
 import { InventoryMovement } from './domain/entities/inventory-movement.entity';
+import { ProductImage } from './domain/entities/product-image.entity';
 import { CreateProductHandler } from './application/commands/create-product/create-product.handler';
 import { CreateAttributeHandler } from './application/commands/create-attribute/create-attribute.handler';
 import { CreateAttributeValueHandler } from './application/commands/create-attribute-value/create-attribute-value.handler';
@@ -25,6 +26,7 @@ import { ProductsController } from './infrastructure/controllers/products.contro
       AttributeValue,
       ProductStock,
       InventoryMovement,
+      ProductImage,
     ]),
     CqrsModule,
   ],

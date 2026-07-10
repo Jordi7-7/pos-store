@@ -29,9 +29,10 @@ export class ProductVariantDto {
   @IsNumber()
   salePrice: number;
 
-  @IsString()
+  @IsArray()
+  @IsUUID(4, { each: true })
   @IsOptional()
-  imageUrl?: string;
+  imageIds?: string[];
 
   @IsArray()
   @ValidateNested({ each: true })
@@ -52,6 +53,11 @@ export class CreateProductDto {
 
   @IsString()
   description: string;
+
+  @IsArray()
+  @IsUUID(4, { each: true })
+  @IsOptional()
+  imageIds?: string[];
 
   @IsArray()
   @ValidateNested({ each: true })

@@ -6,6 +6,7 @@ import { Product } from '../../../domain/entities/product.entity';
 import { ProductVariant } from '../../../domain/entities/product-variant.entity';
 import { AttributeValue } from '../../../domain/entities/attribute-value.entity';
 import { ProductStock } from '../../../domain/entities/product-stock.entity';
+import { ProductImage } from '../../../domain/entities/product-image.entity';
 
 @CommandHandler(CreateProductCommand)
 export class CreateProductHandler implements ICommandHandler<CreateProductCommand> {
@@ -14,11 +15,12 @@ export class CreateProductHandler implements ICommandHandler<CreateProductComman
   constructor(private readonly entityManager: EntityManager) {}
 
   async execute(command: CreateProductCommand): Promise<Product> {
-    const { tenantId, name, description, variants } = command;
+    const { tenantId, name, description, variants, imageIds } = command;
     this.logger.log(`Creating product: ${name} with ${variants.length} variant(s) for Tenant: ${tenantId}`);
     return this.entityManager.transaction(async (transactionalManager) => {
       const productRepo = transactionalManager.getRepository(Product);
       const attributeValueRepo = transactionalManager.getRepository(AttributeValue);
+      const imageRepo = transactionalManager.getRepository(ProductImage);
 
       const product = new Product();
       product.tenantId = tenantId;
@@ -26,13 +28,41 @@ export class CreateProductHandler implements ICommandHandler<CreateProductComman
       product.description = description;
       product.variants = [];
 
+      // Link parent product images
+      if (imageIds && imageIds.length > 0) {
+        const images = await imageRepo.find({
+          where: { id: In(imageIds), tenantId },
+        });
+        if (images.length !== imageIds.length) {
+          this.logger.warn(`Product creation failed: some parent image IDs from [${imageIds}] were not found for Tenant ${tenantId}`);
+          throw new BadRequestException('Some product images were not found');
+        }
+        product.images = images;
+      } else {
+        product.images = [];
+      }
+
       for (const variantDto of variants) {
         const variant = new ProductVariant();
         variant.sku = variantDto.sku;
         variant.barcode = variantDto.barcode;
         variant.purchasePrice = variantDto.purchasePrice;
         variant.salePrice = variantDto.salePrice;
-        variant.imageUrl = variantDto.imageUrl || null;
+        variant.imageUrl = null; // Deprecated, using images relation instead
+
+        // Link variant images
+        if (variantDto.imageIds && variantDto.imageIds.length > 0) {
+          const varImages = await imageRepo.find({
+            where: { id: In(variantDto.imageIds), tenantId },
+          });
+          if (varImages.length !== variantDto.imageIds.length) {
+            this.logger.warn(`Product creation failed: some variant image IDs from [${variantDto.imageIds}] were not found for Tenant ${tenantId}`);
+            throw new BadRequestException('Some variant images were not found');
+          }
+          variant.images = varImages;
+        } else {
+          variant.images = [];
+        }
 
         const valueIds = variantDto.attributeValues.map((v: any) => v.attributeValueId);
         if (valueIds.length > 0) {

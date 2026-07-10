@@ -1,5 +1,5 @@
-import { Controller, Post, Body, Param } from '@nestjs/common';
-import { CommandBus } from '@nestjs/cqrs';
+import { Controller, Post, Body, Param, Get } from '@nestjs/common';
+import { CommandBus, QueryBus } from '@nestjs/cqrs';
 import { ProcessSaleDto } from '../../application/commands/process-sale/process-sale.dto';
 import { ProcessSaleCommand } from '../../application/commands/process-sale/process-sale.command';
 import { OpenCashSessionDto } from '../../application/commands/open-cash-session/open-cash-session.dto';
@@ -10,11 +10,15 @@ import { RegisterExpenseDto } from '../../application/commands/register-expense/
 import { RegisterExpenseCommand } from '../../application/commands/register-expense/register-expense.command';
 import { ProcessRefundDto } from '../../application/commands/process-refund/process-refund.dto';
 import { ProcessRefundCommand } from '../../application/commands/process-refund/process-refund.command';
+import { GetSalesQuery } from '../../application/queries/get-sales/get-sales.query';
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
 
 @Controller('sales')
 export class SalesController {
-  constructor(private readonly commandBus: CommandBus) {}
+  constructor(
+    private readonly commandBus: CommandBus,
+    private readonly queryBus: QueryBus,
+  ) {}
 
   @Post()
   async process(
@@ -31,6 +35,11 @@ export class SalesController {
         dto.payments,
       ),
     );
+  }
+
+  @Get()
+  async findSales(@CurrentUser('tenantId') tenantId: string) {
+    return this.queryBus.execute(new GetSalesQuery(tenantId));
   }
 
   @Post('cash-sessions/open')

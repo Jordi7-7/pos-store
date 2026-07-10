@@ -38,6 +38,10 @@ import { UsersModule } from './modules/users/users.module';
 import { Supplier } from './modules/purchases/domain/entities/supplier.entity';
 import { PurchaseOrder } from './modules/purchases/domain/entities/purchase-order.entity';
 import { PurchasesModule } from './modules/purchases/purchases.module';
+import { ProductImage } from './modules/products/domain/entities/product-image.entity';
+import { MediaModule } from './modules/media/media.module';
+import { BranchesModule } from './modules/branches/branches.module';
+import { CustomersModule } from './modules/customers/customers.module';
 
 @Module({
   imports: [
@@ -69,6 +73,7 @@ import { PurchasesModule } from './modules/purchases/purchases.module';
         RefundItem,
         Supplier,
         PurchaseOrder,
+        ProductImage,
       ],
       synchronize: false,
       logging: process.env.DB_LOGGING === 'true',
@@ -79,6 +84,9 @@ import { PurchasesModule } from './modules/purchases/purchases.module';
     SalesModule,
     UsersModule,
     PurchasesModule,
+    MediaModule,
+    BranchesModule,
+    CustomersModule,
   ],
   controllers: [AppController],
   providers: [
