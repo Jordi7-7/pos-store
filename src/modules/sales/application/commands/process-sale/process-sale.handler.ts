@@ -1,6 +1,6 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { Logger, BadRequestException, NotFoundException } from '@nestjs/common';
-import { EntityManager } from 'typeorm';
+import { EntityManager, MoreThan } from 'typeorm';
 import { ProcessSaleCommand } from './process-sale.command';
 import { Sale } from '../../../domain/entities/sale.entity';
 import { SaleItem } from '../../../domain/entities/sale-item.entity';
@@ -8,6 +8,7 @@ import { SalePayment } from '../../../domain/entities/sale-payment.entity';
 import { ProductStock } from '../../../../products/domain/entities/product-stock.entity';
 import { ProductVariant } from '../../../../products/domain/entities/product-variant.entity';
 import { InventoryMovement } from '../../../../products/domain/entities/inventory-movement.entity';
+import { ProductBatch } from '../../../../products/domain/entities/product-batch.entity';
 import { CashSession } from '../../../domain/entities/cash-session.entity';
 import { Customer } from '../../../../customers/domain/entities/customer.entity';
 
@@ -28,6 +29,7 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
       const stockRepo = transactionalManager.getRepository(ProductStock);
       const saleRepo = transactionalManager.getRepository(Sale);
       const inventoryRepo = transactionalManager.getRepository(InventoryMovement);
+      const batchRepo = transactionalManager.getRepository(ProductBatch);
 
       // 2. Verify Cash Session exists, matches branch and tenant, and is open
       const cashSession = await cashSessionRepo.findOne({
@@ -94,12 +96,44 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
         stock.quantity = Number(stock.quantity) - itemDto.quantity;
         await stockRepo.save(stock);
 
+        // FIFO Batch consumption
+        let remainingToConsume = itemDto.quantity;
+        let totalCost = 0;
+
+        const activeBatches = await batchRepo.find({
+          where: {
+            branchId: branchId,
+            variantId: itemDto.variantId,
+            remainingQuantity: MoreThan(0),
+          },
+          order: { createdAt: 'ASC' },
+          lock: { mode: 'pessimistic_write' },
+        });
+
+        for (const batch of activeBatches) {
+          const toConsume = Math.min(remainingToConsume, Number(batch.remainingQuantity));
+          batch.remainingQuantity = Number(batch.remainingQuantity) - toConsume;
+          await batchRepo.save(batch);
+
+          totalCost += toConsume * Number(batch.unitCost);
+          remainingToConsume -= toConsume;
+
+          if (remainingToConsume === 0) break;
+        }
+
+        // Fallback in case of mismatch/empty batches
+        if (remainingToConsume > 0) {
+          totalCost += remainingToConsume * Number(variant.purchasePrice);
+        }
+
+        const averageUnitCost = Number((totalCost / itemDto.quantity).toFixed(2));
+
         // Build Sale Item
         const saleItem = new SaleItem();
         saleItem.variantId = itemDto.variantId;
         saleItem.quantity = itemDto.quantity;
         saleItem.price = itemDto.price;
-        saleItem.cost = variant.purchasePrice;
+        saleItem.cost = averageUnitCost;
         saleItemsToSave.push(saleItem);
 
         subtotal += itemDto.price * itemDto.quantity;

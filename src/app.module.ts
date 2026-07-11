@@ -43,6 +43,7 @@ import { MediaModule } from './modules/media/media.module';
 import { BranchesModule } from './modules/branches/branches.module';
 import { CustomersModule } from './modules/customers/customers.module';
 import { Category } from './modules/products/domain/entities/category.entity';
+import { ProductBatch } from './modules/products/domain/entities/product-batch.entity';
 
 @Module({
   imports: [
@@ -76,6 +77,7 @@ import { Category } from './modules/products/domain/entities/category.entity';
         PurchaseOrder,
         ProductImage,
         Category,
+        ProductBatch,
       ],
       synchronize: false,
       logging: process.env.DB_LOGGING === 'true',

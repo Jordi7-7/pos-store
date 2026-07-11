@@ -8,6 +8,7 @@ import { Branch } from '../../../../branches/domain/entities/branch.entity';
 import { ProductVariant } from '../../../../products/domain/entities/product-variant.entity';
 import { ProductStock } from '../../../../products/domain/entities/product-stock.entity';
 import { InventoryMovement } from '../../../../products/domain/entities/inventory-movement.entity';
+import { ProductBatch } from '../../../../products/domain/entities/product-batch.entity';
 
 @CommandHandler(RegisterPurchaseCommand)
 export class RegisterPurchaseHandler implements ICommandHandler<RegisterPurchaseCommand> {
@@ -27,6 +28,7 @@ export class RegisterPurchaseHandler implements ICommandHandler<RegisterPurchase
       const variantRepo = transactionalManager.getRepository(ProductVariant);
       const stockRepo = transactionalManager.getRepository(ProductStock);
       const inventoryRepo = transactionalManager.getRepository(InventoryMovement);
+      const batchRepo = transactionalManager.getRepository(ProductBatch);
 
       // 2. Validate Supplier belongs to Tenant
       const supplier = await supplierRepo.findOne({
@@ -112,6 +114,17 @@ export class RegisterPurchaseHandler implements ICommandHandler<RegisterPurchase
 
         branchStock.quantity = Number(branchStock.quantity) + newQty;
         await stockRepo.save(branchStock);
+
+        // Create Product Batch for FIFO tracking
+        const batch = new ProductBatch();
+        batch.tenantId = tenantId;
+        batch.branchId = branchId;
+        batch.variantId = itemDto.variantId;
+        batch.purchaseOrderId = savedPurchase.id;
+        batch.initialQuantity = newQty;
+        batch.remainingQuantity = newQty;
+        batch.unitCost = newPrice;
+        await batchRepo.save(batch);
 
         // Create Kardex entry
         const movement = new InventoryMovement();

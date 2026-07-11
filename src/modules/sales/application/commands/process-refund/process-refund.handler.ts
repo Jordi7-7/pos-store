@@ -9,6 +9,7 @@ import { CashSession } from '../../../domain/entities/cash-session.entity';
 import { Branch } from '../../../../branches/domain/entities/branch.entity';
 import { ProductStock } from '../../../../products/domain/entities/product-stock.entity';
 import { InventoryMovement } from '../../../../products/domain/entities/inventory-movement.entity';
+import { ProductBatch } from '../../../../products/domain/entities/product-batch.entity';
 
 @CommandHandler(ProcessRefundCommand)
 export class ProcessRefundHandler implements ICommandHandler<ProcessRefundCommand> {
@@ -28,6 +29,7 @@ export class ProcessRefundHandler implements ICommandHandler<ProcessRefundComman
       const stockRepo = transactionalManager.getRepository(ProductStock);
       const refundRepo = transactionalManager.getRepository(Refund);
       const inventoryRepo = transactionalManager.getRepository(InventoryMovement);
+      const batchRepo = transactionalManager.getRepository(ProductBatch);
 
       // 2. Validate Branch belongs to Tenant
       const branch = await branchRepo.findOne({
@@ -106,6 +108,17 @@ export class ProcessRefundHandler implements ICommandHandler<ProcessRefundComman
 
         stock.quantity = Number(stock.quantity) + itemDto.quantity;
         await stockRepo.save(stock);
+
+        // Create a new Product Batch representing the returned inventory (using historical cost)
+        const batch = new ProductBatch();
+        batch.tenantId = tenantId;
+        batch.branchId = branchId;
+        batch.variantId = itemDto.variantId;
+        batch.purchaseOrderId = null; // returned stock, not new PO
+        batch.initialQuantity = itemDto.quantity;
+        batch.remainingQuantity = itemDto.quantity;
+        batch.unitCost = Number(saleItem.cost);
+        await batchRepo.save(batch);
 
         // Build Kardex entry
         const movement = new InventoryMovement();

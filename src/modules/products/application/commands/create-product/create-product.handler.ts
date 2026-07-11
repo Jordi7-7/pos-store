@@ -8,6 +8,7 @@ import { AttributeValue } from '../../../domain/entities/attribute-value.entity'
 import { ProductStock } from '../../../domain/entities/product-stock.entity';
 import { ProductImage } from '../../../domain/entities/product-image.entity';
 import { Category } from '../../../domain/entities/category.entity';
+import { ProductBatch } from '../../../domain/entities/product-batch.entity';
 
 @CommandHandler(CreateProductCommand)
 export class CreateProductHandler implements ICommandHandler<CreateProductCommand> {
@@ -23,6 +24,7 @@ export class CreateProductHandler implements ICommandHandler<CreateProductComman
       const attributeValueRepo = transactionalManager.getRepository(AttributeValue);
       const imageRepo = transactionalManager.getRepository(ProductImage);
       const categoryRepo = transactionalManager.getRepository(Category);
+      const batchRepo = transactionalManager.getRepository(ProductBatch);
 
       const product = new Product();
       product.tenantId = tenantId;
@@ -112,6 +114,30 @@ export class CreateProductHandler implements ICommandHandler<CreateProductComman
       }
 
       const savedProduct = await productRepo.save(product);
+
+      // Guardar lotes iniciales si hay existencias iniciales
+      const batchesToSave: ProductBatch[] = [];
+      for (const variant of savedProduct.variants) {
+        if (variant.stocks && variant.stocks.length > 0) {
+          for (const stock of variant.stocks) {
+            if (Number(stock.quantity) > 0) {
+              const batch = new ProductBatch();
+              batch.tenantId = tenantId;
+              batch.branchId = stock.branchId;
+              batch.variantId = variant.id;
+              batch.purchaseOrderId = null;
+              batch.initialQuantity = Number(stock.quantity);
+              batch.remainingQuantity = Number(stock.quantity);
+              batch.unitCost = Number(variant.purchasePrice);
+              batchesToSave.push(batch);
+            }
+          }
+        }
+      }
+      if (batchesToSave.length > 0) {
+        await batchRepo.save(batchesToSave);
+      }
+
       this.logger.log(`Product created successfully: ${savedProduct.name} (ID: ${savedProduct.id})`);
       return savedProduct;
     });
