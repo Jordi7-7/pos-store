@@ -13,7 +13,7 @@ export class RegisterExpenseHandler implements ICommandHandler<RegisterExpenseCo
   constructor(private readonly entityManager: EntityManager) {}
 
   async execute(command: RegisterExpenseCommand): Promise<Expense> {
-    const { tenantId, branchId, description, amount, category } = command;
+    const { tenantId, branchId, description, amount, category, cashSessionId } = command;
     this.logger.log(`Registering expense: $${amount} (${category}) in Branch: ${branchId} for Tenant: ${tenantId}`);
 
     return this.entityManager.transaction(async (transactionalManager) => {
@@ -45,6 +45,7 @@ export class RegisterExpenseHandler implements ICommandHandler<RegisterExpenseCo
       const expense = new Expense();
       expense.tenantId = tenantId;
       expense.branchId = branchId;
+      expense.cashSessionId = cashSessionId || activeSession.id;
       expense.description = description;
       expense.amount = amount;
       expense.category = category;

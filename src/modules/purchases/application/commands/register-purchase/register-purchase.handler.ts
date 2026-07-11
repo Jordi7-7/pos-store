@@ -4,6 +4,7 @@ import { EntityManager } from 'typeorm';
 import { RegisterPurchaseCommand } from './register-purchase.command';
 import { PurchaseOrder } from '../../../domain/entities/purchase-order.entity';
 import { Supplier } from '../../../domain/entities/supplier.entity';
+import { PurchaseOrderItem } from '../../../domain/entities/purchase-order-item.entity';
 import { Branch } from '../../../../branches/domain/entities/branch.entity';
 import { ProductVariant } from '../../../../products/domain/entities/product-variant.entity';
 import { ProductStock } from '../../../../products/domain/entities/product-stock.entity';
@@ -29,6 +30,7 @@ export class RegisterPurchaseHandler implements ICommandHandler<RegisterPurchase
       const stockRepo = transactionalManager.getRepository(ProductStock);
       const inventoryRepo = transactionalManager.getRepository(InventoryMovement);
       const batchRepo = transactionalManager.getRepository(ProductBatch);
+      const purchaseOrderItemRepo = transactionalManager.getRepository(PurchaseOrderItem);
 
       // 2. Validate Supplier belongs to Tenant
       const supplier = await supplierRepo.findOne({
@@ -125,6 +127,14 @@ export class RegisterPurchaseHandler implements ICommandHandler<RegisterPurchase
         batch.remainingQuantity = newQty;
         batch.unitCost = newPrice;
         await batchRepo.save(batch);
+
+        // Save Purchase Order Item
+        const purchaseOrderItem = new PurchaseOrderItem();
+        purchaseOrderItem.purchaseOrderId = savedPurchase.id;
+        purchaseOrderItem.variantId = itemDto.variantId;
+        purchaseOrderItem.quantity = newQty;
+        purchaseOrderItem.purchasePrice = newPrice;
+        await purchaseOrderItemRepo.save(purchaseOrderItem);
 
         // Create Kardex entry
         const movement = new InventoryMovement();

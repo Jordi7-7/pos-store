@@ -5,5 +5,6 @@ export class RegisterExpenseCommand {
     public readonly description: string,
     public readonly amount: number,
     public readonly category: string,
+    public readonly cashSessionId?: string,
   ) {}
 }

@@ -1,9 +1,10 @@
-import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, Column, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
 import { BaseEntity } from '../../../../common/database/base.entity';
 import { Tenant } from '../../../tenants/domain/entities/tenant.entity';
 import { Supplier } from './supplier.entity';
 import { Branch } from '../../../branches/domain/entities/branch.entity';
 import { ColumnNumericTransformer } from '../../../../common/database/numeric-transformer';
+import { PurchaseOrderItem } from './purchase-order-item.entity';
 
 @Entity('purchase_orders')
 export class PurchaseOrder extends BaseEntity {
@@ -42,4 +43,7 @@ export class PurchaseOrder extends BaseEntity {
 
   @Column()
   status: string;
+
+  @OneToMany(() => PurchaseOrderItem, (item) => item.purchaseOrder, { cascade: true })
+  items: PurchaseOrderItem[];
 }

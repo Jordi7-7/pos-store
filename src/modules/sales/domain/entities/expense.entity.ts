@@ -2,6 +2,7 @@ import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
 import { BaseEntity } from '../../../../common/database/base.entity';
 import { Tenant } from '../../../tenants/domain/entities/tenant.entity';
 import { Branch } from '../../../branches/domain/entities/branch.entity';
+import { CashSession } from './cash-session.entity';
 import { ColumnNumericTransformer } from '../../../../common/database/numeric-transformer';
 
 @Entity('expenses')
@@ -20,6 +21,13 @@ export class Expense extends BaseEntity {
   @JoinColumn({ name: 'branch_id' })
   branch: Branch;
 
+  @Column({ name: 'cash_session_id', type: 'uuid', nullable: true })
+  cashSessionId: string | null;
+
+  @ManyToOne(() => CashSession, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'cash_session_id' })
+  cashSession: CashSession | null;
+
   @Column()
   description: string;
 
@@ -34,3 +42,4 @@ export class Expense extends BaseEntity {
   @Column()
   category: string;
 }
+export default Expense;

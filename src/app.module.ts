@@ -44,6 +44,7 @@ import { BranchesModule } from './modules/branches/branches.module';
 import { CustomersModule } from './modules/customers/customers.module';
 import { Category } from './modules/products/domain/entities/category.entity';
 import { ProductBatch } from './modules/products/domain/entities/product-batch.entity';
+import { PurchaseOrderItem } from './modules/purchases/domain/entities/purchase-order-item.entity';
 
 @Module({
   imports: [
@@ -78,6 +79,7 @@ import { ProductBatch } from './modules/products/domain/entities/product-batch.e
         ProductImage,
         Category,
         ProductBatch,
+        PurchaseOrderItem,
       ],
       synchronize: false,
       logging: process.env.DB_LOGGING === 'true',

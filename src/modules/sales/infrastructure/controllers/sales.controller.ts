@@ -1,5 +1,6 @@
-import { Controller, Post, Body, Param, Get } from '@nestjs/common';
+import { Controller, Post, Body, Param, Get, Query } from '@nestjs/common';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
+import { EntityManager } from 'typeorm';
 import { ProcessSaleDto } from '../../application/commands/process-sale/process-sale.dto';
 import { ProcessSaleCommand } from '../../application/commands/process-sale/process-sale.command';
 import { OpenCashSessionDto } from '../../application/commands/open-cash-session/open-cash-session.dto';
@@ -12,13 +13,30 @@ import { ProcessRefundDto } from '../../application/commands/process-refund/proc
 import { ProcessRefundCommand } from '../../application/commands/process-refund/process-refund.command';
 import { GetSalesQuery } from '../../application/queries/get-sales/get-sales.query';
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
+import { CashSession } from '../../domain/entities/cash-session.entity';
 
 @Controller('sales')
 export class SalesController {
   constructor(
     private readonly commandBus: CommandBus,
     private readonly queryBus: QueryBus,
+    private readonly entityManager: EntityManager,
   ) {}
+
+  @Get('cash-sessions/active')
+  async getActiveSession(
+    @CurrentUser('sub') userId: string,
+    @Query('branchId') branchId?: string,
+  ) {
+    const whereClause: any = { userId, status: 'OPEN' };
+    if (branchId) {
+      whereClause.branchId = branchId;
+    }
+    const session = await this.entityManager.getRepository(CashSession).findOne({
+      where: whereClause,
+    });
+    return session || null;
+  }
 
   @Post()
   async process(
@@ -85,6 +103,7 @@ export class SalesController {
         dto.description,
         dto.amount,
         dto.category,
+        dto.cashSessionId,
       ),
     );
   }
