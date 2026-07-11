@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import * as crypto from 'crypto';
 
@@ -64,5 +64,36 @@ export class S3Service {
           : `https://${this.bucketName}.s3.${region}.amazonaws.com/${key}`);
 
     return { uploadUrl, fileUrl };
+  }
+
+  async deleteFile(fileUrl: string): Promise<void> {
+    try {
+      this.logger.log(`Attempting to delete S3/R2 asset at URL: ${fileUrl}`);
+      const urlObj = new URL(fileUrl);
+      let key = urlObj.pathname;
+
+      if (key.startsWith('/')) {
+        key = key.substring(1);
+      }
+
+      // If URL contains the bucket name (path-style endpoint usage), strip it
+      const bucketName = this.bucketName;
+      if (key.startsWith(`${bucketName}/`)) {
+        key = key.substring(bucketName.length + 1);
+      }
+
+      this.logger.log(`Resolved S3/R2 object Key to delete: ${key}`);
+
+      const command = new DeleteObjectCommand({
+        Bucket: this.bucketName,
+        Key: key,
+      });
+
+      await this.s3Client.send(command);
+      this.logger.log(`Successfully deleted S3/R2 asset for Key: ${key}`);
+    } catch (error) {
+      this.logger.error(`Failed to delete S3/R2 asset at ${fileUrl}:`, error);
+      throw error;
+    }
   }
 }
