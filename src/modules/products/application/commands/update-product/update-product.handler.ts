@@ -4,6 +4,7 @@ import { EntityManager, In } from 'typeorm';
 import { UpdateProductCommand } from './update-product.command';
 import { Product } from '../../../domain/entities/product.entity';
 import { ProductImage } from '../../../domain/entities/product-image.entity';
+import { Category } from '../../../domain/entities/category.entity';
 
 @CommandHandler(UpdateProductCommand)
 export class UpdateProductHandler implements ICommandHandler<UpdateProductCommand> {
@@ -12,11 +13,12 @@ export class UpdateProductHandler implements ICommandHandler<UpdateProductComman
   constructor(private readonly entityManager: EntityManager) {}
 
   async execute(command: UpdateProductCommand): Promise<Product> {
-    const { tenantId, id, name, description, imageIds } = command;
+    const { tenantId, id, name, description, imageIds, categoryId } = command;
     this.logger.log(`Updating product ID: ${id} for Tenant: ${tenantId}`);
 
     const productRepo = this.entityManager.getRepository(Product);
     const imageRepo = this.entityManager.getRepository(ProductImage);
+    const categoryRepo = this.entityManager.getRepository(Category);
 
     const product = await productRepo.findOne({
       where: { id, tenantId },
@@ -30,6 +32,22 @@ export class UpdateProductHandler implements ICommandHandler<UpdateProductComman
 
     if (name !== undefined) product.name = name;
     if (description !== undefined) product.description = description;
+
+    // Update Category if provided
+    if (categoryId !== undefined) {
+      if (categoryId === null || categoryId === '') {
+        product.categoryId = null;
+      } else {
+        const category = await categoryRepo.findOne({
+          where: { id: categoryId, tenantId },
+        });
+        if (!category) {
+          this.logger.warn(`Product update failed: Category ID ${categoryId} not found for Tenant ${tenantId}`);
+          throw new NotFoundException(`Category with ID ${categoryId} not found`);
+        }
+        product.categoryId = categoryId;
+      }
+    }
 
     if (imageIds !== undefined) {
       if (imageIds.length > 0) {

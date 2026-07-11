@@ -8,9 +8,12 @@ import { AttributeValue } from './domain/entities/attribute-value.entity';
 import { ProductStock } from './domain/entities/product-stock.entity';
 import { InventoryMovement } from './domain/entities/inventory-movement.entity';
 import { ProductImage } from './domain/entities/product-image.entity';
+import { Category } from './domain/entities/category.entity';
 import { CreateProductHandler } from './application/commands/create-product/create-product.handler';
 import { CreateAttributeHandler } from './application/commands/create-attribute/create-attribute.handler';
 import { CreateAttributeValueHandler } from './application/commands/create-attribute-value/create-attribute-value.handler';
+import { CreateCategoryHandler } from './application/commands/create-category/create-category.handler';
+import { GetCategoriesHandler } from './application/queries/get-categories/get-categories.handler';
 import { GetProductsHandler } from './application/queries/get-products/get-products.handler';
 import { GetProductByIdHandler } from './application/queries/get-product-by-id/get-product-by-id.handler';
 import { UpdateProductHandler } from './application/commands/update-product/update-product.handler';
@@ -27,6 +30,7 @@ import { ProductsController } from './infrastructure/controllers/products.contro
       ProductStock,
       InventoryMovement,
       ProductImage,
+      Category,
     ]),
     CqrsModule,
   ],
@@ -35,6 +39,8 @@ import { ProductsController } from './infrastructure/controllers/products.contro
     CreateProductHandler,
     CreateAttributeHandler,
     CreateAttributeValueHandler,
+    CreateCategoryHandler,
+    GetCategoriesHandler,
     GetProductsHandler,
     GetProductByIdHandler,
     UpdateProductHandler,

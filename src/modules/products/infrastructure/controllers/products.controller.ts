@@ -6,6 +6,9 @@ import { CreateAttributeDto } from '../../application/commands/create-attribute/
 import { CreateAttributeCommand } from '../../application/commands/create-attribute/create-attribute.command';
 import { CreateAttributeValueDto } from '../../application/commands/create-attribute-value/create-attribute-value.dto';
 import { CreateAttributeValueCommand } from '../../application/commands/create-attribute-value/create-attribute-value.command';
+import { CreateCategoryDto } from '../../application/commands/create-category/create-category.dto';
+import { CreateCategoryCommand } from '../../application/commands/create-category/create-category.command';
+import { GetCategoriesQuery } from '../../application/queries/get-categories/get-categories.query';
 import { GetProductsQuery } from '../../application/queries/get-products/get-products.query';
 import { GetProductByIdQuery } from '../../application/queries/get-product-by-id/get-product-by-id.query';
 import { UpdateProductDto } from '../../application/commands/update-product/update-product.dto';
@@ -26,8 +29,23 @@ export class ProductsController {
     @Body() dto: CreateProductDto,
   ) {
     return this.commandBus.execute(
-      new CreateProductCommand(tenantId, dto.name, dto.description, dto.variants, dto.imageIds),
+      new CreateProductCommand(tenantId, dto.name, dto.description, dto.variants, dto.imageIds, dto.categoryId),
     );
+  }
+
+  @Post('categories')
+  async createCategory(
+    @CurrentUser('tenantId') tenantId: string,
+    @Body() dto: CreateCategoryDto,
+  ) {
+    return this.commandBus.execute(
+      new CreateCategoryCommand(tenantId, dto.name),
+    );
+  }
+
+  @Get('categories')
+  async findCategories(@CurrentUser('tenantId') tenantId: string) {
+    return this.queryBus.execute(new GetCategoriesQuery(tenantId));
   }
 
   @Post('attributes')
@@ -70,7 +88,7 @@ export class ProductsController {
     @Body() dto: UpdateProductDto,
   ) {
     return this.commandBus.execute(
-      new UpdateProductCommand(tenantId, id, dto.name, dto.description, dto.imageIds),
+      new UpdateProductCommand(tenantId, id, dto.name, dto.description, dto.imageIds, dto.categoryId),
     );
   }
 

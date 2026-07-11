@@ -5,5 +5,6 @@ export class CreateProductCommand {
     public readonly description: string,
     public readonly variants: any[],
     public readonly imageIds?: string[],
+    public readonly categoryId?: string,
   ) {}
 }

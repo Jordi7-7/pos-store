@@ -10,6 +10,10 @@ export class UpdateProductDto {
   @IsOptional()
   description?: string;
 
+  @IsUUID()
+  @IsOptional()
+  categoryId?: string;
+
   @IsArray()
   @IsUUID(4, { each: true })
   @IsOptional()
