@@ -23,10 +23,22 @@ export class MediaController {
     return this.s3Service.getUploadPresignedUrl(tenantId, filename, contentType);
   }
 
+  @Get()
+  async getImages(
+    @CurrentUser('tenantId') tenantId: string,
+  ) {
+    const imageRepo = this.entityManager.getRepository(ProductImage);
+    return imageRepo.find({
+      where: { tenantId },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
   @Post('register')
   async registerImage(
     @CurrentUser('tenantId') tenantId: string,
     @Body('url') url: string,
+    @Body('description') description?: string,
   ) {
     if (!url) {
       throw new BadRequestException('url is required');
@@ -36,6 +48,7 @@ export class MediaController {
     const image = new ProductImage();
     image.tenantId = tenantId;
     image.url = url;
+    image.description = description;
 
     return imageRepo.save(image);
   }
