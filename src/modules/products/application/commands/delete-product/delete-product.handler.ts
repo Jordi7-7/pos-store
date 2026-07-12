@@ -1,5 +1,5 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import { Logger, NotFoundException } from '@nestjs/common';
+import { Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { DeleteProductCommand } from './delete-product.command';
 import { Product } from '../../../domain/entities/product.entity';
@@ -18,12 +18,24 @@ export class DeleteProductHandler implements ICommandHandler<DeleteProductComman
 
     const product = await productRepo.findOne({
       where: { id, tenantId },
-      relations: { variants: true },
+      relations: { variants: { stocks: true } },
     });
 
     if (!product) {
       this.logger.warn(`Product soft-deletion failed: Product ID ${id} not found for Tenant ${tenantId}`);
       throw new NotFoundException(`Product with ID ${id} not found`);
+    }
+
+    // Validar que el producto no tenga existencias activas en ninguna variante
+    const totalStock = product.variants.reduce(
+      (sum, v) => sum + (v.stocks?.reduce((sSum, s) => sSum + s.quantity, 0) || 0),
+      0,
+    );
+
+    if (totalStock > 0) {
+      throw new BadRequestException(
+        `No se puede eliminar el producto porque tiene stock disponible en inventario (${totalStock} pzs). Ajusta el stock a 0 primero.`,
+      );
     }
 
     // TypeORM softRemove will cascade to variants due to cascade: true on the entity relation

@@ -96,4 +96,39 @@ export class S3Service {
       throw error;
     }
   }
+
+  async uploadFileBuffer(
+    tenantId: string,
+    filename: string,
+    contentType: string,
+    buffer: Buffer,
+  ): Promise<string> {
+    const fileUuid = crypto.randomUUID();
+    const cleanFilename = filename.replace(/\s+/g, '-').toLowerCase();
+    const tenantHash = crypto.createHash('sha256').update(tenantId).digest('hex').substring(0, 16);
+    const key = `${tenantHash}/products/${fileUuid}-${cleanFilename}`;
+
+    this.logger.log(`Uploading S3/R2 asset buffer for Key: ${key}`);
+
+    const command = new PutObjectCommand({
+      Bucket: this.bucketName,
+      Key: key,
+      ContentType: contentType,
+      Body: buffer,
+    });
+
+    await this.s3Client.send(command);
+
+    const endpoint = this.configService.get<string>('AWS_S3_ENDPOINT');
+    const region = this.configService.get<string>('AWS_REGION') || 'us-east-1';
+    const publicUrl = this.configService.get<string>('AWS_S3_PUBLIC_URL');
+
+    const fileUrl = publicUrl
+      ? `${publicUrl}/${key}`
+      : (endpoint 
+          ? `${endpoint}/${this.bucketName}/${key}`
+          : `https://${this.bucketName}.s3.${region}.amazonaws.com/${key}`);
+
+    return fileUrl;
+  }
 }

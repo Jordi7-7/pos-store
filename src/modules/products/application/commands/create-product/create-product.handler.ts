@@ -19,6 +19,23 @@ export class CreateProductHandler implements ICommandHandler<CreateProductComman
   async execute(command: CreateProductCommand): Promise<Product> {
     const { tenantId, name, description, variants, imageIds, categoryId } = command;
     this.logger.log(`Creating product: ${name} with ${variants.length} variant(s) for Tenant: ${tenantId}`);
+
+    // Validate no duplicate attribute combinations in input variants
+    const combinationSet = new Set<string>();
+    for (const variantDto of variants) {
+      const attributeValueIds = variantDto.attributeValues
+        ?.map((av: any) => av.attributeValueId)
+        .sort()
+        .join(',') || '';
+
+      if (attributeValueIds) {
+        if (combinationSet.has(attributeValueIds)) {
+          throw new BadRequestException('No se permiten múltiples variantes con la misma combinación de atributos en un mismo producto.');
+        }
+        combinationSet.add(attributeValueIds);
+      }
+    }
+
     return this.entityManager.transaction(async (transactionalManager) => {
       const productRepo = transactionalManager.getRepository(Product);
       const attributeValueRepo = transactionalManager.getRepository(AttributeValue);

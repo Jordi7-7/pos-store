@@ -18,4 +18,8 @@ export class UpdateProductDto {
   @IsUUID(4, { each: true })
   @IsOptional()
   imageIds?: string[];
+
+  @IsArray()
+  @IsOptional()
+  variants?: any[];
 }

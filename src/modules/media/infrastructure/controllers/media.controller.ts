@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Query, Body, Param, BadRequestException, NotFoundException, ConflictException } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Query, Body, Param, BadRequestException, NotFoundException, ConflictException, Logger } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { S3Service } from '../../services/s3.service';
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
@@ -6,6 +6,8 @@ import { ProductImage } from '../../../products/domain/entities/product-image.en
 
 @Controller('media')
 export class MediaController {
+  private readonly logger = new Logger(MediaController.name);
+
   constructor(
     private readonly s3Service: S3Service,
     private readonly entityManager: EntityManager,
@@ -98,5 +100,54 @@ export class MediaController {
     await imageRepo.remove(image);
 
     return { success: true, message: 'Imagen eliminada exitosamente' };
+  }
+
+  @Post('upload-by-url')
+  async uploadByUrl(
+    @CurrentUser('tenantId') tenantId: string,
+    @Body('url') url: string,
+    @Body('description') description?: string,
+  ) {
+    if (!url) {
+      throw new BadRequestException('url is required');
+    }
+
+    try {
+      this.logger.log(`Fetching remote image for Tenant ${tenantId} from URL: ${url}`);
+      
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch image from URL: ${response.statusText}`);
+      }
+
+      const contentType = response.headers.get('content-type') || 'image/jpeg';
+      const arrayBuffer = await response.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+
+      // Extract filename from URL or generate one
+      let filename = 'downloaded-image.jpg';
+      try {
+        const parsedUrl = new URL(url);
+        const pathname = parsedUrl.pathname;
+        const lastSegment = pathname.substring(pathname.lastIndexOf('/') + 1);
+        if (lastSegment && lastSegment.includes('.')) {
+          filename = lastSegment;
+        }
+      } catch (e) {}
+
+      // Upload buffer to S3/R2
+      const fileUrl = await this.s3Service.uploadFileBuffer(tenantId, filename, contentType, buffer);
+
+      // Register image in database
+      const imageRepo = this.entityManager.getRepository(ProductImage);
+      const image = new ProductImage();
+      image.tenantId = tenantId;
+      image.url = fileUrl;
+      image.description = description || 'Imagen arrastrada de internet';
+
+      return imageRepo.save(image);
+    } catch (error: any) {
+      throw new BadRequestException(`No se pudo procesar la imagen de la URL: ${error.message}`);
+    }
   }
 }
