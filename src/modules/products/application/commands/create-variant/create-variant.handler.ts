@@ -36,9 +36,9 @@ export class CreateVariantHandler implements ICommandHandler<CreateVariantComman
         throw new NotFoundException(`Product with ID ${productId} not found`);
       }
 
-      // Validate SKU uniqueness
+      // Validate SKU uniqueness per tenant
       const isSkuTaken = await variantRepo.findOne({
-        where: { sku: variantDto.sku },
+        where: { sku: variantDto.sku, tenantId },
       });
       if (isSkuTaken) {
         throw new BadRequestException(`El SKU "${variantDto.sku}" ya está registrado en el sistema.`);
@@ -68,6 +68,8 @@ export class CreateVariantHandler implements ICommandHandler<CreateVariantComman
       variant.purchasePrice = Number(variantDto.purchasePrice) || 0;
       variant.salePrice = Number(variantDto.salePrice) || 0;
       variant.imageUrl = null;
+      variant.tenantId = tenantId;
+
 
       // Link variant images
       if (variantDto.imageIds && variantDto.imageIds.length > 0) {

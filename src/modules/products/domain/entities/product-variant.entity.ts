@@ -5,6 +5,7 @@ import { AttributeValue } from './attribute-value.entity';
 import { ColumnNumericTransformer } from '../../../../common/database/numeric-transformer';
 import { ProductStock } from './product-stock.entity';
 import { ProductImage } from './product-image.entity';
+import { Tenant } from '../../../tenants/domain/entities/tenant.entity';
 
 @Entity('product_variants')
 export class ProductVariant extends BaseEntity {
@@ -15,11 +16,19 @@ export class ProductVariant extends BaseEntity {
   @JoinColumn({ name: 'product_id' })
   product: Product;
 
-  @Column({ unique: true })
+  @Column({ name: 'tenant_id', type: 'uuid' })
+  tenantId: string;
+
+  @ManyToOne(() => Tenant, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'tenant_id' })
+  tenant: Tenant;
+
+  @Column()
   sku: string;
 
-  @Column({ unique: true })
+  @Column()
   barcode: string;
+
 
   @Column({
     name: 'purchase_price',
