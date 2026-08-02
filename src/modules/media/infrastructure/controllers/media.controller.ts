@@ -49,7 +49,7 @@ export class MediaController {
     const imageRepo = this.entityManager.getRepository(ProductImage);
     const image = new ProductImage();
     image.tenantId = tenantId;
-    image.url = url;
+    image.url = this.s3Service.cleanUrl(url);
     image.description = description;
 
     return imageRepo.save(image);
@@ -142,7 +142,7 @@ export class MediaController {
       const imageRepo = this.entityManager.getRepository(ProductImage);
       const image = new ProductImage();
       image.tenantId = tenantId;
-      image.url = fileUrl;
+      image.url = this.s3Service.cleanUrl(fileUrl);
       image.description = description || 'Imagen arrastrada de internet';
 
       return imageRepo.save(image);
@@ -151,3 +151,4 @@ export class MediaController {
     }
   }
 }
+

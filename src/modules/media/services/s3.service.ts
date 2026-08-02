@@ -66,20 +66,28 @@ export class S3Service {
     return { uploadUrl, fileUrl };
   }
 
-  async deleteFile(fileUrl: string): Promise<void> {
+  async deleteFile(fileUrlOrKey: string): Promise<void> {
     try {
-      this.logger.log(`Attempting to delete S3/R2 asset at URL: ${fileUrl}`);
-      const urlObj = new URL(fileUrl);
-      let key = urlObj.pathname;
+      this.logger.log(`Attempting to delete S3/R2 asset: ${fileUrlOrKey}`);
+      let key = fileUrlOrKey;
 
-      if (key.startsWith('/')) {
-        key = key.substring(1);
-      }
+      if (fileUrlOrKey.startsWith('http://') || fileUrlOrKey.startsWith('https://')) {
+        const urlObj = new URL(fileUrlOrKey);
+        key = urlObj.pathname;
 
-      // If URL contains the bucket name (path-style endpoint usage), strip it
-      const bucketName = this.bucketName;
-      if (key.startsWith(`${bucketName}/`)) {
-        key = key.substring(bucketName.length + 1);
+        if (key.startsWith('/')) {
+          key = key.substring(1);
+        }
+
+        // If URL contains the bucket name (path-style endpoint usage), strip it
+        const bucketName = this.bucketName;
+        if (key.startsWith(`${bucketName}/`)) {
+          key = key.substring(bucketName.length + 1);
+        }
+      } else {
+        if (key.startsWith('/')) {
+          key = key.substring(1);
+        }
       }
 
       this.logger.log(`Resolved S3/R2 object Key to delete: ${key}`);
@@ -92,10 +100,11 @@ export class S3Service {
       await this.s3Client.send(command);
       this.logger.log(`Successfully deleted S3/R2 asset for Key: ${key}`);
     } catch (error) {
-      this.logger.error(`Failed to delete S3/R2 asset at ${fileUrl}:`, error);
+      this.logger.error(`Failed to delete S3/R2 asset for ${fileUrlOrKey}:`, error);
       throw error;
     }
   }
+
 
   async uploadFileBuffer(
     tenantId: string,
@@ -131,4 +140,36 @@ export class S3Service {
 
     return fileUrl;
   }
+
+  cleanUrl(url: string): string {
+    if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
+      try {
+        const urlObj = new URL(url);
+        let key = urlObj.pathname;
+        if (key.startsWith('/')) {
+          key = key.substring(1);
+        }
+        // If URL contains the bucket name (path-style endpoint usage), strip it
+        const bucketName = this.bucketName;
+        if (key.startsWith(`${bucketName}/`)) {
+          key = key.substring(bucketName.length + 1);
+        }
+        return key;
+      } catch (e) {
+        // Fallback if URL parsing fails
+      }
+    }
+    return url;
+  }
+
+  getFullUrl(key: string): string {
+    if (!key) return key;
+    const publicUrl = this.configService.get<string>('AWS_S3_PUBLIC_URL') || '';
+    const cleanPublicUrl = publicUrl.endsWith('/') ? publicUrl.slice(0, -1) : publicUrl;
+    const cleanPath = key.startsWith('/') ? key.slice(1) : key;
+    return `${cleanPublicUrl}/${cleanPath}`;
+  }
 }
+
+
+

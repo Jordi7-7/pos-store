@@ -2,8 +2,9 @@ import { Controller, Post, Get, Put, Delete, Body, Param, Query } from '@nestjs/
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
 import { EntityManager } from 'typeorm';
 import { Attribute } from '../../domain/entities/attribute.entity';
-import { CreateProductDto } from '../../application/commands/create-product/create-product.dto';
+import { CreateProductDto, ProductVariantDto } from '../../application/commands/create-product/create-product.dto';
 import { CreateProductCommand } from '../../application/commands/create-product/create-product.command';
+import { CreateVariantCommand } from '../../application/commands/create-variant/create-variant.command';
 import { CreateAttributeDto } from '../../application/commands/create-attribute/create-attribute.dto';
 import { CreateAttributeCommand } from '../../application/commands/create-attribute/create-attribute.command';
 import { CreateAttributeValueDto } from '../../application/commands/create-attribute-value/create-attribute-value.dto';
@@ -34,6 +35,17 @@ export class ProductsController {
   ) {
     return this.commandBus.execute(
       new CreateProductCommand(tenantId, dto.name, dto.description, dto.variants, dto.imageIds, dto.categoryId),
+    );
+  }
+
+  @Post(':productId/variants')
+  async createVariant(
+    @CurrentUser('tenantId') tenantId: string,
+    @Param('productId') productId: string,
+    @Body() dto: ProductVariantDto,
+  ) {
+    return this.commandBus.execute(
+      new CreateVariantCommand(tenantId, productId, dto),
     );
   }
 
@@ -100,6 +112,27 @@ export class ProductsController {
     );
   }
 
+  @Get('inventory-movements')
+  async getMovements(
+    @CurrentUser('tenantId') tenantId: string,
+    @Query('variantId') variantId?: string,
+  ) {
+    const repo = this.entityManager.getRepository(InventoryMovement);
+    const where: any = { tenantId };
+    if (variantId) {
+      where.variantId = variantId;
+    }
+    return repo.find({
+      where,
+      relations: {
+        variant: { product: true },
+        originBranch: true,
+        destinationBranch: true,
+      },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
   @Get(':id')
   async findOne(
     @CurrentUser('tenantId') tenantId: string,
@@ -126,25 +159,5 @@ export class ProductsController {
   ) {
     return this.commandBus.execute(new DeleteProductCommand(tenantId, id));
   }
-
-  @Get('inventory-movements')
-  async getMovements(
-    @CurrentUser('tenantId') tenantId: string,
-    @Query('variantId') variantId?: string,
-  ) {
-    const repo = this.entityManager.getRepository(InventoryMovement);
-    const where: any = { tenantId };
-    if (variantId) {
-      where.variantId = variantId;
-    }
-    return repo.find({
-      where,
-      relations: {
-        variant: { product: true },
-        originBranch: true,
-        destinationBranch: true,
-      },
-      order: { createdAt: 'DESC' },
-    });
-  }
 }
+

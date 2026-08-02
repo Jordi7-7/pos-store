@@ -1,4 +1,4 @@
-import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, Column, ManyToOne, JoinColumn, AfterLoad } from 'typeorm';
 import { BaseEntity } from '../../../../common/database/base.entity';
 import { Tenant } from '../../../tenants/domain/entities/tenant.entity';
 
@@ -16,4 +16,13 @@ export class ProductImage extends BaseEntity {
 
   @Column({ nullable: true })
   description?: string;
+
+  @AfterLoad()
+  updateUrl() {
+    if (this.url) {
+      this.url = `${process.env.AWS_S3_PUBLIC_URL}/${this.url}`;
+    }
+  }
 }
+
+

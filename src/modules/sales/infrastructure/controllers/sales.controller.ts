@@ -14,6 +14,7 @@ import { ProcessRefundCommand } from '../../application/commands/process-refund/
 import { GetSalesQuery } from '../../application/queries/get-sales/get-sales.query';
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
 import { CashSession } from '../../domain/entities/cash-session.entity';
+import { Expense } from '../../domain/entities/expense.entity';
 
 @Controller('sales')
 export class SalesController {
@@ -106,6 +107,25 @@ export class SalesController {
         dto.cashSessionId,
       ),
     );
+  }
+
+  @Get('expenses')
+  async findExpenses(
+    @CurrentUser('tenantId') tenantId: string,
+    @Query('cashSessionId') cashSessionId?: string,
+    @Query('branchId') branchId?: string,
+  ) {
+    const whereClause: any = { tenantId };
+    if (cashSessionId) {
+      whereClause.cashSessionId = cashSessionId;
+    }
+    if (branchId) {
+      whereClause.branchId = branchId;
+    }
+    return this.entityManager.getRepository(Expense).find({
+      where: whereClause,
+      order: { createdAt: 'DESC' },
+    });
   }
 
   @Post('refunds')

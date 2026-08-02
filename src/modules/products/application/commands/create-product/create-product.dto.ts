@@ -64,7 +64,8 @@ export class CreateProductDto {
   imageIds?: string[];
 
   @IsArray()
+  @IsOptional()
   @ValidateNested({ each: true })
   @Type(() => ProductVariantDto)
-  variants: ProductVariantDto[];
+  variants?: ProductVariantDto[];
 }

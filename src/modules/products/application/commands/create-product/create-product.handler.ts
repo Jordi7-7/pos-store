@@ -9,6 +9,7 @@ import { ProductStock } from '../../../domain/entities/product-stock.entity';
 import { ProductImage } from '../../../domain/entities/product-image.entity';
 import { Category } from '../../../domain/entities/category.entity';
 import { ProductBatch } from '../../../domain/entities/product-batch.entity';
+import { InventoryMovement } from '../../../domain/entities/inventory-movement.entity';
 
 @CommandHandler(CreateProductCommand)
 export class CreateProductHandler implements ICommandHandler<CreateProductCommand> {
@@ -17,7 +18,8 @@ export class CreateProductHandler implements ICommandHandler<CreateProductComman
   constructor(private readonly entityManager: EntityManager) {}
 
   async execute(command: CreateProductCommand): Promise<Product> {
-    const { tenantId, name, description, variants, imageIds, categoryId } = command;
+    const { tenantId, name, description, imageIds, categoryId } = command;
+    const variants = command.variants || [];
     this.logger.log(`Creating product: ${name} with ${variants.length} variant(s) for Tenant: ${tenantId}`);
 
     // Validate no duplicate attribute combinations in input variants
@@ -132,8 +134,11 @@ export class CreateProductHandler implements ICommandHandler<CreateProductComman
 
       const savedProduct = await productRepo.save(product);
 
-      // Guardar lotes iniciales si hay existencias iniciales
+      // Guardar lotes iniciales e historial de movimientos si hay existencias iniciales
       const batchesToSave: ProductBatch[] = [];
+      const movementsToSave: InventoryMovement[] = [];
+      const movementRepo = transactionalManager.getRepository(InventoryMovement);
+
       for (const variant of savedProduct.variants) {
         if (variant.stocks && variant.stocks.length > 0) {
           for (const stock of variant.stocks) {
@@ -147,12 +152,26 @@ export class CreateProductHandler implements ICommandHandler<CreateProductComman
               batch.remainingQuantity = Number(stock.quantity);
               batch.unitCost = Number(variant.purchasePrice);
               batchesToSave.push(batch);
+
+              const movement = new InventoryMovement();
+              movement.tenantId = tenantId;
+              movement.originBranchId = null;
+              movement.destinationBranchId = stock.branchId;
+              movement.variantId = variant.id;
+              movement.purchaseOrderId = null;
+              movement.quantity = Number(stock.quantity);
+              movement.type = 'INPUT';
+              movement.reason = 'INITIAL_STOCK';
+              movementsToSave.push(movement);
             }
           }
         }
       }
       if (batchesToSave.length > 0) {
         await batchRepo.save(batchesToSave);
+      }
+      if (movementsToSave.length > 0) {
+        await movementRepo.save(movementsToSave);
       }
 
       this.logger.log(`Product created successfully: ${savedProduct.name} (ID: ${savedProduct.id})`);
