@@ -107,6 +107,7 @@ export class UpdateProductHandler implements ICommandHandler<UpdateProductComman
         if (!variant) {
           variant = new ProductVariant();
           variant.product = product;
+          variant.tenantId = tenantId;
           variant.stocks = [];
         }
 
