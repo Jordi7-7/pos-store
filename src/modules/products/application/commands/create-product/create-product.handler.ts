@@ -85,8 +85,8 @@ export class CreateProductHandler implements ICommandHandler<CreateProductComman
         variant.barcode = variantDto.barcode;
         variant.purchasePrice = variantDto.purchasePrice;
         variant.salePrice = variantDto.salePrice;
-        variant.imageUrl = null; // Deprecated, using images relation instead
         variant.tenantId = tenantId;
+
 
 
         // Link variant images

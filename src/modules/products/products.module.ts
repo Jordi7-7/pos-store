@@ -10,6 +10,8 @@ import { InventoryMovement } from './domain/entities/inventory-movement.entity';
 import { ProductImage } from './domain/entities/product-image.entity';
 import { Category } from './domain/entities/category.entity';
 import { CreateProductHandler } from './application/commands/create-product/create-product.handler';
+import { CreateSimpleProductHandler } from './application/commands/create-simple-product/create-simple-product.handler';
+import { CreateVariableProductHandler } from './application/commands/create-variable-product/create-variable-product.handler';
 import { CreateAttributeHandler } from './application/commands/create-attribute/create-attribute.handler';
 import { CreateAttributeValueHandler } from './application/commands/create-attribute-value/create-attribute-value.handler';
 import { CreateCategoryHandler } from './application/commands/create-category/create-category.handler';
@@ -38,6 +40,8 @@ import { ProductsController } from './infrastructure/controllers/products.contro
   controllers: [ProductsController],
   providers: [
     CreateProductHandler,
+    CreateSimpleProductHandler,
+    CreateVariableProductHandler,
     CreateAttributeHandler,
     CreateAttributeValueHandler,
     CreateCategoryHandler,
@@ -50,3 +54,4 @@ import { ProductsController } from './infrastructure/controllers/products.contro
   ],
 })
 export class ProductsModule {}
+

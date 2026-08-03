@@ -2,8 +2,10 @@ import { Controller, Post, Get, Put, Delete, Body, Param, Query } from '@nestjs/
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
 import { EntityManager } from 'typeorm';
 import { Attribute } from '../../domain/entities/attribute.entity';
-import { CreateProductDto, ProductVariantDto } from '../../application/commands/create-product/create-product.dto';
+import { CreateVariableProductDto, ProductVariantDto, CreateSimpleProductDto } from '../../application/commands/create-product/create-product.dto';
 import { CreateProductCommand } from '../../application/commands/create-product/create-product.command';
+import { CreateSimpleProductCommand } from '../../application/commands/create-simple-product/create-simple-product.command';
+import { CreateVariableProductCommand } from '../../application/commands/create-variable-product/create-variable-product.command';
 import { CreateVariantCommand } from '../../application/commands/create-variant/create-variant.command';
 import { CreateAttributeDto } from '../../application/commands/create-attribute/create-attribute.dto';
 import { CreateAttributeCommand } from '../../application/commands/create-attribute/create-attribute.command';
@@ -31,12 +33,52 @@ export class ProductsController {
   @Post()
   async create(
     @CurrentUser('tenantId') tenantId: string,
-    @Body() dto: CreateProductDto,
+    @Body() dto: CreateVariableProductDto,
   ) {
     return this.commandBus.execute(
       new CreateProductCommand(tenantId, dto.name, dto.description, dto.variants, dto.imageIds, dto.categoryId),
     );
   }
+
+  @Post('simple')
+  async createSimple(
+    @CurrentUser('tenantId') tenantId: string,
+    @Body() dto: CreateSimpleProductDto,
+  ) {
+    return this.commandBus.execute(
+      new CreateSimpleProductCommand(
+        tenantId,
+        dto.name,
+        dto.description,
+        dto.sku,
+        dto.barcode || '',
+        dto.purchasePrice,
+        dto.salePrice,
+        dto.categoryId,
+        dto.imageIds,
+        dto.stocks,
+      ),
+    );
+  }
+
+  @Post('variable')
+  async createVariable(
+    @CurrentUser('tenantId') tenantId: string,
+    @Body() dto: CreateVariableProductDto,
+  ) {
+    return this.commandBus.execute(
+      new CreateVariableProductCommand(
+        tenantId,
+        dto.name,
+        dto.description,
+        dto.variants,
+        dto.imageIds,
+        dto.categoryId,
+      ),
+    );
+  }
+
+
 
   @Post(':productId/variants')
   async createVariant(

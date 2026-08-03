@@ -48,9 +48,6 @@ export class ProductVariant extends BaseEntity {
   })
   salePrice: number;
 
-  @Column({ name: 'image_url', type: 'varchar', nullable: true })
-  imageUrl: string | null;
-
   @ManyToMany(() => AttributeValue)
   @JoinTable({
     name: 'variant_attribute_values',

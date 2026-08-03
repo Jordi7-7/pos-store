@@ -46,7 +46,7 @@ export class ProductVariantDto {
   stocks?: ProductVariantStockDto[];
 }
 
-export class CreateProductDto {
+export class CreateVariableProductDto {
   @IsString()
   @IsNotEmpty()
   name: string;
@@ -64,8 +64,48 @@ export class CreateProductDto {
   imageIds?: string[];
 
   @IsArray()
-  @IsOptional()
+  @IsNotEmpty()
   @ValidateNested({ each: true })
   @Type(() => ProductVariantDto)
-  variants?: ProductVariantDto[];
+  variants: ProductVariantDto[];
 }
+
+
+export class CreateSimpleProductDto {
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @IsString()
+  description: string;
+
+  @IsString()
+  @IsNotEmpty()
+  sku: string;
+
+  @IsString()
+  @IsOptional()
+  barcode?: string;
+
+  @IsNumber()
+  purchasePrice: number;
+
+  @IsNumber()
+  salePrice: number;
+
+  @IsUUID()
+  @IsOptional()
+  categoryId?: string;
+
+  @IsArray()
+  @IsUUID(4, { each: true })
+  @IsOptional()
+  imageIds?: string[];
+
+  @IsArray()
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => ProductVariantStockDto)
+  stocks?: ProductVariantStockDto[];
+}
+

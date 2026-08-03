@@ -67,8 +67,8 @@ export class CreateVariantHandler implements ICommandHandler<CreateVariantComman
       variant.barcode = variantDto.barcode || '';
       variant.purchasePrice = Number(variantDto.purchasePrice) || 0;
       variant.salePrice = Number(variantDto.salePrice) || 0;
-      variant.imageUrl = null;
       variant.tenantId = tenantId;
+
 
 
       // Link variant images
