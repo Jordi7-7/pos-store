@@ -33,12 +33,29 @@ export class RegisterPurchaseHandler implements ICommandHandler<RegisterPurchase
       const purchaseOrderItemRepo = transactionalManager.getRepository(PurchaseOrderItem);
 
       // 2. Resolve Supplier
-      const supplier = await supplierRepo.findOne({
-        where: { id: supplierId, tenantId },
-      });
-      if (!supplier) {
-        this.logger.warn(`Purchase failed: Supplier ID ${supplierId} not found under Tenant ${tenantId}`);
-        throw new NotFoundException(`Supplier with ID ${supplierId} not found`);
+      let supplier: Supplier | null = null;
+      if (supplierId) {
+        supplier = await supplierRepo.findOne({
+          where: { id: supplierId, tenantId },
+        });
+        if (!supplier) {
+          this.logger.warn(`Purchase failed: Supplier ID ${supplierId} not found under Tenant ${tenantId}`);
+          throw new NotFoundException(`Supplier with ID ${supplierId} not found`);
+        }
+      } else {
+        supplier = await supplierRepo.findOne({
+          where: { identityNumber: 'GENERICO', tenantId },
+        });
+        if (!supplier) {
+          // fallback to any supplier for tenant if generic one is missing
+          supplier = await supplierRepo.findOne({
+            where: { tenantId },
+          });
+        }
+        if (!supplier) {
+          this.logger.warn(`Purchase failed: No supplier found or provided under Tenant ${tenantId}`);
+          throw new NotFoundException(`Supplier not found`);
+        }
       }
 
       // 3. Validate Branch belongs to Tenant
@@ -59,7 +76,7 @@ export class RegisterPurchaseHandler implements ICommandHandler<RegisterPurchase
       // 5. Create Purchase Order (Stock Input)
       const purchaseOrder = new PurchaseOrder();
       purchaseOrder.tenantId = tenantId;
-      purchaseOrder.supplierId = supplierId;
+      purchaseOrder.supplierId = supplier.id;
       purchaseOrder.branchId = branchId;
       purchaseOrder.invoiceNumber = invoiceNumber || null;
       purchaseOrder.totalAmount = totalAmount;
