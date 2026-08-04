@@ -32,7 +32,7 @@ export class RegisterPurchaseHandler implements ICommandHandler<RegisterPurchase
       const batchRepo = transactionalManager.getRepository(ProductBatch);
       const purchaseOrderItemRepo = transactionalManager.getRepository(PurchaseOrderItem);
 
-      // 2. Validate Supplier belongs to Tenant
+      // 2. Resolve Supplier
       const supplier = await supplierRepo.findOne({
         where: { id: supplierId, tenantId },
       });
@@ -56,7 +56,7 @@ export class RegisterPurchaseHandler implements ICommandHandler<RegisterPurchase
         totalAmount += itemDto.quantity * itemDto.purchasePrice;
       }
 
-      // 5. Create Purchase Order
+      // 5. Create Purchase Order (Stock Input)
       const purchaseOrder = new PurchaseOrder();
       purchaseOrder.tenantId = tenantId;
       purchaseOrder.supplierId = supplierId;

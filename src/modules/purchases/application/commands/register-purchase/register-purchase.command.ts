@@ -3,7 +3,7 @@ export class RegisterPurchaseCommand {
     public readonly tenantId: string,
     public readonly supplierId: string,
     public readonly branchId: string,
-    public readonly invoiceNumber: string | undefined,
+    public readonly invoiceNumber: string | null,
     public readonly items: any[],
   ) {}
 }

@@ -7,6 +7,8 @@ import { User } from '../../../../users/domain/entities/user.entity';
 import { Branch } from '../../../../branches/domain/entities/branch.entity';
 import { UserRole } from '../../../../users/enums/user-role.enum';
 import { HashService } from '../../../services/hash.service';
+import { Supplier } from '../../../../purchases/domain/entities/supplier.entity';
+import { Customer } from '../../../../customers/domain/entities/customer.entity';
 
 @CommandHandler(OnboardTenantCommand)
 export class OnboardTenantHandler implements ICommandHandler<OnboardTenantCommand> {
@@ -74,6 +76,25 @@ export class OnboardTenantHandler implements ICommandHandler<OnboardTenantComman
       user.password = hashedPassword;
       user.role = UserRole.OWNER;
       const savedUser = await transactionalManager.save(user);
+
+      // D. Create Default Supplier
+      const supplier = new Supplier();
+      supplier.tenantId = savedTenant.id;
+      supplier.identityNumber = 'GENERICO';
+      supplier.name = 'PROVEEDOR GENERICO';
+      supplier.email = null;
+      supplier.phone = null;
+      supplier.address = null;
+      await transactionalManager.save(supplier);
+
+      // E. Create Default Customer (Consumidor Final)
+      const customer = new Customer();
+      customer.tenantId = savedTenant.id;
+      customer.identityNumber = '9999999999999';
+      customer.name = 'CONSUMIDOR FINAL';
+      customer.email = 'consumidorfinal@example.com';
+      customer.phone = '9999999999';
+      await transactionalManager.save(customer);
 
       this.logger.log(`Onboarding successful. Created Tenant: ${savedTenant.name} (ID: ${savedTenant.id}), User OWNER: ${savedUser.email}`);
 

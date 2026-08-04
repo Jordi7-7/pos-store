@@ -49,7 +49,7 @@ export class PurchasesController {
         tenantId,
         dto.supplierId,
         dto.branchId,
-        dto.invoiceNumber,
+        dto.invoiceNumber || null,
         dto.items,
       ),
     );

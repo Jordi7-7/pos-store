@@ -74,7 +74,7 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
           throw new NotFoundException(`Product Variant with ID ${itemDto.variantId} not found`);
         }
 
-        const stock = await stockRepo.findOne({
+        let stock = await stockRepo.findOne({
           where: {
             branchId: branchId,
             variantId: itemDto.variantId,
@@ -84,15 +84,14 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
           lock: { mode: 'pessimistic_write' },
         });
 
-        if (!stock || Number(stock.quantity) < itemDto.quantity) {
-          const available = stock ? stock.quantity : 0;
-          this.logger.warn(`Sale failed: Insufficient stock for variant ${variant.sku}. Available: ${available}, Required: ${itemDto.quantity}`);
-          throw new BadRequestException(
-            `Insufficient stock for variant ${variant.sku}. Available: ${available}, Required: ${itemDto.quantity}`,
-          );
+        if (!stock) {
+          stock = new ProductStock();
+          stock.branchId = branchId;
+          stock.variantId = itemDto.variantId;
+          stock.quantity = 0;
         }
 
-        // Subtract stock
+        // Subtract stock (can become negative)
         stock.quantity = Number(stock.quantity) - itemDto.quantity;
         await stockRepo.save(stock);
 
