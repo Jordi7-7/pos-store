@@ -19,7 +19,17 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
   constructor(private readonly entityManager: EntityManager) {}
 
   async execute(command: ProcessSaleCommand): Promise<Sale> {
-    const { tenantId, branchId, cashSessionId, customerId, items, payments } = command;
+    const { 
+      tenantId, 
+      branchId, 
+      cashSessionId, 
+      customerId, 
+      items, 
+      payments, 
+      discountType, 
+      discountRate, 
+      discountAmount 
+    } = command;
     this.logger.log(`Processing sale for Tenant: ${tenantId}, Branch: ${branchId}, Cash Session: ${cashSessionId}`);
     return this.entityManager.transaction(async (transactionalManager) => {
       // 1. Grouped Repository Initialization (Pattern 3)
@@ -133,9 +143,12 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
         saleItem.quantity = itemDto.quantity;
         saleItem.price = itemDto.price;
         saleItem.cost = averageUnitCost;
+        saleItem.discountType = itemDto.discountType || null;
+        saleItem.discountRate = itemDto.discountRate !== undefined ? Number(itemDto.discountRate) : null;
+        saleItem.discountAmount = itemDto.discountAmount !== undefined ? Number(itemDto.discountAmount) : 0;
         saleItemsToSave.push(saleItem);
 
-        subtotal += itemDto.price * itemDto.quantity;
+        subtotal += (itemDto.price - (itemDto.discountAmount || 0)) * itemDto.quantity;
 
         // Build inventory movement (Kardex)
         const movement = new InventoryMovement();
@@ -149,7 +162,7 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
         inventoryMovements.push(movement);
       }
 
-      const total = subtotal;
+      const total = Number((subtotal - (discountAmount || 0)).toFixed(2));
 
       // 5. Create and save Sale
       const sale = new Sale();
@@ -157,8 +170,11 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
       sale.branchId = branchId;
       sale.cashSessionId = cashSessionId;
       sale.customerId = customerId || null;
-      sale.subtotal = subtotal;
+      sale.subtotal = Number(subtotal.toFixed(2));
       sale.total = total;
+      sale.discountType = discountType || null;
+      sale.discountRate = discountRate !== undefined ? Number(discountRate) : null;
+      sale.discountAmount = discountAmount !== undefined ? Number(discountAmount) : 0;
       sale.items = saleItemsToSave;
 
       // 6. Create Payments

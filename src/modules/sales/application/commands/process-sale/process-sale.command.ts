@@ -8,5 +8,8 @@ export class ProcessSaleCommand {
     public readonly customerId: string | undefined,
     public readonly items: any[],
     public readonly payments: any[],
+    public readonly discountType?: string,
+    public readonly discountRate?: number,
+    public readonly discountAmount?: number,
   ) {}
 }

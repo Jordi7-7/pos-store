@@ -43,4 +43,27 @@ export class SaleItem extends BaseEntity {
     transformer: new ColumnNumericTransformer(),
   })
   cost: number;
+
+  @Column({ name: 'discount_type', type: 'varchar', nullable: true })
+  discountType: string | null;
+
+  @Column({
+    name: 'discount_rate',
+    type: 'numeric',
+    precision: 10,
+    scale: 2,
+    nullable: true,
+    transformer: new ColumnNumericTransformer(),
+  })
+  discountRate: number | null;
+
+  @Column({
+    name: 'discount_amount',
+    type: 'numeric',
+    precision: 10,
+    scale: 2,
+    default: 0,
+    transformer: new ColumnNumericTransformer(),
+  })
+  discountAmount: number;
 }

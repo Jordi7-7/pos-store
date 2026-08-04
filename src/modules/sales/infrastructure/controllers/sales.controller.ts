@@ -52,6 +52,9 @@ export class SalesController {
         dto.customerId,
         dto.items,
         dto.payments,
+        dto.discountType,
+        dto.discountRate,
+        dto.discountAmount,
       ),
     );
   }

@@ -11,6 +11,18 @@ export class SaleItemDto {
 
   @IsNumber()
   price: number;
+
+  @IsString()
+  @IsOptional()
+  discountType?: string;
+
+  @IsNumber()
+  @IsOptional()
+  discountRate?: number;
+
+  @IsNumber()
+  @IsOptional()
+  discountAmount?: number;
 }
 
 export class SalePaymentDto {
@@ -35,6 +47,18 @@ export class ProcessSaleDto {
   @IsUUID()
   @IsOptional()
   customerId?: string;
+
+  @IsString()
+  @IsOptional()
+  discountType?: string;
+
+  @IsNumber()
+  @IsOptional()
+  discountRate?: number;
+
+  @IsNumber()
+  @IsOptional()
+  discountAmount?: number;
 
   @IsArray()
   @ValidateNested({ each: true })

@@ -5,9 +5,7 @@ import { ColumnNumericTransformer } from '../../../../common/database/numeric-tr
 
 export enum PaymentMethod {
   EFECTIVO = 'EFECTIVO',
-  TRANSFERENCIA = 'TRANSFERENCIA',
   TARJETA = 'TARJETA',
-  BILLETERA_DIGITAL = 'BILLETERA_DIGITAL',
 }
 
 @Entity('sale_payments')
