@@ -145,7 +145,26 @@ export class ProcessRefundHandler implements ICommandHandler<ProcessRefundComman
       const savedRefund = await refundRepo.save(refund);
       await inventoryRepo.save(inventoryMovements);
 
-      this.logger.log(`Refund processed successfully: ID ${savedRefund.id}, Total Refunded: $${savedRefund.totalRefunded}`);
+      // 7. Update Sale status based on total refunded quantities across ALL refunds for this sale
+      const allRefunds = await refundRepo.find({
+        where: { saleId },
+        relations: { items: true },
+      });
+      // Accumulate total refunded quantity per variant
+      const totalRefundedQtyByVariant: Record<string, number> = {};
+      for (const r of allRefunds) {
+        for (const ri of r.items) {
+          totalRefundedQtyByVariant[ri.variantId] = (totalRefundedQtyByVariant[ri.variantId] || 0) + Number(ri.quantity);
+        }
+      }
+      // Compare against sold quantities: full refund if every sold item is fully returned
+      const isFullRefund = sale.items.every((si) =>
+        Number(totalRefundedQtyByVariant[si.variantId] || 0) >= Number(si.quantity)
+      );
+      sale.status = isFullRefund ? 'REFUNDED' : 'PARTIALLY_REFUNDED';
+      await saleRepo.save(sale);
+
+      this.logger.log(`Refund processed successfully: ID ${savedRefund.id}, Total Refunded: $${savedRefund.totalRefunded}. Sale ${saleId} status updated to: ${sale.status}`);
 
       return savedRefund;
     });

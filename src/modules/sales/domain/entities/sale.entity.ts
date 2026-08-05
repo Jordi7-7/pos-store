@@ -77,6 +77,9 @@ export class Sale extends BaseEntity {
   })
   discountAmount: number;
 
+  @Column({ type: 'varchar', default: 'COMPLETED' })
+  status: string;
+
   @OneToMany(() => SaleItem, (item) => item.sale, { cascade: true })
   items: SaleItem[];
 

@@ -175,6 +175,7 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
       sale.discountType = discountType || null;
       sale.discountRate = discountRate !== undefined ? Number(discountRate) : null;
       sale.discountAmount = discountAmount !== undefined ? Number(discountAmount) : 0;
+      sale.status = 'COMPLETED';
       sale.items = saleItemsToSave;
 
       // 6. Create Payments

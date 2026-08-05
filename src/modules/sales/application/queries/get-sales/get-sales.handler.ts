@@ -13,7 +13,11 @@ export class GetSalesHandler implements IQueryHandler<GetSalesQuery> {
     return saleRepo.find({
       where: { tenantId },
       relations: {
-        items: true,
+        items: {
+          variant: {
+            product: true,
+          },
+        },
         payments: true,
       },
       order: { createdAt: 'DESC' },
