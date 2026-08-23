@@ -7,6 +7,7 @@ import { OnboardTenantHandler } from './application/commands/onboard/onboard-ten
 import { LoginHandler } from './application/commands/login/login.handler';
 import { RefreshTokenHandler } from './application/commands/refresh/refresh-token.handler';
 import { LogoutHandler } from './application/commands/logout/logout.handler';
+import { PinLoginHandler } from './application/commands/pin-login/pin-login.handler';
 import { HashService } from './services/hash.service';
 
 @Module({
@@ -28,6 +29,7 @@ import { HashService } from './services/hash.service';
     LoginHandler,
     RefreshTokenHandler,
     LogoutHandler,
+    PinLoginHandler,
   ],
   exports: [HashService, JwtModule],
 })

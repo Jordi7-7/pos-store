@@ -22,4 +22,10 @@ export class User extends BaseEntity {
 
   @Column()
   role: string;
+
+  @Column({ nullable: true, select: false })
+  pin?: string;
+
+  @Column({ name: 'pin_enabled', default: false })
+  pinEnabled: boolean;
 }

@@ -69,12 +69,15 @@ export class OnboardTenantHandler implements ICommandHandler<OnboardTenantComman
 
       // C. Hash Admin Password & Create User
       const hashedPassword = await this.hashService.hash(password);
+      const defaultPinHash = await this.hashService.hash('000000');
       const user = new User();
       user.tenantId = savedTenant.id;
       user.name = adminName;
       user.email = email;
       user.password = hashedPassword;
       user.role = UserRole.OWNER;
+      user.pin = defaultPinHash;
+      user.pinEnabled = true;
       const savedUser = await transactionalManager.save(user);
 
       // D. Create Default Supplier

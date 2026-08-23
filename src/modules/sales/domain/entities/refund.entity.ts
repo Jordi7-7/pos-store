@@ -4,6 +4,7 @@ import { Tenant } from '../../../tenants/domain/entities/tenant.entity';
 import { Branch } from '../../../branches/domain/entities/branch.entity';
 import { Sale } from './sale.entity';
 import { CashSession } from './cash-session.entity';
+import { User } from '../../../users/domain/entities/user.entity';
 import { ColumnNumericTransformer } from '../../../../common/database/numeric-transformer';
 import { RefundItem } from './refund-item.entity';
 
@@ -48,6 +49,13 @@ export class Refund extends BaseEntity {
 
   @Column()
   reason: string;
+
+  @Column({ name: 'user_id', type: 'uuid', nullable: true })
+  userId: string | null;
+
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'user_id' })
+  user: User | null;
 
   @OneToMany(() => RefundItem, (item) => item.refund, { cascade: true })
   items: RefundItem[];

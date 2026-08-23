@@ -7,6 +7,7 @@ import { LoginCommand } from '../../application/commands/login/login.command';
 import { RefreshTokenDto } from '../../application/commands/refresh/refresh-token.dto';
 import { RefreshTokenCommand } from '../../application/commands/refresh/refresh-token.command';
 import { LogoutCommand } from '../../application/commands/logout/logout.command';
+import { PinLoginCommand } from '../../application/commands/pin-login/pin-login.command';
 import { Public } from '../../decorators/public.decorator';
 import { CurrentUser } from '../../decorators/current-user.decorator';
 
@@ -52,5 +53,15 @@ export class AuthController {
   async logout(@CurrentUser('sub') userId: string) {
     await this.commandBus.execute(new LogoutCommand(userId));
     return { message: 'Logged out successfully' };
+  }
+
+  // Authenticated with admin JWT — tenant is extracted from it
+  @Post('pin-login')
+  @HttpCode(HttpStatus.OK)
+  async pinLogin(
+    @CurrentUser('tenantId') tenantId: string,
+    @Body() body: { pin: string },
+  ) {
+    return this.commandBus.execute(new PinLoginCommand(tenantId, body.pin));
   }
 }

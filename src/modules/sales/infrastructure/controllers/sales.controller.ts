@@ -43,11 +43,13 @@ export class SalesController {
   @Post()
   async process(
     @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser('sub') userId: string,
     @Body() dto: ProcessSaleDto,
   ) {
     return this.commandBus.execute(
       new ProcessSaleCommand(
         tenantId,
+        userId,
         dto.branchId,
         dto.cashSessionId,
         dto.customerId,
@@ -135,11 +137,13 @@ export class SalesController {
   @Post('refunds')
   async processRefund(
     @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser('sub') userId: string,
     @Body() dto: ProcessRefundDto,
   ) {
     return this.commandBus.execute(
       new ProcessRefundCommand(
         tenantId,
+        userId,
         dto.branchId,
         dto.saleId,
         dto.cashSessionId,

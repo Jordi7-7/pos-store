@@ -1,6 +1,7 @@
 export class ProcessRefundCommand {
   constructor(
     public readonly tenantId: string,
+    public readonly userId: string | null,
     public readonly branchId: string,
     public readonly saleId: string,
     public readonly cashSessionId: string,

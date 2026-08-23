@@ -4,6 +4,7 @@ import { Tenant } from '../../../tenants/domain/entities/tenant.entity';
 import { Branch } from '../../../branches/domain/entities/branch.entity';
 import { CashSession } from './cash-session.entity';
 import { Customer } from '../../../customers/domain/entities/customer.entity';
+import { User } from '../../../users/domain/entities/user.entity';
 import { ColumnNumericTransformer } from '../../../../common/database/numeric-transformer';
 import { SaleItem } from './sale-item.entity';
 import { SalePayment } from './sale-payment.entity';
@@ -79,6 +80,13 @@ export class Sale extends BaseEntity {
 
   @Column({ type: 'varchar', default: 'COMPLETED' })
   status: string;
+
+  @Column({ name: 'user_id', type: 'uuid', nullable: true })
+  userId: string | null;
+
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'user_id' })
+  user: User | null;
 
   @OneToMany(() => SaleItem, (item) => item.sale, { cascade: true })
   items: SaleItem[];

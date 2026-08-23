@@ -20,7 +20,8 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
 
   async execute(command: ProcessSaleCommand): Promise<Sale> {
     const { 
-      tenantId, 
+      tenantId,
+      userId,
       branchId, 
       cashSessionId, 
       customerId, 
@@ -176,6 +177,7 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
       sale.discountRate = discountRate !== undefined ? Number(discountRate) : null;
       sale.discountAmount = discountAmount !== undefined ? Number(discountAmount) : 0;
       sale.status = 'COMPLETED';
+      sale.userId = userId || null;
       sale.items = saleItemsToSave;
 
       // 6. Create Payments

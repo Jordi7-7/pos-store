@@ -18,7 +18,7 @@ export class ProcessRefundHandler implements ICommandHandler<ProcessRefundComman
   constructor(private readonly entityManager: EntityManager) {}
 
   async execute(command: ProcessRefundCommand): Promise<Refund> {
-    const { tenantId, branchId, saleId, cashSessionId, reason, items } = command;
+    const { tenantId, userId, branchId, saleId, cashSessionId, reason, items } = command;
     this.logger.log(`Processing refund for Sale ID: ${saleId} under Tenant: ${tenantId}`);
 
     return this.entityManager.transaction(async (transactionalManager) => {
@@ -140,6 +140,7 @@ export class ProcessRefundHandler implements ICommandHandler<ProcessRefundComman
       refund.cashSessionId = cashSessionId;
       refund.totalRefunded = totalRefunded;
       refund.reason = reason;
+      refund.userId = userId || null;
       refund.items = refundItemsToSave;
 
       const savedRefund = await refundRepo.save(refund);
