@@ -17,4 +17,7 @@ export class Tenant extends BaseEntity {
 
   @Column({ name: 'currency_symbol' })
   currencySymbol: string;
+
+  @Column({ default: 'America/Guayaquil' })
+  timezone: string;
 }

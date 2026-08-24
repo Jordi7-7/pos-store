@@ -2,35 +2,48 @@ import { Injectable, NestMiddleware, UnauthorizedException } from '@nestjs/commo
 import { Request, Response, NextFunction } from 'express';
 import { tenantLocalStorage } from './tenant-context';
 
+interface JwtPayload {
+  sub: string;
+  tenantId: string;
+  email: string;
+  role: string;
+  name: string;
+  timezone?: string;
+}
+
 @Injectable()
 export class TenantMiddleware implements NestMiddleware {
   use(req: Request, res: Response, next: NextFunction) {
-    let tenantId = req.headers['x-tenant-id'] as string;
-    let userId = req.headers['x-user-id'] as string;
+    let tenantId: string | undefined;
+    let userId: string | undefined;
+    let timezone = 'America/Guayaquil';
 
     const authHeader = req.headers['authorization'];
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.substring(7);
       const payload = this.decodeJwt(token);
       if (payload) {
-        tenantId = tenantId || payload.tenant_id || payload.tenantId;
-        userId = userId || payload.user_id || payload.userId || payload.sub;
+        tenantId = payload.tenantId;
+        userId = payload.sub;
+        timezone = payload.timezone || timezone;
       }
     }
 
-    // For Phase 1 backend, we want to ensure tenantId is present on operations.
-    // If it's a public route or health check, we could skip it.
-    // But we will enforce it unless it's a root/health endpoint.
-    if (!tenantId && req.path !== '/' && !req.path.startsWith('/health')) {
+    // If it's a public route or health check, skip tenant context execution entirely.
+    if (req.path === '/' || req.path.startsWith('/health')) {
+      return next();
+    }
+
+    if (!tenantId) {
       throw new UnauthorizedException('Missing tenant_id in request header or JWT');
     }
 
-    tenantLocalStorage.run({ tenantId, userId }, () => {
+    tenantLocalStorage.run({ tenantId, userId, timezone }, () => {
       next();
     });
   }
 
-  private decodeJwt(token: string): any {
+  private decodeJwt(token: string): JwtPayload | null {
     try {
       const parts = token.split('.');
       if (parts.length === 3) {

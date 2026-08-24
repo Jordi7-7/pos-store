@@ -42,9 +42,9 @@ export class CashSession extends BaseEntity {
   @Column()
   status: string;
 
-  @Column({ name: 'opened_at', type: 'timestamp' })
+  @Column({ name: 'opened_at', type: 'timestamp with time zone' })
   openedAt: Date;
 
-  @Column({ name: 'closed_at', type: 'timestamp', nullable: true })
+  @Column({ name: 'closed_at', type: 'timestamp with time zone', nullable: true })
   closedAt: Date | null;
 }

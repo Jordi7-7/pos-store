@@ -26,6 +26,7 @@ export class LoginHandler implements ICommandHandler<LoginCommand> {
     const user = await this.entityManager
       .getRepository(User)
       .createQueryBuilder('user')
+      .leftJoinAndSelect('user.tenant', 'tenant')
       .addSelect('user.password')
       .where('user.email = :email', { email })
       .getOne();
@@ -47,6 +48,7 @@ export class LoginHandler implements ICommandHandler<LoginCommand> {
       email: user.email,
       role: user.role,
       name: user.name,
+      timezone: user.tenant.timezone,
     };
 
     const accessToken = this.jwtService.sign(payload, {
@@ -77,6 +79,7 @@ export class LoginHandler implements ICommandHandler<LoginCommand> {
         email: user.email,
         role: user.role,
         tenantId: user.tenantId,
+        timezone: user.tenant.timezone,
       },
     };
   }

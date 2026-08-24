@@ -28,6 +28,7 @@ export class PinLoginHandler implements ICommandHandler<PinLoginCommand> {
     const users = await this.entityManager
       .getRepository(User)
       .createQueryBuilder('user')
+      .leftJoinAndSelect('user.tenant', 'tenant')
       .addSelect('user.pin')
       .where('user.tenantId = :tenantId', { tenantId })
       .andWhere('user.pinEnabled = true')
@@ -57,6 +58,7 @@ export class PinLoginHandler implements ICommandHandler<PinLoginCommand> {
       email: matchedUser.email,
       role: matchedUser.role,
       name: matchedUser.name,
+      timezone: matchedUser.tenant.timezone,
     };
 
     const accessToken = this.jwtService.sign(payload, {
@@ -86,6 +88,7 @@ export class PinLoginHandler implements ICommandHandler<PinLoginCommand> {
         email: matchedUser.email,
         role: matchedUser.role,
         tenantId: matchedUser.tenantId,
+        timezone: matchedUser.tenant.timezone,
       },
     };
   }
