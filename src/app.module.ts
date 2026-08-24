@@ -46,6 +46,7 @@ import { Category } from './modules/products/domain/entities/category.entity';
 import { ProductBatch } from './modules/products/domain/entities/product-batch.entity';
 import { PurchaseOrderItem } from './modules/purchases/domain/entities/purchase-order-item.entity';
 import { TenantsModule } from './modules/tenants/tenants.module';
+import { ReportsModule } from './modules/reports/reports.module';
 
 @Module({
   imports: [
@@ -95,6 +96,7 @@ import { TenantsModule } from './modules/tenants/tenants.module';
     BranchesModule,
     CustomersModule,
     TenantsModule,
+    ReportsModule,
   ],
   controllers: [AppController],
   providers: [
