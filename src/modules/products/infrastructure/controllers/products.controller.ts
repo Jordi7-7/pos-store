@@ -1,7 +1,9 @@
 import { Controller, Post, Get, Put, Delete, Body, Param, Query } from '@nestjs/common';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
-import { EntityManager } from 'typeorm';
+import { EntityManager, In } from 'typeorm';
 import { Attribute } from '../../domain/entities/attribute.entity';
+import { Tag } from '../../domain/entities/tag.entity';
+import { ProductVariant } from '../../domain/entities/product-variant.entity';
 import { CreateVariableProductDto, ProductVariantDto, CreateSimpleProductDto } from '../../application/commands/create-product/create-product.dto';
 import { CreateProductCommand } from '../../application/commands/create-product/create-product.command';
 import { CreateSimpleProductCommand } from '../../application/commands/create-simple-product/create-simple-product.command';
@@ -175,6 +177,32 @@ export class ProductsController {
     });
   }
 
+  // ── Tags ──────────────────────────────────────────────────────────────────
+
+  @Get('tags')
+  async findTags(@CurrentUser('tenantId') tenantId: string) {
+    const repo = this.entityManager.getRepository(Tag);
+    return repo.find({ where: { tenantId }, order: { name: 'ASC' } });
+  }
+
+  @Post('tags')
+  async createTag(
+    @CurrentUser('tenantId') tenantId: string,
+    @Body() body: { name: string },
+  ) {
+    const repo = this.entityManager.getRepository(Tag);
+    const name = body.name.trim();
+    // Return existing tag if one with the same name already exists for this tenant
+    const existing = await repo
+      .createQueryBuilder('tag')
+      .where('tag.tenantId = :tenantId', { tenantId })
+      .andWhere('LOWER(tag.name) = LOWER(:name)', { name })
+      .getOne();
+    if (existing) return existing;
+    const tag = repo.create({ tenantId, name });
+    return repo.save(tag);
+  }
+
   @Get(':id')
   async findOne(
     @CurrentUser('tenantId') tenantId: string,
@@ -200,6 +228,31 @@ export class ProductsController {
     @Param('id') id: string,
   ) {
     return this.commandBus.execute(new DeleteProductCommand(tenantId, id));
+  }
+
+  @Put('variants/:variantId/tags')
+  async updateVariantTags(
+    @CurrentUser('tenantId') tenantId: string,
+    @Param('variantId') variantId: string,
+    @Body() body: { tagIds: string[] },
+  ) {
+    const variantRepo = this.entityManager.getRepository(ProductVariant);
+    const tagRepo = this.entityManager.getRepository(Tag);
+
+    const variant = await variantRepo.findOne({
+      where: { id: variantId, tenantId },
+      relations: { tags: true },
+    });
+    if (!variant) {
+      return { error: 'Variant not found' };
+    }
+
+    const tags = body.tagIds.length > 0
+      ? await tagRepo.find({ where: { id: In(body.tagIds), tenantId } })
+      : [];
+
+    variant.tags = tags;
+    return variantRepo.save(variant);
   }
 }
 

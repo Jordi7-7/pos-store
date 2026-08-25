@@ -20,6 +20,7 @@ export class GetProductByIdHandler implements IQueryHandler<GetProductByIdQuery>
         variants: {
           stocks: true,
           images: true,
+          tags: true,
           attributeValues: {
             attribute: true,
           },
@@ -38,6 +39,7 @@ export class GetProductByIdHandler implements IQueryHandler<GetProductByIdQuery>
           variants: {
             stocks: true,
             images: true,
+            tags: true,
             attributeValues: {
               attribute: true,
             },

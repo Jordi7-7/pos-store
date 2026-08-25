@@ -18,6 +18,7 @@ export class GetProductsHandler implements IQueryHandler<GetProductsQuery> {
       .leftJoinAndSelect('variants.images', 'variantImages')
       .leftJoinAndSelect('variants.attributeValues', 'attributeValues')
       .leftJoinAndSelect('attributeValues.attribute', 'attribute')
+      .leftJoinAndSelect('variants.tags', 'tags')
       .where('product.tenantId = :tenantId', { tenantId });
 
     if (search) {

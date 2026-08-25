@@ -21,6 +21,7 @@ import { Attribute } from './modules/products/domain/entities/attribute.entity';
 import { AttributeValue } from './modules/products/domain/entities/attribute-value.entity';
 import { ProductStock } from './modules/products/domain/entities/product-stock.entity';
 import { InventoryMovement } from './modules/products/domain/entities/inventory-movement.entity';
+import { Tag } from './modules/products/domain/entities/tag.entity';
 import { CashSession } from './modules/sales/domain/entities/cash-session.entity';
 import { Sale } from './modules/sales/domain/entities/sale.entity';
 import { SaleItem } from './modules/sales/domain/entities/sale-item.entity';
@@ -82,6 +83,7 @@ import { ReportsModule } from './modules/reports/reports.module';
         Category,
         ProductBatch,
         PurchaseOrderItem,
+        Tag,
       ],
       synchronize: false,
       logging: process.env.DB_LOGGING === 'true',

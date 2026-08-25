@@ -9,6 +9,7 @@ import { ProductStock } from './domain/entities/product-stock.entity';
 import { InventoryMovement } from './domain/entities/inventory-movement.entity';
 import { ProductImage } from './domain/entities/product-image.entity';
 import { Category } from './domain/entities/category.entity';
+import { Tag } from './domain/entities/tag.entity';
 import { CreateProductHandler } from './application/commands/create-product/create-product.handler';
 import { CreateSimpleProductHandler } from './application/commands/create-simple-product/create-simple-product.handler';
 import { CreateVariableProductHandler } from './application/commands/create-variable-product/create-variable-product.handler';
@@ -34,6 +35,7 @@ import { ProductsController } from './infrastructure/controllers/products.contro
       InventoryMovement,
       ProductImage,
       Category,
+      Tag,
     ]),
     CqrsModule,
   ],

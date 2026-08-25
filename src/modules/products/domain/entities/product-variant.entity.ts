@@ -6,6 +6,7 @@ import { ColumnNumericTransformer } from '../../../../common/database/numeric-tr
 import { ProductStock } from './product-stock.entity';
 import { ProductImage } from './product-image.entity';
 import { Tenant } from '../../../tenants/domain/entities/tenant.entity';
+import { Tag } from './tag.entity';
 
 @Entity('product_variants')
 export class ProductVariant extends BaseEntity {
@@ -66,4 +67,12 @@ export class ProductVariant extends BaseEntity {
 
   @OneToMany(() => ProductStock, (stock) => stock.variant, { cascade: true })
   stocks: ProductStock[];
+
+  @ManyToMany(() => Tag)
+  @JoinTable({
+    name: 'variant_tags',
+    joinColumn: { name: 'variant_id', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'tag_id', referencedColumnName: 'id' },
+  })
+  tags: Tag[];
 }
