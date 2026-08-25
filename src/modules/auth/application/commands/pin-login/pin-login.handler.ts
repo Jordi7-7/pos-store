@@ -58,7 +58,6 @@ export class PinLoginHandler implements ICommandHandler<PinLoginCommand> {
       email: matchedUser.email,
       role: matchedUser.role,
       name: matchedUser.name,
-      timezone: matchedUser.tenant.timezone,
     };
 
     const accessToken = this.jwtService.sign(payload, {

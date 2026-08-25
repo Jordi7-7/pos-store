@@ -48,7 +48,6 @@ export class LoginHandler implements ICommandHandler<LoginCommand> {
       email: user.email,
       role: user.role,
       name: user.name,
-      timezone: user.tenant.timezone,
     };
 
     const accessToken = this.jwtService.sign(payload, {

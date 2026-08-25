@@ -1,5 +1,7 @@
-import { Controller, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Body, HttpCode, HttpStatus, Get, UnauthorizedException } from '@nestjs/common';
 import { CommandBus } from '@nestjs/cqrs';
+import { EntityManager } from 'typeorm';
+import { User } from '../../../users/domain/entities/user.entity';
 import { OnboardTenantDto } from '../../application/commands/onboard/onboard-tenant.dto';
 import { OnboardTenantCommand } from '../../application/commands/onboard/onboard-tenant.command';
 import { LoginDto } from '../../application/commands/login/login.dto';
@@ -13,7 +15,10 @@ import { CurrentUser } from '../../decorators/current-user.decorator';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly commandBus: CommandBus) {}
+  constructor(
+    private readonly commandBus: CommandBus,
+    private readonly entityManager: EntityManager,
+  ) {}
 
   @Public()
   @Post('onboard')
@@ -63,5 +68,28 @@ export class AuthController {
     @Body() body: { pin: string },
   ) {
     return this.commandBus.execute(new PinLoginCommand(tenantId, body.pin));
+  }
+  @Get('profile')
+  async getProfile(@CurrentUser('sub') userId: string) {
+    const user = await this.entityManager.findOne(User, {
+      where: { id: userId },
+      relations: { tenant: true },
+    });
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      tenant: {
+        id: user.tenant.id,
+        name: user.tenant.name,
+        timezone: user.tenant.timezone,
+        currencyCode: user.tenant.currencyCode,
+        currencySymbol: user.tenant.currencySymbol,
+      }
+    };
   }
 }
