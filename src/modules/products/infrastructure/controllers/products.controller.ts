@@ -23,6 +23,8 @@ import { UpdateProductCommand } from '../../application/commands/update-product/
 import { DeleteProductCommand } from '../../application/commands/delete-product/delete-product.command';
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
 import { InventoryMovement } from '../../domain/entities/inventory-movement.entity';
+import { AdjustStockDto } from '../../application/commands/adjust-stock/adjust-stock.dto';
+import { AdjustStockCommand } from '../../application/commands/adjust-stock/adjust-stock.command';
 
 @Controller('products')
 export class ProductsController {
@@ -175,6 +177,24 @@ export class ProductsController {
       },
       order: { createdAt: 'DESC' },
     });
+  }
+
+  @Post('stock-adjustments')
+  async adjustStock(
+    @CurrentUser('tenantId') tenantId: string,
+    @Body() dto: AdjustStockDto,
+  ) {
+    return this.commandBus.execute(
+      new AdjustStockCommand(
+        tenantId,
+        dto.branchId,
+        dto.variantId,
+        dto.quantity,
+        dto.type,
+        dto.reason,
+        dto.comment,
+      ),
+    );
   }
 
   // ── Tags ──────────────────────────────────────────────────────────────────

@@ -22,6 +22,7 @@ import { GetProductByIdHandler } from './application/queries/get-product-by-id/g
 import { UpdateProductHandler } from './application/commands/update-product/update-product.handler';
 import { DeleteProductHandler } from './application/commands/delete-product/delete-product.handler';
 import { CreateVariantHandler } from './application/commands/create-variant/create-variant.handler';
+import { AdjustStockHandler } from './application/commands/adjust-stock/adjust-stock.handler';
 import { ProductsController } from './infrastructure/controllers/products.controller';
 
 @Module({
@@ -53,6 +54,7 @@ import { ProductsController } from './infrastructure/controllers/products.contro
     UpdateProductHandler,
     DeleteProductHandler,
     CreateVariantHandler,
+    AdjustStockHandler,
   ],
 })
 export class ProductsModule {}
