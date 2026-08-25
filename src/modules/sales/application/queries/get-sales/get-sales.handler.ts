@@ -13,6 +13,9 @@ export class GetSalesHandler implements IQueryHandler<GetSalesQuery> {
     return saleRepo.find({
       where: { tenantId },
       relations: {
+        branch: true,
+        customer: true,
+        user: true,
         items: {
           variant: {
             product: true,
