@@ -4,6 +4,9 @@ import { Repository, Between } from 'typeorm';
 import { Sale } from '../../../sales/domain/entities/sale.entity';
 import { PurchaseOrder } from '../../../purchases/domain/entities/purchase-order.entity';
 import { Expense } from '../../../sales/domain/entities/expense.entity';
+import { DateTime } from 'luxon';
+import { getTimezone } from '../../../../common/tenant/tenant-context';
+import { Tenant } from '../../../tenants/domain/entities/tenant.entity';
 
 @Injectable()
 export class ReportsService {
@@ -16,12 +19,31 @@ export class ReportsService {
     private readonly expenseRepository: Repository<Expense>,
   ) {}
 
-  async getSummary(tenantId: string, startDate: Date, endDate: Date) {
+  async parseReportDates(tenantId: string, startDate?: string, endDate?: string): Promise<{ start: Date; end: Date }> {
+    const tenant = await this.saleRepository.manager.findOne(Tenant, {
+      where: { id: tenantId }
+    });
+    const timezone = tenant?.timezone || 'America/Guayaquil';
+
+    const start = startDate 
+      ? DateTime.fromISO(startDate, { zone: timezone }).startOf('day').toJSDate()
+      : DateTime.now().setZone(timezone).startOf('month').toJSDate();
+      
+    const end = endDate 
+      ? DateTime.fromISO(endDate, { zone: timezone }).endOf('day').toJSDate()
+      : DateTime.now().setZone(timezone).endOf('day').toJSDate();
+
+    return { start, end };
+  }
+
+  async getSummary(tenantId: string, startDateStr?: string, endDateStr?: string) {
+    const { start, end } = await this.parseReportDates(tenantId, startDateStr, endDateStr);
+
     // 1. Fetch sales in date range
     const sales = await this.saleRepository.find({
       where: {
         tenantId,
-        createdAt: Between(startDate, endDate),
+        createdAt: Between(start, end),
       },
       relations: { items: true },
     });
@@ -30,7 +52,7 @@ export class ReportsService {
     const purchases = await this.purchaseRepository.find({
       where: {
         tenantId,
-        createdAt: Between(startDate, endDate),
+        createdAt: Between(start, end),
       },
     });
 
@@ -38,7 +60,7 @@ export class ReportsService {
     const expenses = await this.expenseRepository.find({
       where: {
         tenantId,
-        createdAt: Between(startDate, endDate),
+        createdAt: Between(start, end),
       },
     });
 
@@ -90,8 +112,8 @@ export class ReportsService {
     };
 
     // Initialize map for each day in range
-    const current = new Date(startDate);
-    while (current <= endDate) {
+    const current = new Date(start);
+    while (current <= end) {
       const key = formatDateKey(current);
       dailyMap[key] = { date: key, sales: 0, purchases: 0, expenses: 0, profit: 0 };
       current.setUTCDate(current.getUTCDate() + 1);
@@ -145,5 +167,49 @@ export class ReportsService {
       },
       breakdown,
     };
+  }
+
+  async getSalesCostReport(tenantId: string, startDateStr?: string, endDateStr?: string) {
+    const { start, end } = await this.parseReportDates(tenantId, startDateStr, endDateStr);
+
+    const sales = await this.saleRepository.find({
+      where: {
+        tenantId,
+        createdAt: Between(start, end),
+      },
+      relations: {
+        customer: true,
+        items: true,
+      },
+      order: { createdAt: 'ASC' },
+    });
+
+    return sales.map((sale) => {
+      let pieces = 0;
+      let costPrice = 0;
+
+      if (sale.items) {
+        for (const item of sale.items) {
+          const qty = Number(item.quantity || 0);
+          pieces += qty;
+          costPrice += Number(item.cost || 0) * qty;
+        }
+      }
+
+      const salePrice = Number(sale.total || 0);
+      const difference = salePrice - costPrice;
+
+      return {
+        id: sale.id,
+        invoiceNumber: `FAC-${sale.id.replace(/-/g, '').slice(0, 8).toUpperCase()}`,
+        createdAt: sale.createdAt,
+        clientName: sale.customer?.name || 'PUBLICO VENTA DE MOSTRADOR',
+        pieces,
+        salePrice,
+        costPrice,
+        difference,
+        status: sale.status,
+      };
+    });
   }
 }

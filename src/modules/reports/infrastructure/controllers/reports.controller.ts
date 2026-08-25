@@ -12,18 +12,14 @@ export class ReportsController {
     @CurrentUser('tenantId') tenantId: string,
     @Query() query: GetReportDto,
   ) {
-    const start = query.startDate 
-      ? new Date(query.startDate) 
-      : new Date(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1);
-      
-    const end = query.endDate 
-      ? new Date(query.endDate) 
-      : new Date();
+    return this.reportsService.getSummary(tenantId, query.startDate, query.endDate);
+  }
 
-    // Adjust hours to cover the entire selected days
-    start.setUTCHours(0, 0, 0, 0);
-    end.setUTCHours(23, 59, 59, 999);
-
-    return this.reportsService.getSummary(tenantId, start, end);
+  @Get('sales-cost')
+  async getSalesCost(
+    @CurrentUser('tenantId') tenantId: string,
+    @Query() query: GetReportDto,
+  ) {
+    return this.reportsService.getSalesCostReport(tenantId, query.startDate, query.endDate);
   }
 }
