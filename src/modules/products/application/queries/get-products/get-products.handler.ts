@@ -34,7 +34,7 @@ export class GetProductsHandler implements IQueryHandler<GetProductsQuery> {
     // We use skip and take. For leftJoinAndSelect with relations, TypeORM requires getManyAndCount
     // to handle skip/take correctly via subqueries.
     queryBuilder
-      .orderBy('product.createdAt', 'DESC')
+      .orderBy('variants.sku', 'ASC')
       .skip(skip)
       .take(take);
 
