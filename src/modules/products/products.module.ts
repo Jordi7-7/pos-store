@@ -25,6 +25,11 @@ import { CreateVariantHandler } from './application/commands/create-variant/crea
 import { AdjustStockHandler } from './application/commands/adjust-stock/adjust-stock.handler';
 import { ImportProductsHandler } from './application/commands/import-products/import-products.handler';
 import { ValidateImportProductsHandler } from './application/queries/validate-import-products/validate-import-products.handler';
+import { GetAttributesHandler } from './application/queries/get-attributes/get-attributes.handler';
+import { GetInventoryMovementsHandler } from './application/queries/get-inventory-movements/get-inventory-movements.handler';
+import { GetTagsHandler } from './application/queries/get-tags/get-tags.handler';
+import { CreateTagHandler } from './application/commands/create-tag/create-tag.handler';
+import { UpdateVariantTagsHandler } from './application/commands/update-variant-tags/update-variant-tags.handler';
 import { ProductsController } from './infrastructure/controllers/products.controller';
 
 @Module({
@@ -59,6 +64,11 @@ import { ProductsController } from './infrastructure/controllers/products.contro
     AdjustStockHandler,
     ImportProductsHandler,
     ValidateImportProductsHandler,
+    GetAttributesHandler,
+    GetInventoryMovementsHandler,
+    GetTagsHandler,
+    CreateTagHandler,
+    UpdateVariantTagsHandler,
   ],
 })
 export class ProductsModule {}

@@ -1,9 +1,5 @@
 import { Controller, Post, Get, Put, Delete, Body, Param, Query } from '@nestjs/common';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
-import { EntityManager, In } from 'typeorm';
-import { Attribute } from '../../domain/entities/attribute.entity';
-import { Tag } from '../../domain/entities/tag.entity';
-import { ProductVariant } from '../../domain/entities/product-variant.entity';
 import { CreateVariableProductDto, ProductVariantDto, CreateSimpleProductDto } from '../../application/commands/create-product/create-product.dto';
 import { CreateProductCommand } from '../../application/commands/create-product/create-product.command';
 import { CreateSimpleProductCommand } from '../../application/commands/create-simple-product/create-simple-product.command';
@@ -22,19 +18,22 @@ import { UpdateProductDto } from '../../application/commands/update-product/upda
 import { UpdateProductCommand } from '../../application/commands/update-product/update-product.command';
 import { DeleteProductCommand } from '../../application/commands/delete-product/delete-product.command';
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
-import { InventoryMovement } from '../../domain/entities/inventory-movement.entity';
 import { AdjustStockDto } from '../../application/commands/adjust-stock/adjust-stock.dto';
 import { AdjustStockCommand } from '../../application/commands/adjust-stock/adjust-stock.command';
 import { ValidateImportProductsDto, ImportProductsDto } from '../../application/commands/import-products/import-products.dto';
 import { ImportProductsCommand } from '../../application/commands/import-products/import-products.command';
 import { ValidateImportProductsQuery } from '../../application/queries/validate-import-products/validate-import-products.query';
+import { GetAttributesQuery } from '../../application/queries/get-attributes/get-attributes.query';
+import { GetInventoryMovementsQuery } from '../../application/queries/get-inventory-movements/get-inventory-movements.query';
+import { GetTagsQuery } from '../../application/queries/get-tags/get-tags.query';
+import { CreateTagCommand } from '../../application/commands/create-tag/create-tag.command';
+import { UpdateVariantTagsCommand } from '../../application/commands/update-variant-tags/update-variant-tags.command';
 
 @Controller('products')
 export class ProductsController {
   constructor(
     private readonly commandBus: CommandBus,
     private readonly queryBus: QueryBus,
-    private readonly entityManager: EntityManager,
   ) {}
 
   @Post()
@@ -135,13 +134,7 @@ export class ProductsController {
 
   @Get('attributes')
   async findAttributes(@CurrentUser('tenantId') tenantId: string) {
-    const repo = this.entityManager.getRepository(Attribute);
-    return repo.find({
-      where: { tenantId },
-      relations: {
-        values: true
-      },
-    });
+    return this.queryBus.execute(new GetAttributesQuery(tenantId));
   }
 
   @Get()
@@ -166,20 +159,7 @@ export class ProductsController {
     @CurrentUser('tenantId') tenantId: string,
     @Query('variantId') variantId?: string,
   ) {
-    const repo = this.entityManager.getRepository(InventoryMovement);
-    const where: any = { tenantId };
-    if (variantId) {
-      where.variantId = variantId;
-    }
-    return repo.find({
-      where,
-      relations: {
-        variant: { product: true },
-        originBranch: true,
-        destinationBranch: true,
-      },
-      order: { createdAt: 'DESC' },
-    });
+    return this.queryBus.execute(new GetInventoryMovementsQuery(tenantId, variantId));
   }
 
   @Post('stock-adjustments')
@@ -203,8 +183,7 @@ export class ProductsController {
 
   @Get('tags')
   async findTags(@CurrentUser('tenantId') tenantId: string) {
-    const repo = this.entityManager.getRepository(Tag);
-    return repo.find({ where: { tenantId }, order: { name: 'ASC' } });
+    return this.queryBus.execute(new GetTagsQuery(tenantId));
   }
 
   @Post('tags')
@@ -212,17 +191,7 @@ export class ProductsController {
     @CurrentUser('tenantId') tenantId: string,
     @Body() body: { name: string },
   ) {
-    const repo = this.entityManager.getRepository(Tag);
-    const name = body.name.trim();
-    // Return existing tag if one with the same name already exists for this tenant
-    const existing = await repo
-      .createQueryBuilder('tag')
-      .where('tag.tenantId = :tenantId', { tenantId })
-      .andWhere('LOWER(tag.name) = LOWER(:name)', { name })
-      .getOne();
-    if (existing) return existing;
-    const tag = repo.create({ tenantId, name });
-    return repo.save(tag);
+    return this.commandBus.execute(new CreateTagCommand(tenantId, body.name));
   }
 
   @Get(':id')
@@ -258,23 +227,9 @@ export class ProductsController {
     @Param('variantId') variantId: string,
     @Body() body: { tagIds: string[] },
   ) {
-    const variantRepo = this.entityManager.getRepository(ProductVariant);
-    const tagRepo = this.entityManager.getRepository(Tag);
-
-    const variant = await variantRepo.findOne({
-      where: { id: variantId, tenantId },
-      relations: { tags: true },
-    });
-    if (!variant) {
-      return { error: 'Variant not found' };
-    }
-
-    const tags = body.tagIds.length > 0
-      ? await tagRepo.find({ where: { id: In(body.tagIds), tenantId } })
-      : [];
-
-    variant.tags = tags;
-    return variantRepo.save(variant);
+    return this.commandBus.execute(
+      new UpdateVariantTagsCommand(tenantId, variantId, body.tagIds),
+    );
   }
 
   @Post('validate-import')

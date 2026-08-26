@@ -13,6 +13,7 @@ import { RegisterPurchaseHandler } from './application/commands/register-purchas
 import { CancelPurchaseOrderHandler } from './application/commands/cancel-purchase-order/cancel-purchase-order.handler';
 import { ImportPurchasesHandler } from './application/commands/import-purchases/import-purchases.handler';
 import { ValidateImportPurchasesHandler } from './application/queries/validate-import-purchases/validate-import-purchases.handler';
+import { GetPurchasesHandler } from './application/queries/get-purchases/get-purchases.handler';
 import { GetSuppliersHandler } from './application/queries/get-suppliers/get-suppliers.handler';
 import { PurchasesController } from './infrastructure/controllers/purchases.controller';
 
@@ -36,6 +37,7 @@ import { PurchasesController } from './infrastructure/controllers/purchases.cont
     CancelPurchaseOrderHandler,
     ImportPurchasesHandler,
     ValidateImportPurchasesHandler,
+    GetPurchasesHandler,
     GetSuppliersHandler,
   ],
   exports: [TypeOrmModule],
