@@ -12,6 +12,8 @@ import { RegisterExpenseCommand } from '../../application/commands/register-expe
 import { ProcessRefundDto } from '../../application/commands/process-refund/process-refund.dto';
 import { ProcessRefundCommand } from '../../application/commands/process-refund/process-refund.command';
 import { GetSalesQuery } from '../../application/queries/get-sales/get-sales.query';
+import { GetCashSessionsQuery } from '../../application/queries/get-cash-sessions/get-cash-sessions.query';
+import { GetCashSessionDetailsQuery } from '../../application/queries/get-cash-session-details/get-cash-session-details.query';
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
 import { CashSession } from '../../domain/entities/cash-session.entity';
 import { Expense } from '../../domain/entities/expense.entity';
@@ -167,5 +169,21 @@ export class SalesController {
       relations: { items: { variant: { product: true } } },
       order: { createdAt: 'DESC' },
     });
+  }
+
+  @Get('cash-sessions')
+  async getCashSessions(
+    @CurrentUser('tenantId') tenantId: string,
+    @Query('branchId') branchId?: string,
+  ) {
+    return this.queryBus.execute(new GetCashSessionsQuery(tenantId, branchId));
+  }
+
+  @Get('cash-sessions/:id/details')
+  async getCashSessionDetails(
+    @CurrentUser('tenantId') tenantId: string,
+    @Param('id') id: string,
+  ) {
+    return this.queryBus.execute(new GetCashSessionDetailsQuery(tenantId, id));
   }
 }

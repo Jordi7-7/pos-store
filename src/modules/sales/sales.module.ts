@@ -14,6 +14,8 @@ import { CloseCashSessionHandler } from './application/commands/close-cash-sessi
 import { RegisterExpenseHandler } from './application/commands/register-expense/register-expense.handler';
 import { ProcessRefundHandler } from './application/commands/process-refund/process-refund.handler';
 import { GetSalesHandler } from './application/queries/get-sales/get-sales.handler';
+import { GetCashSessionsHandler } from './application/queries/get-cash-sessions/get-cash-sessions.handler';
+import { GetCashSessionDetailsHandler } from './application/queries/get-cash-session-details/get-cash-session-details.handler';
 import { SalesController } from './infrastructure/controllers/sales.controller';
 
 @Module({
@@ -37,6 +39,8 @@ import { SalesController } from './infrastructure/controllers/sales.controller';
     RegisterExpenseHandler,
     ProcessRefundHandler,
     GetSalesHandler,
+    GetCashSessionsHandler,
+    GetCashSessionDetailsHandler,
   ],
 })
 export class SalesModule {}
