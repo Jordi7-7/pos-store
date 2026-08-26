@@ -1,6 +1,6 @@
 import { Controller, Post, Body, Get, Patch, Param } from '@nestjs/common';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
-import { EntityManager } from 'typeorm';
+import { EntityManager, In } from 'typeorm';
 import { CreateSupplierDto } from '../../application/commands/create-supplier/create-supplier.dto';
 import { CreateSupplierCommand } from '../../application/commands/create-supplier/create-supplier.command';
 import { RegisterPurchaseDto } from '../../application/commands/register-purchase/register-purchase.dto';
@@ -10,6 +10,10 @@ import { GetSuppliersQuery } from '../../application/queries/get-suppliers/get-s
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
 import { PurchaseOrder } from '../../domain/entities/purchase-order.entity';
 import { ProductBatch } from '../../../products/domain/entities/product-batch.entity';
+import { ProductVariant } from '../../../products/domain/entities/product-variant.entity';
+import { ValidateImportPurchasesDto, ImportPurchasesDto } from '../../application/commands/import-purchases/import-purchases.dto';
+import { ImportPurchasesCommand } from '../../application/commands/import-purchases/import-purchases.command';
+import { ValidateImportPurchasesQuery } from '../../application/queries/validate-import-purchases/validate-import-purchases.query';
 
 @Controller('purchases')
 export class PurchasesController {
@@ -105,5 +109,25 @@ export class PurchasesController {
       new CancelPurchaseOrderCommand(tenantId, purchaseOrderId),
     );
     return { message: 'Purchase order cancelled successfully' };
+  }
+
+  @Post('validate-import')
+  async validateImport(
+    @CurrentUser('tenantId') tenantId: string,
+    @Body() dto: ValidateImportPurchasesDto,
+  ) {
+    return this.queryBus.execute(
+      new ValidateImportPurchasesQuery(tenantId, dto.items),
+    );
+  }
+
+  @Post('import')
+  async importPurchases(
+    @CurrentUser('tenantId') tenantId: string,
+    @Body() dto: ImportPurchasesDto,
+  ) {
+    return this.commandBus.execute(
+      new ImportPurchasesCommand(tenantId, dto.branchId, dto.items),
+    );
   }
 }

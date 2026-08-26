@@ -7,9 +7,12 @@ import { PurchaseOrderItem } from './domain/entities/purchase-order-item.entity'
 import { ProductStock } from '../products/domain/entities/product-stock.entity';
 import { ProductBatch } from '../products/domain/entities/product-batch.entity';
 import { InventoryMovement } from '../products/domain/entities/inventory-movement.entity';
+import { ProductVariant } from '../products/domain/entities/product-variant.entity';
 import { CreateSupplierHandler } from './application/commands/create-supplier/create-supplier.handler';
 import { RegisterPurchaseHandler } from './application/commands/register-purchase/register-purchase.handler';
 import { CancelPurchaseOrderHandler } from './application/commands/cancel-purchase-order/cancel-purchase-order.handler';
+import { ImportPurchasesHandler } from './application/commands/import-purchases/import-purchases.handler';
+import { ValidateImportPurchasesHandler } from './application/queries/validate-import-purchases/validate-import-purchases.handler';
 import { GetSuppliersHandler } from './application/queries/get-suppliers/get-suppliers.handler';
 import { PurchasesController } from './infrastructure/controllers/purchases.controller';
 
@@ -22,6 +25,7 @@ import { PurchasesController } from './infrastructure/controllers/purchases.cont
       ProductStock,
       ProductBatch,
       InventoryMovement,
+      ProductVariant,
     ]),
     CqrsModule,
   ],
@@ -30,6 +34,8 @@ import { PurchasesController } from './infrastructure/controllers/purchases.cont
     CreateSupplierHandler,
     RegisterPurchaseHandler,
     CancelPurchaseOrderHandler,
+    ImportPurchasesHandler,
+    ValidateImportPurchasesHandler,
     GetSuppliersHandler,
   ],
   exports: [TypeOrmModule],

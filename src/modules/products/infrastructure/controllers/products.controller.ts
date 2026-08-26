@@ -25,6 +25,9 @@ import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
 import { InventoryMovement } from '../../domain/entities/inventory-movement.entity';
 import { AdjustStockDto } from '../../application/commands/adjust-stock/adjust-stock.dto';
 import { AdjustStockCommand } from '../../application/commands/adjust-stock/adjust-stock.command';
+import { ValidateImportProductsDto, ImportProductsDto } from '../../application/commands/import-products/import-products.dto';
+import { ImportProductsCommand } from '../../application/commands/import-products/import-products.command';
+import { ValidateImportProductsQuery } from '../../application/queries/validate-import-products/validate-import-products.query';
 
 @Controller('products')
 export class ProductsController {
@@ -272,6 +275,26 @@ export class ProductsController {
 
     variant.tags = tags;
     return variantRepo.save(variant);
+  }
+
+  @Post('validate-import')
+  async validateImport(
+    @CurrentUser('tenantId') tenantId: string,
+    @Body() dto: ValidateImportProductsDto,
+  ) {
+    return this.queryBus.execute(
+      new ValidateImportProductsQuery(tenantId, dto.items),
+    );
+  }
+
+  @Post('import')
+  async importProducts(
+    @CurrentUser('tenantId') tenantId: string,
+    @Body() dto: ImportProductsDto,
+  ) {
+    return this.commandBus.execute(
+      new ImportProductsCommand(tenantId, dto.branchId, dto.items),
+    );
   }
 }
 
