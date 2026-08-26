@@ -1,18 +1,23 @@
 import { Controller, Get, Query } from '@nestjs/common';
-import { ReportsService } from '../../application/services/reports.service';
+import { QueryBus } from '@nestjs/cqrs';
 import { GetReportDto } from '../dtos/get-report.dto';
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
+import { GetReportsSummaryQuery } from '../../application/queries/get-reports-summary/get-reports-summary.query';
+import { GetSalesCostReportQuery } from '../../application/queries/get-sales-cost-report/get-sales-cost-report.query';
+import { GetValuedInventoryQuery } from '../../application/queries/get-valued-inventory/get-valued-inventory.query';
 
 @Controller('reports')
 export class ReportsController {
-  constructor(private readonly reportsService: ReportsService) {}
+  constructor(private readonly queryBus: QueryBus) {}
 
   @Get('summary')
   async getSummary(
     @CurrentUser('tenantId') tenantId: string,
     @Query() query: GetReportDto,
   ) {
-    return this.reportsService.getSummary(tenantId, query.startDate, query.endDate);
+    return this.queryBus.execute(
+      new GetReportsSummaryQuery(tenantId, query.startDate, query.endDate),
+    );
   }
 
   @Get('sales-cost')
@@ -20,6 +25,17 @@ export class ReportsController {
     @CurrentUser('tenantId') tenantId: string,
     @Query() query: GetReportDto,
   ) {
-    return this.reportsService.getSalesCostReport(tenantId, query.startDate, query.endDate);
+    return this.queryBus.execute(
+      new GetSalesCostReportQuery(tenantId, query.startDate, query.endDate),
+    );
+  }
+
+  @Get('valued-inventory')
+  async getValuedInventory(
+    @CurrentUser('tenantId') tenantId: string,
+  ) {
+    return this.queryBus.execute(
+      new GetValuedInventoryQuery(tenantId),
+    );
   }
 }

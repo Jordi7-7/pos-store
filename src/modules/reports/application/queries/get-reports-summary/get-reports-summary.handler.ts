@@ -1,65 +1,48 @@
-import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between } from 'typeorm';
-import { Sale } from '../../../sales/domain/entities/sale.entity';
-import { PurchaseOrder } from '../../../purchases/domain/entities/purchase-order.entity';
-import { Expense } from '../../../sales/domain/entities/expense.entity';
-import { DateTime } from 'luxon';
-import { getTimezone } from '../../../../common/tenant/tenant-context';
-import { Tenant } from '../../../tenants/domain/entities/tenant.entity';
+import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
+import { EntityManager, Between } from 'typeorm';
+import { GetReportsSummaryQuery } from './get-reports-summary.query';
+import { Sale } from '../../../../sales/domain/entities/sale.entity';
+import { PurchaseOrder } from '../../../../purchases/domain/entities/purchase-order.entity';
+import { Expense } from '../../../../sales/domain/entities/expense.entity';
+import { parseReportDates } from '../parse-dates.helper';
 
-@Injectable()
-export class ReportsService {
-  constructor(
-    @InjectRepository(Sale)
-    private readonly saleRepository: Repository<Sale>,
-    @InjectRepository(PurchaseOrder)
-    private readonly purchaseRepository: Repository<PurchaseOrder>,
-    @InjectRepository(Expense)
-    private readonly expenseRepository: Repository<Expense>,
-  ) {}
+@QueryHandler(GetReportsSummaryQuery)
+export class GetReportsSummaryHandler implements IQueryHandler<GetReportsSummaryQuery> {
+  constructor(private readonly entityManager: EntityManager) {}
 
-  async parseReportDates(tenantId: string, startDate?: string, endDate?: string): Promise<{ start: Date; end: Date }> {
-    const tenant = await this.saleRepository.manager.findOne(Tenant, {
-      where: { id: tenantId }
-    });
-    const timezone = tenant?.timezone || 'America/Guayaquil';
+  async execute(query: GetReportsSummaryQuery) {
+    const { start, end } = await parseReportDates(
+      this.entityManager,
+      query.tenantId,
+      query.startDateStr,
+      query.endDateStr,
+    );
 
-    const start = startDate 
-      ? DateTime.fromISO(startDate, { zone: timezone }).startOf('day').toJSDate()
-      : DateTime.now().setZone(timezone).startOf('month').toJSDate();
-      
-    const end = endDate 
-      ? DateTime.fromISO(endDate, { zone: timezone }).endOf('day').toJSDate()
-      : DateTime.now().setZone(timezone).endOf('day').toJSDate();
-
-    return { start, end };
-  }
-
-  async getSummary(tenantId: string, startDateStr?: string, endDateStr?: string) {
-    const { start, end } = await this.parseReportDates(tenantId, startDateStr, endDateStr);
+    const saleRepository = this.entityManager.getRepository(Sale);
+    const purchaseRepository = this.entityManager.getRepository(PurchaseOrder);
+    const expenseRepository = this.entityManager.getRepository(Expense);
 
     // 1. Fetch sales in date range
-    const sales = await this.saleRepository.find({
+    const sales = await saleRepository.find({
       where: {
-        tenantId,
+        tenantId: query.tenantId,
         createdAt: Between(start, end),
       },
       relations: { items: true },
     });
 
     // 2. Fetch purchases in date range
-    const purchases = await this.purchaseRepository.find({
+    const purchases = await purchaseRepository.find({
       where: {
-        tenantId,
+        tenantId: query.tenantId,
         createdAt: Between(start, end),
       },
     });
 
     // 3. Fetch expenses in date range
-    const expenses = await this.expenseRepository.find({
+    const expenses = await expenseRepository.find({
       where: {
-        tenantId,
+        tenantId: query.tenantId,
         createdAt: Between(start, end),
       },
     });
@@ -167,49 +150,5 @@ export class ReportsService {
       },
       breakdown,
     };
-  }
-
-  async getSalesCostReport(tenantId: string, startDateStr?: string, endDateStr?: string) {
-    const { start, end } = await this.parseReportDates(tenantId, startDateStr, endDateStr);
-
-    const sales = await this.saleRepository.find({
-      where: {
-        tenantId,
-        createdAt: Between(start, end),
-      },
-      relations: {
-        customer: true,
-        items: true,
-      },
-      order: { createdAt: 'ASC' },
-    });
-
-    return sales.map((sale) => {
-      let pieces = 0;
-      let costPrice = 0;
-
-      if (sale.items) {
-        for (const item of sale.items) {
-          const qty = Number(item.quantity || 0);
-          pieces += qty;
-          costPrice += Number(item.cost || 0) * qty;
-        }
-      }
-
-      const salePrice = Number(sale.total || 0);
-      const difference = salePrice - costPrice;
-
-      return {
-        id: sale.id,
-        invoiceNumber: `FAC-${sale.id.replace(/-/g, '').slice(0, 8).toUpperCase()}`,
-        createdAt: sale.createdAt,
-        clientName: sale.customer?.name || 'PUBLICO VENTA DE MOSTRADOR',
-        pieces,
-        salePrice,
-        costPrice,
-        difference,
-        status: sale.status,
-      };
-    });
   }
 }
