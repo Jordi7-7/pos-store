@@ -1,20 +1,26 @@
 import { Controller, Get, Put, Body, UseGuards } from '@nestjs/common';
-import { TenantsService } from '../../application/services/tenants.service';
+import { CommandBus, QueryBus } from '@nestjs/cqrs';
 import { UpdateTenantDto } from '../dtos/update-tenant.dto';
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
+import { GetTenantMetadataQuery } from '../../application/queries/get-tenant-metadata/get-tenant-metadata.query';
+import { GetTenantQuery } from '../../application/queries/get-tenant/get-tenant.query';
+import { UpdateTenantCommand } from '../../application/commands/update-tenant/update-tenant.command';
 
 @Controller('tenants')
 export class TenantsController {
-  constructor(private readonly tenantsService: TenantsService) {}
+  constructor(
+    private readonly commandBus: CommandBus,
+    private readonly queryBus: QueryBus,
+  ) {}
 
   @Get('metadata')
   async getMetadata() {
-    return this.tenantsService.getMetadata();
+    return this.queryBus.execute(new GetTenantMetadataQuery());
   }
 
   @Get('current')
   async getCurrent(@CurrentUser('tenantId') tenantId: string) {
-    return this.tenantsService.findOne(tenantId);
+    return this.queryBus.execute(new GetTenantQuery(tenantId));
   }
 
   @Put('current')
@@ -22,6 +28,6 @@ export class TenantsController {
     @CurrentUser('tenantId') tenantId: string,
     @Body() dto: UpdateTenantDto,
   ) {
-    return this.tenantsService.update(tenantId, dto);
+    return this.commandBus.execute(new UpdateTenantCommand(tenantId, dto));
   }
 }
