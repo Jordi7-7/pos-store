@@ -191,7 +191,6 @@ export class ProductsController {
         dto.variantId,
         dto.quantity,
         dto.type,
-        dto.reason,
         dto.comment,
       ),
     );

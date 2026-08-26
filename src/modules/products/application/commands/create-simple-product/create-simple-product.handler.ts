@@ -10,6 +10,7 @@ import { Category } from '../../../domain/entities/category.entity';
 import { ProductBatch } from '../../../domain/entities/product-batch.entity';
 import { InventoryMovement } from '../../../domain/entities/inventory-movement.entity';
 import { Branch } from '../../../../branches/domain/entities/branch.entity';
+import { InventoryMovementReason } from '../../../../../common/enums/inventory-movement-reason.enum';
 
 
 @CommandHandler(CreateSimpleProductCommand)
@@ -145,8 +146,8 @@ export class CreateSimpleProductHandler implements ICommandHandler<CreateSimpleP
           movement.variantId = savedVariant.id;
           movement.purchaseOrderId = null;
           movement.quantity = Number(stock.quantity);
-          movement.type = 'INPUT';
-          movement.reason = 'INITIAL_STOCK';
+          movement.type = 'IN';
+          movement.reason = InventoryMovementReason.INITIAL_STOCK;
           movementsToSave.push(movement);
         }
       }

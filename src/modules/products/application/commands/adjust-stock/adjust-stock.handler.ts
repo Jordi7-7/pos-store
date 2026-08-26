@@ -6,6 +6,7 @@ import { ProductVariant } from '../../../domain/entities/product-variant.entity'
 import { ProductStock } from '../../../domain/entities/product-stock.entity';
 import { InventoryMovement } from '../../../domain/entities/inventory-movement.entity';
 import { Branch } from '../../../../branches/domain/entities/branch.entity';
+import { InventoryMovementReason } from '../../../../../common/enums/inventory-movement-reason.enum';
 
 @CommandHandler(AdjustStockCommand)
 export class AdjustStockHandler implements ICommandHandler<AdjustStockCommand> {
@@ -14,9 +15,9 @@ export class AdjustStockHandler implements ICommandHandler<AdjustStockCommand> {
   constructor(private readonly entityManager: EntityManager) {}
 
   async execute(command: AdjustStockCommand): Promise<any> {
-    const { tenantId, branchId, variantId, quantity, type, reason, comment } = command;
+    const { tenantId, branchId, variantId, quantity, type, comment } = command;
     this.logger.log(
-      `Executing stock adjustment: Type ${type}, Reason ${reason}, Qty ${quantity} for Variant ${variantId} on Branch ${branchId}`,
+      `Executing stock adjustment: Type ${type}, Qty ${quantity} for Variant ${variantId} on Branch ${branchId}`,
     );
 
     if (quantity <= 0) {
@@ -80,7 +81,7 @@ export class AdjustStockHandler implements ICommandHandler<AdjustStockCommand> {
       movement.variantId = variantId;
       movement.quantity = quantity;
       movement.type = type;
-      movement.reason = reason;
+      movement.reason = InventoryMovementReason.ADJUSTMENT;
 
       if (type === 'IN') {
         movement.originBranchId = null;

@@ -17,10 +17,6 @@ export class AdjustStockDto {
   @IsNotEmpty()
   type: 'IN' | 'OUT';
 
-  @IsIn(['ROBBERY', 'DAMAGE', 'EXPIRED', 'ADJUSTMENT', 'INTERNAL_USE'])
-  @IsNotEmpty()
-  reason: 'ROBBERY' | 'DAMAGE' | 'EXPIRED' | 'ADJUSTMENT' | 'INTERNAL_USE';
-
   @IsString()
   @IsOptional()
   comment?: string;

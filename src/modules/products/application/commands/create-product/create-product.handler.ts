@@ -10,6 +10,7 @@ import { ProductImage } from '../../../domain/entities/product-image.entity';
 import { Category } from '../../../domain/entities/category.entity';
 import { ProductBatch } from '../../../domain/entities/product-batch.entity';
 import { InventoryMovement } from '../../../domain/entities/inventory-movement.entity';
+import { InventoryMovementReason } from '../../../../../common/enums/inventory-movement-reason.enum';
 
 @CommandHandler(CreateProductCommand)
 export class CreateProductHandler implements ICommandHandler<CreateProductCommand> {
@@ -162,8 +163,8 @@ export class CreateProductHandler implements ICommandHandler<CreateProductComman
               movement.variantId = variant.id;
               movement.purchaseOrderId = null;
               movement.quantity = Number(stock.quantity);
-              movement.type = 'INPUT';
-              movement.reason = 'INITIAL_STOCK';
+              movement.type = 'IN';
+              movement.reason = InventoryMovementReason.INITIAL_STOCK;
               movementsToSave.push(movement);
             }
           }

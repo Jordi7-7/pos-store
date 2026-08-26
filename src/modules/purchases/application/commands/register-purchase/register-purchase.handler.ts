@@ -10,6 +10,7 @@ import { ProductVariant } from '../../../../products/domain/entities/product-var
 import { ProductStock } from '../../../../products/domain/entities/product-stock.entity';
 import { InventoryMovement } from '../../../../products/domain/entities/inventory-movement.entity';
 import { ProductBatch } from '../../../../products/domain/entities/product-batch.entity';
+import { InventoryMovementReason } from '../../../../../common/enums/inventory-movement-reason.enum';
 
 @CommandHandler(RegisterPurchaseCommand)
 export class RegisterPurchaseHandler implements ICommandHandler<RegisterPurchaseCommand> {
@@ -161,7 +162,7 @@ export class RegisterPurchaseHandler implements ICommandHandler<RegisterPurchase
         movement.variantId = itemDto.variantId;
         movement.quantity = newQty;
         movement.type = 'IN';
-        movement.reason = 'COMPRA';
+        movement.reason = InventoryMovementReason.COMPRA;
         movement.purchaseOrderId = savedPurchase.id;
         inventoryMovements.push(movement);
       }

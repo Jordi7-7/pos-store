@@ -11,6 +11,7 @@ import { InventoryMovement } from '../../../../products/domain/entities/inventor
 import { ProductBatch } from '../../../../products/domain/entities/product-batch.entity';
 import { CashSession } from '../../../domain/entities/cash-session.entity';
 import { Customer } from '../../../../customers/domain/entities/customer.entity';
+import { InventoryMovementReason } from '../../../../../common/enums/inventory-movement-reason.enum';
 
 @CommandHandler(ProcessSaleCommand)
 export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
@@ -159,7 +160,7 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
         movement.variantId = itemDto.variantId;
         movement.quantity = itemDto.quantity;
         movement.type = 'OUT';
-        movement.reason = 'VENTA';
+        movement.reason = InventoryMovementReason.VENTA;
         inventoryMovements.push(movement);
       }
 

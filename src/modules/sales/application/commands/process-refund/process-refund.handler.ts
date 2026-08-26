@@ -3,6 +3,7 @@ import { Logger, BadRequestException, NotFoundException } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { ProcessRefundCommand } from './process-refund.command';
 import { Refund } from '../../../domain/entities/refund.entity';
+import { InventoryMovementReason } from '../../../../../common/enums/inventory-movement-reason.enum';
 import { RefundItem } from '../../../domain/entities/refund-item.entity';
 import { Sale } from '../../../domain/entities/sale.entity';
 import { CashSession } from '../../../domain/entities/cash-session.entity';
@@ -128,7 +129,7 @@ export class ProcessRefundHandler implements ICommandHandler<ProcessRefundComman
         movement.variantId = itemDto.variantId;
         movement.quantity = itemDto.quantity;
         movement.type = 'IN';
-        movement.reason = 'DEVOLUCION';
+        movement.reason = InventoryMovementReason.DEVOLUCION;
         inventoryMovements.push(movement);
       }
 
