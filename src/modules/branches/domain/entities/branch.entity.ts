@@ -11,6 +11,9 @@ export class Branch extends BaseEntity {
   @JoinColumn({ name: 'tenant_id' })
   tenant: Tenant;
 
+  @Column({ type: 'integer', nullable: true, default: 1 })
+  code?: number;
+
   @Column()
   name: string;
 

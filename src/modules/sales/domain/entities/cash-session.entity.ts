@@ -3,6 +3,7 @@ import { BaseEntity } from '../../../../common/database/base.entity';
 import { Branch } from '../../../branches/domain/entities/branch.entity';
 import { User } from '../../../users/domain/entities/user.entity';
 import { ColumnNumericTransformer } from '../../../../common/database/numeric-transformer';
+import { CashRegister } from './cash-register.entity';
 
 @Entity('cash_sessions')
 export class CashSession extends BaseEntity {
@@ -47,4 +48,11 @@ export class CashSession extends BaseEntity {
 
   @Column({ name: 'closed_at', type: 'timestamp with time zone', nullable: true })
   closedAt: Date | null;
+
+  @Column({ name: 'cash_register_id', type: 'uuid', nullable: true })
+  cashRegisterId: string | null;
+
+  @ManyToOne(() => CashRegister)
+  @JoinColumn({ name: 'cash_register_id' })
+  cashRegister: CashRegister | null;
 }

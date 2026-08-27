@@ -66,6 +66,7 @@ export class OnboardTenantHandler implements ICommandHandler<OnboardTenantComman
       branch.tenantId = savedTenant.id;
       branch.name = branchName;
       branch.address = branchAddress;
+      branch.code = 1;
       branch.isActive = true;
       const savedBranch = await transactionalManager.save(branch);
 

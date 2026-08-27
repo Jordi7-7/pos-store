@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { CqrsModule } from '@nestjs/cqrs';
 import { CashSession } from './domain/entities/cash-session.entity';
+import { CashRegister } from './domain/entities/cash-register.entity';
 import { Sale } from './domain/entities/sale.entity';
 import { SaleItem } from './domain/entities/sale-item.entity';
 import { SalePayment } from './domain/entities/sale-payment.entity';
@@ -22,6 +23,7 @@ import { SalesController } from './infrastructure/controllers/sales.controller';
   imports: [
     TypeOrmModule.forFeature([
       CashSession,
+      CashRegister,
       Sale,
       SaleItem,
       SalePayment,

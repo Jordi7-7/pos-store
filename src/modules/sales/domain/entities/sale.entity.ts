@@ -93,4 +93,7 @@ export class Sale extends BaseEntity {
 
   @OneToMany(() => SalePayment, (payment) => payment.sale, { cascade: true })
   payments: SalePayment[];
+
+  @Column({ name: 'invoice_number', type: 'varchar', nullable: true })
+  invoiceNumber: string | null;
 }

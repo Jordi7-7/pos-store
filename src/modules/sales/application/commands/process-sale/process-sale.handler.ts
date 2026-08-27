@@ -10,6 +10,7 @@ import { ProductVariant } from '../../../../products/domain/entities/product-var
 import { InventoryMovement } from '../../../../products/domain/entities/inventory-movement.entity';
 import { ProductBatch } from '../../../../products/domain/entities/product-batch.entity';
 import { CashSession } from '../../../domain/entities/cash-session.entity';
+import { CashRegister } from '../../../domain/entities/cash-register.entity';
 import { Customer } from '../../../../customers/domain/entities/customer.entity';
 import { InventoryMovementReason } from '../../../../../common/enums/inventory-movement-reason.enum';
 
@@ -56,6 +57,42 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
         this.logger.warn(`Sale failed: active cash session ${cashSessionId} not found or closed for branch ${branchId} under tenant ${tenantId}`);
         throw new BadRequestException('Active cash session not found for this branch');
       }
+
+      // Lock cash register and generate invoice number
+      const registerRepo = transactionalManager.getRepository(CashRegister);
+      let registerId = cashSession.cashRegisterId;
+      if (!registerId) {
+        let reg = await registerRepo.findOne({
+          where: { branchId, code: 1, tenantId }
+        });
+        if (!reg) {
+          reg = new CashRegister();
+          reg.tenantId = tenantId;
+          reg.branchId = branchId;
+          reg.code = 1;
+          reg.name = 'Caja Principal 1';
+          reg.nextInvoiceNumber = 1;
+          reg = await registerRepo.save(reg);
+        }
+        registerId = reg.id;
+      }
+
+      const register = await registerRepo.findOne({
+        where: { id: registerId },
+        lock: { mode: 'pessimistic_write' }
+      });
+      if (!register) {
+        throw new BadRequestException('Cash register not found');
+      }
+
+      const branchCode = String(cashSession.branch.code || 1).padStart(3, '0');
+      const registerCode = String(register.code || 1).padStart(3, '0');
+      const seqStr = String(register.nextInvoiceNumber).padStart(9, '0');
+      const invoiceNumber = `${branchCode}-${registerCode}-${seqStr}`;
+
+      // Increment sequential count
+      register.nextInvoiceNumber += 1;
+      await registerRepo.save(register);
 
       // 3. Validate Customer belongs to Tenant if provided
       if (customerId) {
@@ -171,6 +208,7 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
       sale.tenantId = tenantId;
       sale.branchId = branchId;
       sale.cashSessionId = cashSessionId;
+      sale.invoiceNumber = invoiceNumber;
       sale.customerId = customerId || null;
       sale.subtotal = Number(subtotal.toFixed(2));
       sale.total = total;

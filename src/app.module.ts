@@ -23,6 +23,7 @@ import { ProductStock } from './modules/products/domain/entities/product-stock.e
 import { InventoryMovement } from './modules/products/domain/entities/inventory-movement.entity';
 import { Tag } from './modules/products/domain/entities/tag.entity';
 import { CashSession } from './modules/sales/domain/entities/cash-session.entity';
+import { CashRegister } from './modules/sales/domain/entities/cash-register.entity';
 import { Sale } from './modules/sales/domain/entities/sale.entity';
 import { SaleItem } from './modules/sales/domain/entities/sale-item.entity';
 import { SalePayment } from './modules/sales/domain/entities/sale-payment.entity';
@@ -71,6 +72,7 @@ import { ReportsModule } from './modules/reports/reports.module';
         ProductStock,
         InventoryMovement,
         CashSession,
+        CashRegister,
         Sale,
         SaleItem,
         SalePayment,
