@@ -26,6 +26,7 @@ export class OnboardTenantHandler implements ICommandHandler<OnboardTenantComman
       country,
       currencyCode,
       currencySymbol,
+      timezone,
       adminName,
       email,
       password,
@@ -57,6 +58,7 @@ export class OnboardTenantHandler implements ICommandHandler<OnboardTenantComman
       tenant.country = country;
       tenant.currencyCode = currencyCode;
       tenant.currencySymbol = currencySymbol;
+      tenant.timezone = timezone;
       const savedTenant = await transactionalManager.save(tenant);
 
       // B. Create Default Branch

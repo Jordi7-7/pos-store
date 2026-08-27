@@ -5,6 +5,7 @@ export class OnboardTenantCommand {
     public readonly country: string,
     public readonly currencyCode: string,
     public readonly currencySymbol: string,
+    public readonly timezone: string,
     public readonly adminName: string,
     public readonly email: string,
     public readonly password: string,

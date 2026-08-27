@@ -30,6 +30,7 @@ export class AuthController {
         dto.country,
         dto.currencyCode,
         dto.currencySymbol,
+        dto.timezone,
         dto.adminName,
         dto.email,
         dto.password,

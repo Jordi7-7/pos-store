@@ -22,6 +22,10 @@ export class OnboardTenantDto {
   @IsNotEmpty()
   currencySymbol: string;
 
+  @IsString()
+  @IsNotEmpty()
+  timezone: string;
+
   // Admin User Details
   @IsString()
   @IsNotEmpty()
