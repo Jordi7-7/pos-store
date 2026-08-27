@@ -31,6 +31,8 @@ import { GetInventoryMovementsHandler } from './application/queries/get-inventor
 import { GetTagsHandler } from './application/queries/get-tags/get-tags.handler';
 import { CreateTagHandler } from './application/commands/create-tag/create-tag.handler';
 import { UpdateVariantTagsHandler } from './application/commands/update-variant-tags/update-variant-tags.handler';
+import { GetPosVariantBySkuHandler } from './application/queries/get-pos-variant-by-sku/get-pos-variant-by-sku.handler';
+import { GetPosVariantsHandler } from './application/queries/get-pos-variants/get-pos-variants.handler';
 import { ProductsController } from './infrastructure/controllers/products.controller';
 
 @Module({
@@ -71,6 +73,8 @@ import { ProductsController } from './infrastructure/controllers/products.contro
     GetTagsHandler,
     CreateTagHandler,
     UpdateVariantTagsHandler,
+    GetPosVariantBySkuHandler,
+    GetPosVariantsHandler,
   ],
 })
 export class ProductsModule {}

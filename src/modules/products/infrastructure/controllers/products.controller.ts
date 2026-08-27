@@ -15,6 +15,8 @@ import { GetCategoriesQuery } from '../../application/queries/get-categories/get
 import { GetProductsQuery } from '../../application/queries/get-products/get-products.query';
 import { GetProductByIdQuery } from '../../application/queries/get-product-by-id/get-product-by-id.query';
 import { GetVariantBySkuQuery } from '../../application/queries/get-variant-by-sku/get-variant-by-sku.query';
+import { GetPosVariantBySkuQuery } from '../../application/queries/get-pos-variant-by-sku/get-pos-variant-by-sku.query';
+import { GetPosVariantsQuery } from '../../application/queries/get-pos-variants/get-pos-variants.query';
 import { UpdateProductDto } from '../../application/commands/update-product/update-product.dto';
 import { UpdateProductCommand } from '../../application/commands/update-product/update-product.command';
 import { DeleteProductCommand } from '../../application/commands/delete-product/delete-product.command';
@@ -201,6 +203,23 @@ export class ProductsController {
     @Param('sku') sku: string,
   ) {
     return this.queryBus.execute(new GetVariantBySkuQuery(tenantId, sku));
+  }
+
+  @Get('pos/variant/sku/:sku')
+  async findPosVariantBySku(
+    @CurrentUser('tenantId') tenantId: string,
+    @Param('sku') sku: string,
+    @Query('branchId') branchId: string,
+  ) {
+    return this.queryBus.execute(new GetPosVariantBySkuQuery(tenantId, sku, branchId));
+  }
+
+  @Get('pos/variants')
+  async findPosVariants(
+    @CurrentUser('tenantId') tenantId: string,
+    @Query('branchId') branchId: string,
+  ) {
+    return this.queryBus.execute(new GetPosVariantsQuery(tenantId, branchId));
   }
 
   @Get(':id')
