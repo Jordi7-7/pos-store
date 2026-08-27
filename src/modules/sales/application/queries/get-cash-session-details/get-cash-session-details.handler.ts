@@ -38,7 +38,12 @@ export class GetCashSessionDetailsHandler implements IQueryHandler<GetCashSessio
 
     const sales = await this.saleRepository.find({
       where: { cashSessionId: sessionId, tenantId },
-      relations: { customer: true, user: true, items: true },
+      relations: {
+        customer: true,
+        user: true,
+        items: { variant: { product: true, attributeValues: { attribute: true } } },
+        payments: true,
+      },
       order: { createdAt: 'ASC' },
     });
 
