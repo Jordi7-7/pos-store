@@ -19,6 +19,7 @@ import { CreateCategoryHandler } from './application/commands/create-category/cr
 import { GetCategoriesHandler } from './application/queries/get-categories/get-categories.handler';
 import { GetProductsHandler } from './application/queries/get-products/get-products.handler';
 import { GetProductByIdHandler } from './application/queries/get-product-by-id/get-product-by-id.handler';
+import { GetVariantBySkuHandler } from './application/queries/get-variant-by-sku/get-variant-by-sku.handler';
 import { UpdateProductHandler } from './application/commands/update-product/update-product.handler';
 import { DeleteProductHandler } from './application/commands/delete-product/delete-product.handler';
 import { CreateVariantHandler } from './application/commands/create-variant/create-variant.handler';
@@ -58,6 +59,7 @@ import { ProductsController } from './infrastructure/controllers/products.contro
     GetCategoriesHandler,
     GetProductsHandler,
     GetProductByIdHandler,
+    GetVariantBySkuHandler,
     UpdateProductHandler,
     DeleteProductHandler,
     CreateVariantHandler,

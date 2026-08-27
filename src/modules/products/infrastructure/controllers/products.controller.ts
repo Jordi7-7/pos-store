@@ -14,6 +14,7 @@ import { CreateCategoryCommand } from '../../application/commands/create-categor
 import { GetCategoriesQuery } from '../../application/queries/get-categories/get-categories.query';
 import { GetProductsQuery } from '../../application/queries/get-products/get-products.query';
 import { GetProductByIdQuery } from '../../application/queries/get-product-by-id/get-product-by-id.query';
+import { GetVariantBySkuQuery } from '../../application/queries/get-variant-by-sku/get-variant-by-sku.query';
 import { UpdateProductDto } from '../../application/commands/update-product/update-product.dto';
 import { UpdateProductCommand } from '../../application/commands/update-product/update-product.command';
 import { DeleteProductCommand } from '../../application/commands/delete-product/delete-product.command';
@@ -192,6 +193,14 @@ export class ProductsController {
     @Body() body: { name: string },
   ) {
     return this.commandBus.execute(new CreateTagCommand(tenantId, body.name));
+  }
+
+  @Get('variant/sku/:sku')
+  async findVariantBySku(
+    @CurrentUser('tenantId') tenantId: string,
+    @Param('sku') sku: string,
+  ) {
+    return this.queryBus.execute(new GetVariantBySkuQuery(tenantId, sku));
   }
 
   @Get(':id')
