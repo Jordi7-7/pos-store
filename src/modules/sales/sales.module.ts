@@ -17,6 +17,7 @@ import { ProcessRefundHandler } from './application/commands/process-refund/proc
 import { GetSalesHandler } from './application/queries/get-sales/get-sales.handler';
 import { GetCashSessionsHandler } from './application/queries/get-cash-sessions/get-cash-sessions.handler';
 import { GetCashSessionDetailsHandler } from './application/queries/get-cash-session-details/get-cash-session-details.handler';
+import { GetSaleByInvoiceHandler } from './application/queries/get-sale-by-invoice/get-sale-by-invoice.handler';
 import { SalesController } from './infrastructure/controllers/sales.controller';
 
 @Module({
@@ -43,6 +44,7 @@ import { SalesController } from './infrastructure/controllers/sales.controller';
     GetSalesHandler,
     GetCashSessionsHandler,
     GetCashSessionDetailsHandler,
+    GetSaleByInvoiceHandler,
   ],
 })
 export class SalesModule {}

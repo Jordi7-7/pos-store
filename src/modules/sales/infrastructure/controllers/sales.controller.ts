@@ -14,6 +14,7 @@ import { ProcessRefundCommand } from '../../application/commands/process-refund/
 import { GetSalesQuery } from '../../application/queries/get-sales/get-sales.query';
 import { GetCashSessionsQuery } from '../../application/queries/get-cash-sessions/get-cash-sessions.query';
 import { GetCashSessionDetailsQuery } from '../../application/queries/get-cash-session-details/get-cash-session-details.query';
+import { GetSaleByInvoiceQuery } from '../../application/queries/get-sale-by-invoice/get-sale-by-invoice.query';
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
 import { CashSession } from '../../domain/entities/cash-session.entity';
 import { Expense } from '../../domain/entities/expense.entity';
@@ -185,5 +186,13 @@ export class SalesController {
     @Param('id') id: string,
   ) {
     return this.queryBus.execute(new GetCashSessionDetailsQuery(tenantId, id));
+  }
+
+  @Get('invoice/:invoiceNumber')
+  async getSaleByInvoice(
+    @CurrentUser('tenantId') tenantId: string,
+    @Param('invoiceNumber') invoiceNumber: string,
+  ) {
+    return this.queryBus.execute(new GetSaleByInvoiceQuery(tenantId, invoiceNumber));
   }
 }
