@@ -15,6 +15,7 @@ import { ImportPurchasesHandler } from './application/commands/import-purchases/
 import { ValidateImportPurchasesHandler } from './application/queries/validate-import-purchases/validate-import-purchases.handler';
 import { GetPurchasesHandler } from './application/queries/get-purchases/get-purchases.handler';
 import { GetSuppliersHandler } from './application/queries/get-suppliers/get-suppliers.handler';
+import { GetPurchasesByProductHandler } from './application/queries/get-purchases-by-product/get-purchases-by-product.handler';
 import { PurchasesController } from './infrastructure/controllers/purchases.controller';
 
 @Module({
@@ -39,6 +40,7 @@ import { PurchasesController } from './infrastructure/controllers/purchases.cont
     ValidateImportPurchasesHandler,
     GetPurchasesHandler,
     GetSuppliersHandler,
+    GetPurchasesByProductHandler,
   ],
   exports: [TypeOrmModule],
 })

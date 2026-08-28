@@ -28,6 +28,7 @@ import { ImportProductsCommand } from '../../application/commands/import-product
 import { ValidateImportProductsQuery } from '../../application/queries/validate-import-products/validate-import-products.query';
 import { GetAttributesQuery } from '../../application/queries/get-attributes/get-attributes.query';
 import { GetInventoryMovementsQuery } from '../../application/queries/get-inventory-movements/get-inventory-movements.query';
+import { GetInventoryMovementsByVariantQuery } from '../../application/queries/get-inventory-movements-by-variant/get-inventory-movements-by-variant.query';
 import { GetTagsQuery } from '../../application/queries/get-tags/get-tags.query';
 import { CreateTagCommand } from '../../application/commands/create-tag/create-tag.command';
 import { UpdateVariantTagsCommand } from '../../application/commands/update-variant-tags/update-variant-tags.command';
@@ -160,9 +161,31 @@ export class ProductsController {
   @Get('inventory-movements')
   async getMovements(
     @CurrentUser('tenantId') tenantId: string,
-    @Query('variantId') variantId?: string,
+    @Query('branchId') branchId: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
   ) {
-    return this.queryBus.execute(new GetInventoryMovementsQuery(tenantId, variantId));
+    return this.queryBus.execute(new GetInventoryMovementsQuery(
+      tenantId,
+      branchId,
+      page ? Number(page) : 1,
+      limit ? Number(limit) : 10,
+    ));
+  }
+
+  @Get('inventory-movements-by-variant')
+  async getMovementsByVariant(
+    @CurrentUser('tenantId') tenantId: string,
+    @Query('variantId') variantId: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.queryBus.execute(new GetInventoryMovementsByVariantQuery(
+      tenantId,
+      variantId,
+      page ? Number(page) : 1,
+      limit ? Number(limit) : 10,
+    ));
   }
 
   @Post('stock-adjustments')

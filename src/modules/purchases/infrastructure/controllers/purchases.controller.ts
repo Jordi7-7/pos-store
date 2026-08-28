@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get, Patch, Param } from '@nestjs/common';
+import { Controller, Post, Body, Get, Patch, Param, Query } from '@nestjs/common';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
 import { CreateSupplierDto } from '../../application/commands/create-supplier/create-supplier.dto';
 import { CreateSupplierCommand } from '../../application/commands/create-supplier/create-supplier.command';
@@ -11,6 +11,7 @@ import { ValidateImportPurchasesDto, ImportPurchasesDto } from '../../applicatio
 import { ImportPurchasesCommand } from '../../application/commands/import-purchases/import-purchases.command';
 import { ValidateImportPurchasesQuery } from '../../application/queries/validate-import-purchases/validate-import-purchases.query';
 import { GetPurchasesQuery } from '../../application/queries/get-purchases/get-purchases.query';
+import { GetPurchasesByProductQuery } from '../../application/queries/get-purchases-by-product/get-purchases-by-product.query';
 
 @Controller('purchases')
 export class PurchasesController {
@@ -60,6 +61,21 @@ export class PurchasesController {
   @Get()
   async getPurchases(@CurrentUser('tenantId') tenantId: string) {
     return this.queryBus.execute(new GetPurchasesQuery(tenantId));
+  }
+
+  @Get('by-product/:productId')
+  async getPurchasesByProduct(
+    @CurrentUser('tenantId') tenantId: string,
+    @Param('productId') productId: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.queryBus.execute(new GetPurchasesByProductQuery(
+      tenantId,
+      productId,
+      page ? Number(page) : 1,
+      limit ? Number(limit) : 10,
+    ));
   }
 
   @Patch(':id/cancel')
