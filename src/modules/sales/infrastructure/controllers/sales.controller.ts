@@ -16,6 +16,7 @@ import { GetCashSessionsQuery } from '../../application/queries/get-cash-session
 import { GetCashSessionDetailsQuery } from '../../application/queries/get-cash-session-details/get-cash-session-details.query';
 import { GetSaleByInvoiceQuery } from '../../application/queries/get-sale-by-invoice/get-sale-by-invoice.query';
 import { GetSalesByProductQuery } from '../../application/queries/get-sales-by-product/get-sales-by-product.query';
+import { GetSalesPaginatedQuery } from '../../application/queries/get-sales-paginated/get-sales-paginated.query';
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
 import { CashSession } from '../../domain/entities/cash-session.entity';
 import { Expense } from '../../domain/entities/expense.entity';
@@ -69,6 +70,23 @@ export class SalesController {
   @Get()
   async findSales(@CurrentUser('tenantId') tenantId: string) {
     return this.queryBus.execute(new GetSalesQuery(tenantId));
+  }
+
+  @Get('paginated')
+  async findSalesPaginated(
+    @CurrentUser('tenantId') tenantId: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.queryBus.execute(new GetSalesPaginatedQuery(
+      tenantId,
+      startDate,
+      endDate,
+      page ? Number(page) : 1,
+      limit ? Number(limit) : 10,
+    ));
   }
 
   @Get('by-product/:productId')

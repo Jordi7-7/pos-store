@@ -19,6 +19,7 @@ import { GetCashSessionsHandler } from './application/queries/get-cash-sessions/
 import { GetCashSessionDetailsHandler } from './application/queries/get-cash-session-details/get-cash-session-details.handler';
 import { GetSaleByInvoiceHandler } from './application/queries/get-sale-by-invoice/get-sale-by-invoice.handler';
 import { GetSalesByProductHandler } from './application/queries/get-sales-by-product/get-sales-by-product.handler';
+import { GetSalesPaginatedHandler } from './application/queries/get-sales-paginated/get-sales-paginated.handler';
 import { SalesController } from './infrastructure/controllers/sales.controller';
 
 @Module({
@@ -47,6 +48,7 @@ import { SalesController } from './infrastructure/controllers/sales.controller';
     GetCashSessionDetailsHandler,
     GetSaleByInvoiceHandler,
     GetSalesByProductHandler,
+    GetSalesPaginatedHandler,
   ],
 })
 export class SalesModule {}

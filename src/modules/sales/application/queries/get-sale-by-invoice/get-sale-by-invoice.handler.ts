@@ -30,6 +30,9 @@ export class GetSaleByInvoiceHandler implements IQueryHandler<GetSaleByInvoiceQu
           },
         },
         customer: true,
+        branch: true,
+        user: true,
+        payments: true,
       },
     });
 
@@ -40,7 +43,8 @@ export class GetSaleByInvoiceHandler implements IQueryHandler<GetSaleByInvoiceQu
     // Load all refunds for this sale to know already-refunded quantities per variant
     const existingRefunds = await this.refundRepo.find({
       where: { saleId: sale.id },
-      relations: { items: true },
+      relations: { items: { variant: { product: true } }, user: true },
+      order: { createdAt: 'ASC' },
     });
 
     // Accumulate total refunded qty per variantId
@@ -64,6 +68,30 @@ export class GetSaleByInvoiceHandler implements IQueryHandler<GetSaleByInvoiceQu
       cashSessionId: sale.cashSessionId,
       createdAt: sale.createdAt,
       isFullyRefunded: sale.status === 'REFUNDED',
+      branch: sale.branch
+        ? { id: sale.branch.id, name: sale.branch.name, address: sale.branch.address }
+        : null,
+      user: sale.user ? { id: sale.user.id, name: sale.user.name } : null,
+      payments: sale.payments.map((payment) => ({
+        id: payment.id,
+        paymentMethod: payment.paymentMethod,
+        amount: Number(payment.amount),
+      })),
+      refunds: existingRefunds.map((refund) => ({
+        id: refund.id,
+        createdAt: refund.createdAt,
+        reason: refund.reason,
+        totalRefunded: Number(refund.totalRefunded),
+        user: refund.user ? { id: refund.user.id, name: refund.user.name } : null,
+        items: refund.items.map((item) => ({
+          id: item.id,
+          variantId: item.variantId,
+          sku: item.variant?.sku ?? '',
+          productName: item.variant?.product?.name ?? 'Producto',
+          quantity: Number(item.quantity),
+          priceRefunded: Number(item.priceRefunded),
+        })),
+      })),
       customer: sale.customer
         ? { id: sale.customer.id, name: sale.customer.name }
         : null,
