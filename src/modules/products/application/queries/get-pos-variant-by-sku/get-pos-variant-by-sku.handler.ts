@@ -8,34 +8,37 @@ import { ProductVariant } from '../../../domain/entities/product-variant.entity'
 export class GetPosVariantBySkuHandler implements IQueryHandler<GetPosVariantBySkuQuery> {
   constructor(private readonly entityManager: EntityManager) {}
 
-  async execute(query: GetPosVariantBySkuQuery): Promise<any> {
+  async execute(query: GetPosVariantBySkuQuery): Promise<any[]> {
     const { tenantId, sku, branchId } = query;
     const repo = this.entityManager.getRepository(ProductVariant);
+    const searchString = sku.trim();
 
-    const variant = await repo.createQueryBuilder('variant')
+    const variants = await repo.createQueryBuilder('variant')
       .innerJoinAndSelect('variant.product', 'product')
       .leftJoinAndSelect('variant.attributeValues', 'attributeValue')
       .leftJoinAndSelect('attributeValue.attribute', 'attribute')
       .leftJoinAndSelect('variant.stocks', 'stock', 'stock.branchId = :branchId', { branchId })
       .where('variant.tenantId = :tenantId', { tenantId })
-      .andWhere('LOWER(variant.sku) = LOWER(:sku)', { sku: sku.trim() })
-      .getOne();
+      .andWhere(
+        '(variant.sku = :searchString OR variant.barcode = :searchString)',
+        { searchString }
+      )
+      .getMany();
 
-    if (!variant) {
-      throw new NotFoundException(`Variante con SKU ${sku} no encontrada`);
-    }
+    return variants.map(variant => {
+      const branchStock = variant.stocks ? variant.stocks.find(s => s.branchId === branchId) : null;
+      const stockQuantity = branchStock ? Number(branchStock.quantity) : 0;
 
-    const branchStock = variant.stocks ? variant.stocks.find(s => s.branchId === branchId) : null;
-    const stockQuantity = branchStock ? Number(branchStock.quantity) : 0;
-
-    return {
-      id: variant.id,
-      sku: variant.sku,
-      purchasePrice: variant.purchasePrice,
-      salePrice: variant.salePrice,
-      productName: variant.product.name,
-      stock: stockQuantity,
-      attributeValues: variant.attributeValues || [],
-    };
+      return {
+        id: variant.id,
+        sku: variant.sku,
+        barcode: variant.barcode,
+        purchasePrice: variant.purchasePrice,
+        salePrice: variant.salePrice,
+        productName: variant.product.name,
+        stock: stockQuantity,
+        attributeValues: variant.attributeValues || [],
+      };
+    });
   }
 }
