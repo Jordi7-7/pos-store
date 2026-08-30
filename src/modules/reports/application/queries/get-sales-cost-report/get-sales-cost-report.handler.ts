@@ -47,7 +47,7 @@ export class GetSalesCostReportHandler implements IQueryHandler<GetSalesCostRepo
 
       return {
         id: sale.id,
-        invoiceNumber: `FAC-${sale.id.replace(/-/g, '').slice(0, 8).toUpperCase()}`,
+        invoiceNumber: sale.invoiceNumber,
         createdAt: sale.createdAt,
         clientName: sale.customer?.name || 'PUBLICO VENTA DE MOSTRADOR',
         pieces,

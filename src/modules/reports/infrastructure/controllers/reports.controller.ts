@@ -33,9 +33,15 @@ export class ReportsController {
   @Get('valued-inventory')
   async getValuedInventory(
     @CurrentUser('tenantId') tenantId: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
   ) {
     return this.queryBus.execute(
-      new GetValuedInventoryQuery(tenantId),
+      new GetValuedInventoryQuery(
+        tenantId,
+        page ? Number(page) : undefined,
+        limit ? Number(limit) : undefined,
+      ),
     );
   }
 }
