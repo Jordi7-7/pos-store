@@ -1,4 +1,4 @@
-import { Entity, Column, ManyToOne, JoinColumn, ManyToMany, JoinTable, OneToMany } from 'typeorm';
+import { Entity, Column, ManyToOne, JoinColumn, ManyToMany, JoinTable, OneToMany, Index } from 'typeorm';
 import { BaseEntity } from '../../../../common/database/base.entity';
 import { Product } from './product.entity';
 import { AttributeValue } from './attribute-value.entity';
@@ -9,6 +9,8 @@ import { Tenant } from '../../../tenants/domain/entities/tenant.entity';
 import { Tag } from './tag.entity';
 
 @Entity('product_variants')
+@Index('idx_product_variants_tenant_sku', ['tenantId', 'sku'], { unique: true, where: 'deleted_at IS NULL' })
+@Index('idx_product_variants_tenant_barcode', ['tenantId', 'barcode'], { unique: false, where: 'deleted_at IS NULL' })
 export class ProductVariant extends BaseEntity {
   @Column({ name: 'product_id', type: 'uuid' })
   productId: string;
