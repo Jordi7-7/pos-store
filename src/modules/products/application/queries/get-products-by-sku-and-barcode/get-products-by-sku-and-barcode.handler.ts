@@ -1,15 +1,16 @@
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
 import { EntityManager } from 'typeorm';
-import { GetProductsQuery } from './get-products.query';
+import { GetProductsBySkuAndBarcodeQuery } from './get-products-by-sku-and-barcode.query';
 import { ProductVariant } from '../../../domain/entities/product-variant.entity';
 
-@QueryHandler(GetProductsQuery)
-export class GetProductsHandler implements IQueryHandler<GetProductsQuery> {
+@QueryHandler(GetProductsBySkuAndBarcodeQuery)
+export class GetProductsBySkuAndBarcodeHandler implements IQueryHandler<GetProductsBySkuAndBarcodeQuery> {
   constructor(private readonly entityManager: EntityManager) {}
 
-  async execute(query: GetProductsQuery): Promise<any> {
-    const { tenantId, page = 1, limit = 10 } = query;
+  async execute(query: GetProductsBySkuAndBarcodeQuery): Promise<any> {
+    const { tenantId, code, page = 1, limit = 10 } = query;
     const repo = this.entityManager.getRepository(ProductVariant);
+    const searchCode = `%${code.trim()}%`;
     const take = limit;
     const skip = (page - 1) * limit;
 
@@ -21,6 +22,7 @@ export class GetProductsHandler implements IQueryHandler<GetProductsQuery> {
       .leftJoinAndSelect('attributeValues.attribute', 'attribute')
       .leftJoinAndSelect('variant.tags', 'tags')
       .where('variant.tenantId = :tenantId', { tenantId })
+      .andWhere('(variant.sku LIKE :searchCode OR variant.barcode LIKE :searchCode)', { searchCode })
       .orderBy('variant.sku', 'ASC')
       .skip(skip)
       .take(take)

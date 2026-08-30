@@ -34,6 +34,8 @@ import { CreateTagHandler } from './application/commands/create-tag/create-tag.h
 import { UpdateVariantTagsHandler } from './application/commands/update-variant-tags/update-variant-tags.handler';
 import { GetPosVariantBySkuHandler } from './application/queries/get-pos-variant-by-sku/get-pos-variant-by-sku.handler';
 import { GetPosVariantsHandler } from './application/queries/get-pos-variants/get-pos-variants.handler';
+import { GetProductsBySkuAndBarcodeHandler } from './application/queries/get-products-by-sku-and-barcode/get-products-by-sku-and-barcode.handler';
+import { GetProductsByNameHandler } from './application/queries/get-products-by-name/get-products-by-name.handler';
 import { ProductsController } from './infrastructure/controllers/products.controller';
 
 @Module({
@@ -77,6 +79,8 @@ import { ProductsController } from './infrastructure/controllers/products.contro
     UpdateVariantTagsHandler,
     GetPosVariantBySkuHandler,
     GetPosVariantsHandler,
+    GetProductsBySkuAndBarcodeHandler,
+    GetProductsByNameHandler,
   ],
 })
 export class ProductsModule {}

@@ -13,6 +13,8 @@ import { CreateCategoryDto } from '../../application/commands/create-category/cr
 import { CreateCategoryCommand } from '../../application/commands/create-category/create-category.command';
 import { GetCategoriesQuery } from '../../application/queries/get-categories/get-categories.query';
 import { GetProductsQuery } from '../../application/queries/get-products/get-products.query';
+import { GetProductsBySkuAndBarcodeQuery } from '../../application/queries/get-products-by-sku-and-barcode/get-products-by-sku-and-barcode.query';
+import { GetProductsByNameQuery } from '../../application/queries/get-products-by-name/get-products-by-name.query';
 import { GetProductByIdQuery } from '../../application/queries/get-product-by-id/get-product-by-id.query';
 import { GetVariantBySkuQuery } from '../../application/queries/get-variant-by-sku/get-variant-by-sku.query';
 import { GetPosVariantBySkuQuery } from '../../application/queries/get-pos-variant-by-sku/get-pos-variant-by-sku.query';
@@ -142,19 +144,31 @@ export class ProductsController {
   }
 
   @Get()
-  async findAll(
+  async find(
     @CurrentUser('tenantId') tenantId: string,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
     @Query('search') search?: string,
   ) {
+    const p = page ? Number(page) : undefined;
+    const l = limit ? Number(limit) : undefined;
+
+    if (search && search.trim() !== '') {
+      const codeResult = await this.queryBus.execute(
+        new GetProductsBySkuAndBarcodeQuery(tenantId, search, p, l),
+      );
+
+      if (codeResult && codeResult.meta && codeResult.meta.total > 0) {
+        return codeResult;
+      }
+
+      return this.queryBus.execute(
+        new GetProductsByNameQuery(tenantId, search, p, l),
+      );
+    }
+
     return this.queryBus.execute(
-      new GetProductsQuery(
-        tenantId,
-        page ? Number(page) : undefined,
-        limit ? Number(limit) : undefined,
-        search
-      )
+      new GetProductsQuery(tenantId, p, l),
     );
   }
 
