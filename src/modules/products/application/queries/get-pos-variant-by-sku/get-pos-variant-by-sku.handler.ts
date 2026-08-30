@@ -15,6 +15,7 @@ export class GetPosVariantBySkuHandler implements IQueryHandler<GetPosVariantByS
 
     const variants = await repo.createQueryBuilder('variant')
       .innerJoinAndSelect('variant.product', 'product')
+      .leftJoinAndSelect('variant.images', 'variantImages')
       .leftJoinAndSelect('variant.attributeValues', 'attributeValue')
       .leftJoinAndSelect('attributeValue.attribute', 'attribute')
       .leftJoinAndSelect('variant.stocks', 'stock', 'stock.branchId = :branchId', { branchId })
@@ -28,6 +29,7 @@ export class GetPosVariantBySkuHandler implements IQueryHandler<GetPosVariantByS
     return variants.map(variant => {
       const branchStock = variant.stocks ? variant.stocks.find(s => s.branchId === branchId) : null;
       const stockQuantity = branchStock ? Number(branchStock.quantity) : 0;
+      const firstImage = variant.images && variant.images.length > 0 ? variant.images[0] : null;
 
       return {
         id: variant.id,
@@ -38,6 +40,7 @@ export class GetPosVariantBySkuHandler implements IQueryHandler<GetPosVariantByS
         productName: variant.product.name,
         stock: stockQuantity,
         attributeValues: variant.attributeValues || [],
+        imageUrl: firstImage ? firstImage.url : null,
       };
     });
   }
