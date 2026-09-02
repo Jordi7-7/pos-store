@@ -56,6 +56,11 @@ export class LoginHandler implements ICommandHandler<LoginCommand> {
       throw new UnauthorizedException('Invalid email/username or password');
     }
 
+    if (user.isActive === false) {
+      this.logger.warn(`Login failed: user ${user.id} (${identifier}) is deactivated`);
+      throw new UnauthorizedException('Usuario deshabilitado. Contacta a un administrador.');
+    }
+
     const isPasswordValid = await this.hashService.compare(password, user.password || '');
     if (!isPasswordValid) {
       this.logger.warn(`Login failed: incorrect password for identifier ${identifier}`);

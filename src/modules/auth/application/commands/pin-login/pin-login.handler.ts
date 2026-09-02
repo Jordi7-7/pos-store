@@ -47,11 +47,12 @@ export class PinLoginHandler implements ICommandHandler<PinLoginCommand> {
       .leftJoinAndSelect('user.tenant', 'tenant')
       .addSelect('user.pin')
       .where('user.tenantId = :tenantId', { tenantId: tenant.id })
-      .andWhere('user.pinEnabled = true')
+      .andWhere('user.isActive = true')
+      .andWhere('user.pin IS NOT NULL')
       .getMany();
 
     if (!users.length) {
-      throw new UnauthorizedException('No cashiers with PIN enabled found for this tenant');
+      throw new UnauthorizedException('No se encontraron cajeros con PIN configurado en esta tienda.');
     }
 
     // Find the user whose hashed PIN matches the provided PIN

@@ -31,6 +31,6 @@ export class User extends BaseEntity {
   @Column({ type: 'varchar', nullable: true, select: false })
   pin?: string;
 
-  @Column({ name: 'pin_enabled', default: false })
-  pinEnabled: boolean;
+  @Column({ name: 'is_active', type: 'boolean', default: true })
+  isActive: boolean;
 }

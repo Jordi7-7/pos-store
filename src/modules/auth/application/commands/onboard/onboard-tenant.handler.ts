@@ -80,7 +80,6 @@ export class OnboardTenantHandler implements ICommandHandler<OnboardTenantComman
       user.password = hashedPassword;
       user.role = UserRole.OWNER;
       user.pin = defaultPinHash;
-      user.pinEnabled = true;
       const savedUser = await transactionalManager.save(user);
 
       // D. Create Default Supplier

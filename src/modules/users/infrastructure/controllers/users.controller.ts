@@ -1,8 +1,10 @@
-import { Controller, Post, Body, Param, Get } from '@nestjs/common';
+import { Controller, Post, Put, Body, Param, Get } from '@nestjs/common';
 import { CommandBus } from '@nestjs/cqrs';
 import { EntityManager } from 'typeorm';
 import { CreateUserDto } from '../../application/commands/create-user/create-user.dto';
 import { CreateUserCommand } from '../../application/commands/create-user/create-user.command';
+import { UpdateUserDto } from '../../application/commands/update-user/update-user.dto';
+import { UpdateUserCommand } from '../../application/commands/update-user/update-user.command';
 import { GeneratePinCommand } from '../../application/commands/generate-pin/generate-pin.command';
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
 import { Roles } from '../../../auth/decorators/roles.decorator';
@@ -29,7 +31,21 @@ export class UsersController {
         dto.email,
         dto.password,
         dto.role,
+        dto.username,
+        dto.pin,
       ),
+    );
+  }
+
+  @Put(':id')
+  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  async update(
+    @CurrentUser('tenantId') tenantId: string,
+    @Param('id') userId: string,
+    @Body() dto: UpdateUserDto,
+  ) {
+    return this.commandBus.execute(
+      new UpdateUserCommand(tenantId, userId, dto),
     );
   }
 
@@ -47,10 +63,17 @@ export class UsersController {
   @Get()
   @Roles(UserRole.OWNER, UserRole.ADMIN)
   async list(@CurrentUser('tenantId') tenantId: string) {
-    const userRepo = this.entityManager.getRepository(User);
-    return userRepo.find({
-      where: { tenantId },
-      order: { name: 'ASC' },
-    });
+    const rawUsers = await this.entityManager
+      .getRepository(User)
+      .createQueryBuilder('user')
+      .addSelect('CASE WHEN user.pin IS NOT NULL AND user.pin != \'\' THEN true ELSE false END', 'hasPin')
+      .where('user.tenantId = :tenantId', { tenantId })
+      .orderBy('user.createdAt', 'ASC')
+      .getRawAndEntities();
+
+    return rawUsers.entities.map((user, idx) => ({
+      ...user,
+      hasPin: rawUsers.raw[idx]?.hasPin === true || rawUsers.raw[idx]?.hasPin === 'true',
+    }));
   }
 }

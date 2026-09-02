@@ -32,7 +32,6 @@ export class GeneratePinHandler implements ICommandHandler<GeneratePinCommand> {
     const hashedPin = await this.hashService.hash(pin);
 
     user.pin = hashedPin;
-    user.pinEnabled = true;
     await userRepo.save(user);
 
     this.logger.log(`PIN generated for user ${user.name} (ID: ${user.id}) in Tenant: ${tenantId}`);
