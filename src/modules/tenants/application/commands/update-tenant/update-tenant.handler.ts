@@ -1,6 +1,6 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import { EntityManager } from 'typeorm';
-import { NotFoundException } from '@nestjs/common';
+import { EntityManager, Not } from 'typeorm';
+import { NotFoundException, ConflictException } from '@nestjs/common';
 import { UpdateTenantCommand } from './update-tenant.command';
 import { Tenant } from '../../../domain/entities/tenant.entity';
 import getSymbolFromCurrency from 'currency-symbol-map';
@@ -18,6 +18,19 @@ export class UpdateTenantHandler implements ICommandHandler<UpdateTenantCommand>
 
     if (dto.name !== undefined) {
       tenant.name = dto.name;
+    }
+    if (dto.slug !== undefined) {
+      const cleanSlug = dto.slug.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+      const existingSlugTenant = await this.entityManager.findOne(Tenant, {
+        where: { slug: cleanSlug, id: Not(id) },
+      });
+      if (existingSlugTenant) {
+        throw new ConflictException(`El identificador "${cleanSlug}" ya está en uso por otra tienda`);
+      }
+      tenant.slug = cleanSlug;
+    }
+    if (dto.logoUrl !== undefined) {
+      tenant.logoUrl = dto.logoUrl ? dto.logoUrl.trim() : null;
     }
     if (dto.country !== undefined) {
       tenant.country = dto.country;

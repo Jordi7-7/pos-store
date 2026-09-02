@@ -1,8 +1,10 @@
-import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, Column, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { BaseEntity } from '../../../../common/database/base.entity';
 import { Tenant } from '../../../tenants/domain/entities/tenant.entity';
 
 @Entity('users')
+@Index(['tenantId', 'email'], { unique: true })
+@Index(['tenantId', 'username'], { unique: true })
 export class User extends BaseEntity {
   @Column({ name: 'tenant_id', type: 'uuid' })
   tenantId: string;
@@ -14,7 +16,10 @@ export class User extends BaseEntity {
   @Column()
   name: string;
 
-  @Column({ unique: true })
+  @Column({ type: 'varchar', nullable: true })
+  username?: string;
+
+  @Column()
   email: string;
 
   @Column({ select: false })
@@ -23,7 +28,7 @@ export class User extends BaseEntity {
   @Column()
   role: string;
 
-  @Column({ nullable: true, select: false })
+  @Column({ type: 'varchar', nullable: true, select: false })
   pin?: string;
 
   @Column({ name: 'pin_enabled', default: false })

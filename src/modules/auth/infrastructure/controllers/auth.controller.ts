@@ -44,7 +44,7 @@ export class AuthController {
   @Post('login')
   @HttpCode(HttpStatus.OK)
   async login(@Body() dto: LoginDto) {
-    return this.commandBus.execute(new LoginCommand(dto.email, dto.password));
+    return this.commandBus.execute(new LoginCommand(dto.email, dto.password, dto.tenantSlug));
   }
 
   @Public()
@@ -61,15 +61,15 @@ export class AuthController {
     return { message: 'Logged out successfully' };
   }
 
-  // Authenticated with admin JWT — tenant is extracted from it
+  @Public()
   @Post('pin-login')
   @HttpCode(HttpStatus.OK)
   async pinLogin(
-    @CurrentUser('tenantId') tenantId: string,
-    @Body() body: { pin: string },
+    @Body() body: { pin: string; tenantSlug: string },
   ) {
-    return this.commandBus.execute(new PinLoginCommand(tenantId, body.pin));
+    return this.commandBus.execute(new PinLoginCommand(body.pin, body.tenantSlug));
   }
+
   @Get('profile')
   async getProfile(@CurrentUser('sub') userId: string) {
     const user = await this.entityManager.findOne(User, {
@@ -87,6 +87,8 @@ export class AuthController {
       tenant: {
         id: user.tenant.id,
         name: user.tenant.name,
+        slug: user.tenant.slug,
+        logoUrl: user.tenant.logoUrl || null,
         timezone: user.tenant.timezone,
         currencyCode: user.tenant.currencyCode,
         currencySymbol: user.tenant.currencySymbol,

@@ -20,4 +20,13 @@ export class UpdateTenantDto {
   @IsNotEmpty()
   @IsOptional()
   timezone?: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @IsOptional()
+  slug?: string;
+
+  @IsString()
+  @IsOptional()
+  logoUrl?: string;
 }

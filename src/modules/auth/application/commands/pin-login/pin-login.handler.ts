@@ -8,6 +8,8 @@ import { User } from '../../../../users/domain/entities/user.entity';
 import { HashService } from '../../../services/hash.service';
 import { RedisService } from '../../../../../common/redis/redis.service';
 
+import { Tenant } from '../../../../tenants/domain/entities/tenant.entity';
+
 @CommandHandler(PinLoginCommand)
 export class PinLoginHandler implements ICommandHandler<PinLoginCommand> {
   private readonly logger = new Logger(PinLoginHandler.name);
@@ -21,8 +23,22 @@ export class PinLoginHandler implements ICommandHandler<PinLoginCommand> {
   ) {}
 
   async execute(command: PinLoginCommand) {
-    const { tenantId, pin } = command;
-    this.logger.log(`PIN login attempt for Tenant: ${tenantId}`);
+    const { tenantSlug, pin } = command;
+
+    if (!tenantSlug || !tenantSlug.trim()) {
+      throw new UnauthorizedException('El identificador de la tienda (tenantSlug) es requerido para inicio con PIN');
+    }
+
+    const cleanSlug = tenantSlug.toLowerCase().trim();
+    const tenant = await this.entityManager.findOne(Tenant, {
+      where: { slug: cleanSlug },
+    });
+    if (!tenant) {
+      this.logger.warn(`PIN login failed: tenant with slug ${tenantSlug} not found`);
+      throw new UnauthorizedException('Tienda no encontrada');
+    }
+
+    this.logger.log(`PIN login attempt for Tenant: ${tenant.id} (@${tenant.slug})`);
 
     // Find all users in this tenant with PIN enabled, selecting the pin hash
     const users = await this.entityManager
@@ -30,7 +46,7 @@ export class PinLoginHandler implements ICommandHandler<PinLoginCommand> {
       .createQueryBuilder('user')
       .leftJoinAndSelect('user.tenant', 'tenant')
       .addSelect('user.pin')
-      .where('user.tenantId = :tenantId', { tenantId })
+      .where('user.tenantId = :tenantId', { tenantId: tenant.id })
       .andWhere('user.pinEnabled = true')
       .getMany();
 
@@ -48,7 +64,7 @@ export class PinLoginHandler implements ICommandHandler<PinLoginCommand> {
     }
 
     if (!matchedUser) {
-      this.logger.warn(`PIN login failed: incorrect PIN for Tenant ${tenantId}`);
+      this.logger.warn(`PIN login failed: incorrect PIN for Tenant ${tenant.id} (@${tenant.slug})`);
       throw new UnauthorizedException('Invalid PIN');
     }
 

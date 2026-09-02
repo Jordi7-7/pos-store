@@ -8,6 +8,8 @@ import { User } from '../../../../users/domain/entities/user.entity';
 import { HashService } from '../../../services/hash.service';
 import { RedisService } from '../../../../../common/redis/redis.service';
 
+import { Tenant } from '../../../../tenants/domain/entities/tenant.entity';
+
 @CommandHandler(LoginCommand)
 export class LoginHandler implements ICommandHandler<LoginCommand> {
   private readonly logger = new Logger(LoginHandler.name);
@@ -21,25 +23,43 @@ export class LoginHandler implements ICommandHandler<LoginCommand> {
   ) {}
 
   async execute(command: LoginCommand) {
-    const { email, password } = command;
-    this.logger.log(`Login attempt for email: ${email}`);
+    const { email: identifier, password, tenantSlug } = command;
+    this.logger.log(`Login attempt for identifier: ${identifier} (tenant: ${tenantSlug || 'none'})`);
+
+    if (!tenantSlug || !tenantSlug.trim()) {
+      this.logger.warn(`Login rejected: missing tenantSlug for identifier ${identifier}`);
+      throw new UnauthorizedException('El identificador de la tienda es obligatorio para iniciar sesión');
+    }
+
+    const cleanSlug = tenantSlug.toLowerCase().trim();
+    const tenant = await this.entityManager.findOne(Tenant, {
+      where: { slug: cleanSlug },
+    });
+    if (!tenant) {
+      this.logger.warn(`Login failed: tenant with slug ${tenantSlug} not found`);
+      throw new UnauthorizedException('Tienda no encontrada o credenciales inválidas');
+    }
+
     const user = await this.entityManager
       .getRepository(User)
       .createQueryBuilder('user')
       .leftJoinAndSelect('user.tenant', 'tenant')
       .addSelect('user.password')
-      .where('user.email = :email', { email })
+      .where('user.tenantId = :tenantId', { tenantId: tenant.id })
+      .andWhere('(LOWER(user.email) = LOWER(:identifier) OR LOWER(user.username) = LOWER(:identifier))', {
+        identifier: identifier.trim(),
+      })
       .getOne();
 
     if (!user) {
-      this.logger.warn(`Login failed: user with email ${email} not found`);
-      throw new UnauthorizedException('Invalid email or password');
+      this.logger.warn(`Login failed: user with identifier ${identifier} not found`);
+      throw new UnauthorizedException('Invalid email/username or password');
     }
 
     const isPasswordValid = await this.hashService.compare(password, user.password || '');
     if (!isPasswordValid) {
-      this.logger.warn(`Login failed: incorrect password for email ${email}`);
-      throw new UnauthorizedException('Invalid email or password');
+      this.logger.warn(`Login failed: incorrect password for identifier ${identifier}`);
+      throw new UnauthorizedException('Invalid email/username or password');
     }
 
     const payload = {
