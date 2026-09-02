@@ -1,13 +1,19 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { EntityManager, Not } from 'typeorm';
-import { NotFoundException, ConflictException } from '@nestjs/common';
+import { NotFoundException, ConflictException, Logger } from '@nestjs/common';
 import { UpdateTenantCommand } from './update-tenant.command';
 import { Tenant } from '../../../domain/entities/tenant.entity';
+import { S3Service } from '../../../../media/services/s3.service';
 import getSymbolFromCurrency from 'currency-symbol-map';
 
 @CommandHandler(UpdateTenantCommand)
 export class UpdateTenantHandler implements ICommandHandler<UpdateTenantCommand> {
-  constructor(private readonly entityManager: EntityManager) {}
+  private readonly logger = new Logger(UpdateTenantHandler.name);
+
+  constructor(
+    private readonly entityManager: EntityManager,
+    private readonly s3Service: S3Service,
+  ) {}
 
   async execute(command: UpdateTenantCommand): Promise<Tenant> {
     const { id, dto } = command;
@@ -30,7 +36,17 @@ export class UpdateTenantHandler implements ICommandHandler<UpdateTenantCommand>
       tenant.slug = cleanSlug;
     }
     if (dto.logoUrl !== undefined) {
-      tenant.logoUrl = dto.logoUrl ? dto.logoUrl.trim() : null;
+      const newLogoUrl = dto.logoUrl ? dto.logoUrl.trim() : null;
+      // If logo changed and there was an old logo in the bucket, delete the previous file
+      if (tenant.logoUrl && tenant.logoUrl !== newLogoUrl) {
+        try {
+          this.logger.log(`Deleting previous tenant logo from S3/bucket: ${tenant.logoUrl}`);
+          await this.s3Service.deleteFile(tenant.logoUrl);
+        } catch (err) {
+          this.logger.warn(`Failed to delete previous logo from S3 bucket: ${err}`);
+        }
+      }
+      tenant.logoUrl = newLogoUrl;
     }
     if (dto.country !== undefined) {
       tenant.country = dto.country;

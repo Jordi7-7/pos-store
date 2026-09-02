@@ -7,6 +7,7 @@ import { GetTenantHandler } from './application/queries/get-tenant/get-tenant.ha
 import { GetTenantMetadataHandler } from './application/queries/get-tenant-metadata/get-tenant-metadata.handler';
 import { GetPublicTenantBySlugHandler } from './application/queries/get-public-tenant-by-slug/get-public-tenant-by-slug.handler';
 import { UpdateTenantHandler } from './application/commands/update-tenant/update-tenant.handler';
+import { MediaModule } from '../media/media.module';
 
 const Handlers = [
   GetTenantHandler,
@@ -19,6 +20,7 @@ const Handlers = [
   imports: [
     CqrsModule,
     TypeOrmModule.forFeature([Tenant]),
+    MediaModule,
   ],
   providers: [...Handlers],
   controllers: [TenantsController],
