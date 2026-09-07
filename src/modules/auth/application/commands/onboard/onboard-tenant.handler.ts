@@ -51,9 +51,34 @@ export class OnboardTenantHandler implements ICommandHandler<OnboardTenantComman
     }
 
     return this.entityManager.transaction(async (transactionalManager) => {
+      // Helper function to sanitize a slug
+      const sanitizeSlug = (str: string): string => {
+        return str
+          .toLowerCase()
+          .trim()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '') // Remove accents
+          .replace(/[^a-z0-9]+/g, '-')     // Replace non-alphanumeric with hyphens
+          .replace(/^-+|-+$/g, '');        // Trim leading/trailing hyphens
+      };
+
+      const baseSlug = command.slug
+        ? sanitizeSlug(command.slug)
+        : sanitizeSlug(tenantName) || 'tienda';
+
+      let cleanSlug = baseSlug;
+      let counter = 1;
+
+      // Ensure slug uniqueness across tenants
+      while (await transactionalManager.findOne(Tenant, { where: { slug: cleanSlug } })) {
+        cleanSlug = `${baseSlug}-${counter}`;
+        counter++;
+      }
+
       // A. Create Tenant
       const tenant = new Tenant();
       tenant.name = tenantName;
+      tenant.slug = cleanSlug;
       tenant.ruc = ruc;
       tenant.country = country;
       tenant.currencyCode = currencyCode;
@@ -107,7 +132,11 @@ export class OnboardTenantHandler implements ICommandHandler<OnboardTenantComman
         tenant: {
           id: savedTenant.id,
           name: savedTenant.name,
+          slug: savedTenant.slug,
           ruc: savedTenant.ruc,
+          timezone: savedTenant.timezone,
+          currencyCode: savedTenant.currencyCode,
+          currencySymbol: savedTenant.currencySymbol,
         },
         branch: {
           id: savedBranch.id,

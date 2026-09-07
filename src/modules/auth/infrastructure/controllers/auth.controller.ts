@@ -36,6 +36,7 @@ export class AuthController {
         dto.password,
         dto.branchName,
         dto.branchAddress,
+        dto.slug,
       ),
     );
   }

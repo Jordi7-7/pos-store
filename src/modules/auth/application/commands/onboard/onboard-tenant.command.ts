@@ -11,5 +11,6 @@ export class OnboardTenantCommand {
     public readonly password: string,
     public readonly branchName: string,
     public readonly branchAddress: string,
+    public readonly slug?: string,
   ) {}
 }

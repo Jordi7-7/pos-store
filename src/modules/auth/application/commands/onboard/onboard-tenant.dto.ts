@@ -1,10 +1,14 @@
-import { IsString, IsNotEmpty, IsEmail, MinLength } from 'class-validator';
+import { IsString, IsNotEmpty, IsEmail, MinLength, IsOptional } from 'class-validator';
 
 export class OnboardTenantDto {
   // Tenant Details
   @IsString()
   @IsNotEmpty()
   tenantName: string;
+
+  @IsString()
+  @IsOptional()
+  slug?: string;
 
   @IsString()
   @IsNotEmpty()
