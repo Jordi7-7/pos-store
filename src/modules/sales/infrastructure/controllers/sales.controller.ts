@@ -32,15 +32,35 @@ export class SalesController {
 
   @Get('cash-sessions/active')
   async getActiveSession(
+    @CurrentUser('tenantId') tenantId: string,
     @CurrentUser('sub') userId: string,
     @Query('branchId') branchId?: string,
   ) {
-    const whereClause: any = { userId, status: 'OPEN' };
+    const cashSessionRepo = this.entityManager.getRepository(CashSession);
+
     if (branchId) {
-      whereClause.branchId = branchId;
+      // Look for the active session in this branch under this tenant
+      const session = await cashSessionRepo.findOne({
+        where: {
+          branchId,
+          status: 'OPEN',
+          branch: { tenantId },
+        },
+        relations: { user: true, branch: true },
+        order: { openedAt: 'DESC' },
+      });
+      return session || null;
     }
-    const session = await this.entityManager.getRepository(CashSession).findOne({
-      where: whereClause,
+
+    // Fallback if branchId is not passed: check active session of the user
+    const session = await cashSessionRepo.findOne({
+      where: {
+        userId,
+        status: 'OPEN',
+        branch: { tenantId },
+      },
+      relations: { user: true, branch: true },
+      order: { openedAt: 'DESC' },
     });
     return session || null;
   }

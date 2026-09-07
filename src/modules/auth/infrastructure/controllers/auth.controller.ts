@@ -87,8 +87,10 @@ export class AuthController {
       tenant: {
         id: user.tenant.id,
         name: user.tenant.name,
+        ruc: user.tenant.ruc,
         slug: user.tenant.slug,
         logoUrl: user.tenant.logoUrl || null,
+        country: user.tenant.country,
         timezone: user.tenant.timezone,
         currencyCode: user.tenant.currencyCode,
         currencySymbol: user.tenant.currencySymbol,

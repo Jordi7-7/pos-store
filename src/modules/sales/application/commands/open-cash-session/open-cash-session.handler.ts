@@ -29,16 +29,18 @@ export class OpenCashSessionHandler implements ICommandHandler<OpenCashSessionCo
         throw new NotFoundException(`Branch with ID ${branchId} not found`);
       }
 
-      // 2. Ensure user doesn't already have an open cash session
-      const activeSession = await cashSessionRepo.findOne({
+      // 2. Ensure branch doesn't already have an open cash session (1 register per branch)
+      const branchActiveSession = await cashSessionRepo.findOne({
         where: {
-          userId,
+          branchId,
           status: 'OPEN',
         },
+        relations: { user: true },
       });
-      if (activeSession) {
-        this.logger.warn(`Cash session opening failed: User ${userId} already has an active open cash session (ID: ${activeSession.id})`);
-        throw new BadRequestException('You already have an active open cash session. Please close it first.');
+      if (branchActiveSession) {
+        const openedByName = branchActiveSession.user?.name || 'otro usuario';
+        this.logger.warn(`Cash session opening failed: Branch ${branchId} already has an active open cash session (ID: ${branchActiveSession.id}) by User ${branchActiveSession.userId}`);
+        throw new BadRequestException(`Ya existe una caja abierta en esta sucursal (abierta por ${openedByName}). No se puede abrir otra caja simultánea.`);
       }
 
       // Get or create CashRegister 1 for this branch
