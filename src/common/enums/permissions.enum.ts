@@ -16,7 +16,6 @@ export const APP_PERMISSIONS = {
   // POS y Ventas
   POS_APPLY_DISCOUNT: 'action:pos.apply_discount',
   SALES_REFUND: 'action:sales.refund',
-  SALES_CANCEL: 'action:sales.cancel',
 
   // Catálogo e Inventario
   PRODUCTS_CREATE: 'action:products.create',
@@ -93,13 +92,6 @@ export const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
     code: APP_PERMISSIONS.SALES_REFUND,
     label: 'Reembolsos y Devoluciones',
     description: 'Permite procesar notas de crédito o devoluciones de productos.',
-    module: 'sales',
-    isDangerous: true,
-  },
-  {
-    code: APP_PERMISSIONS.SALES_CANCEL,
-    label: 'Anular Ventas',
-    description: 'Permite anular ventas emitidas y devolver stock automáticamente.',
     module: 'sales',
     isDangerous: true,
   },

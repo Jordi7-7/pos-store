@@ -103,9 +103,8 @@ export class RolesController {
       throw new NotFoundException('Rol no encontrado.');
     }
 
-    if (role.isSystem && dto.name && dto.name.trim() !== role.name) {
-      // El nombre de los roles de sistema no se modifica para no romper identidades básicas
-      throw new BadRequestException('No puedes cambiar el nombre de un rol predeterminado del sistema.');
+    if (role.name === 'Propietario' && dto.name && dto.name.trim() !== role.name) {
+      throw new BadRequestException('El nombre del rol Propietario no puede ser modificado.');
     }
 
     if (dto.name && dto.name.trim() !== role.name) {
@@ -150,8 +149,9 @@ export class RolesController {
       throw new NotFoundException('Rol no encontrado.');
     }
 
-    if (role.isSystem) {
-      throw new BadRequestException('Los roles predeterminados del sistema no pueden ser eliminados.');
+    const isOwnerRole = role.name === 'Propietario' || (Array.isArray(role.permissions) && role.permissions.includes('*'));
+    if (isOwnerRole) {
+      throw new BadRequestException('El rol principal de Propietario es fundamental para el sistema y no puede ser eliminado.');
     }
 
     const assignedUsers = await userRepo.count({
