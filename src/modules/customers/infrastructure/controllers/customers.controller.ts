@@ -7,6 +7,8 @@ import { UpdateCustomerDto } from '../dtos/update-customer.dto';
 import { CreateCustomerCommand } from '../../application/commands/create-customer/create-customer.command';
 import { UpdateCustomerCommand } from '../../application/commands/update-customer/update-customer.command';
 import { DeleteCustomerCommand } from '../../application/commands/delete-customer/delete-customer.command';
+import { RequirePermissions } from '../../../auth/decorators/permissions.decorator';
+import { APP_PERMISSIONS } from '../../../../common/enums/permissions.enum';
 
 @Controller('customers')
 export class CustomersController {
@@ -16,11 +18,13 @@ export class CustomersController {
   ) {}
 
   @Get()
+  @RequirePermissions(APP_PERMISSIONS.VIEW_CUSTOMERS)
   async findAll(@CurrentUser('tenantId') tenantId: string) {
     return this.queryBus.execute(new GetCustomersQuery(tenantId));
   }
 
   @Post()
+  @RequirePermissions(APP_PERMISSIONS.CUSTOMERS_CREATE)
   async create(
     @CurrentUser('tenantId') tenantId: string,
     @Body() dto: CreateCustomerDto,
@@ -29,6 +33,7 @@ export class CustomersController {
   }
 
   @Put(':id')
+  @RequirePermissions(APP_PERMISSIONS.CUSTOMERS_EDIT)
   async update(
     @CurrentUser('tenantId') tenantId: string,
     @Param('id') id: string,
@@ -38,6 +43,7 @@ export class CustomersController {
   }
 
   @Delete(':id')
+  @RequirePermissions(APP_PERMISSIONS.CUSTOMERS_DELETE)
   async remove(
     @CurrentUser('tenantId') tenantId: string,
     @Param('id') id: string,

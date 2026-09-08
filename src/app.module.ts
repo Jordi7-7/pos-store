@@ -50,6 +50,10 @@ import { PurchaseOrderItem } from './modules/purchases/domain/entities/purchase-
 import { TenantsModule } from './modules/tenants/tenants.module';
 import { ReportsModule } from './modules/reports/reports.module';
 
+import { Role } from './modules/roles/domain/entities/role.entity';
+import { RolesModule } from './modules/roles/roles.module';
+import { PermissionsGuard } from './modules/auth/guards/permissions.guard';
+
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
@@ -63,6 +67,7 @@ import { ReportsModule } from './modules/reports/reports.module';
       entities: [
         Tenant,
         User,
+        Role,
         Branch,
         Customer,
         Product,
@@ -95,6 +100,7 @@ import { ReportsModule } from './modules/reports/reports.module';
     ProductsModule,
     SalesModule,
     UsersModule,
+    RolesModule,
     PurchasesModule,
     MediaModule,
     BranchesModule,
@@ -112,6 +118,10 @@ import { ReportsModule } from './modules/reports/reports.module';
     {
       provide: APP_GUARD,
       useClass: RolesGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: PermissionsGuard,
     },
   ],
 })

@@ -28,6 +28,16 @@ export class User extends BaseEntity {
   @Column()
   role: string;
 
+  @Column({ name: 'role_id', type: 'uuid', nullable: true })
+  roleId?: string | null;
+
+  @ManyToOne('Role', 'users', { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'role_id' })
+  roleEntity?: any;
+
+  @Column({ type: 'text', array: true, nullable: true, name: 'custom_permissions' })
+  customPermissions?: string[] | null;
+
   @Column({ type: 'varchar', nullable: true, select: false })
   pin?: string;
 

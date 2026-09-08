@@ -34,6 +34,8 @@ import { GetInventoryMovementsByVariantQuery } from '../../application/queries/g
 import { GetTagsQuery } from '../../application/queries/get-tags/get-tags.query';
 import { CreateTagCommand } from '../../application/commands/create-tag/create-tag.command';
 import { UpdateVariantTagsCommand } from '../../application/commands/update-variant-tags/update-variant-tags.command';
+import { RequirePermissions } from '../../../auth/decorators/permissions.decorator';
+import { APP_PERMISSIONS } from '../../../../common/enums/permissions.enum';
 
 @Controller('products')
 export class ProductsController {
@@ -43,6 +45,7 @@ export class ProductsController {
   ) {}
 
   @Post()
+  @RequirePermissions(APP_PERMISSIONS.PRODUCTS_CREATE)
   async create(
     @CurrentUser('tenantId') tenantId: string,
     @Body() dto: CreateVariableProductDto,
@@ -53,6 +56,7 @@ export class ProductsController {
   }
 
   @Post('simple')
+  @RequirePermissions(APP_PERMISSIONS.PRODUCTS_CREATE)
   async createSimple(
     @CurrentUser('tenantId') tenantId: string,
     @Body() dto: CreateSimpleProductDto,
@@ -75,6 +79,7 @@ export class ProductsController {
   }
 
   @Post('variable')
+  @RequirePermissions(APP_PERMISSIONS.PRODUCTS_CREATE)
   async createVariable(
     @CurrentUser('tenantId') tenantId: string,
     @Body() dto: CreateVariableProductDto,
@@ -94,6 +99,7 @@ export class ProductsController {
 
 
   @Post(':productId/variants')
+  @RequirePermissions(APP_PERMISSIONS.PRODUCTS_CREATE)
   async createVariant(
     @CurrentUser('tenantId') tenantId: string,
     @Param('productId') productId: string,
@@ -105,6 +111,7 @@ export class ProductsController {
   }
 
   @Post('categories')
+  @RequirePermissions(APP_PERMISSIONS.PRODUCTS_CREATE)
   async createCategory(
     @CurrentUser('tenantId') tenantId: string,
     @Body() dto: CreateCategoryDto,
@@ -204,6 +211,7 @@ export class ProductsController {
   }
 
   @Post('stock-adjustments')
+  @RequirePermissions(APP_PERMISSIONS.PRODUCTS_ADJUST_STOCK)
   async adjustStock(
     @CurrentUser('tenantId') tenantId: string,
     @Body() dto: AdjustStockDto,
@@ -228,6 +236,7 @@ export class ProductsController {
   }
 
   @Post('tags')
+  @RequirePermissions(APP_PERMISSIONS.PRODUCTS_CREATE)
   async createTag(
     @CurrentUser('tenantId') tenantId: string,
     @Body() body: { name: string },
@@ -269,6 +278,7 @@ export class ProductsController {
   }
 
   @Put(':id')
+  @RequirePermissions(APP_PERMISSIONS.PRODUCTS_EDIT)
   async update(
     @CurrentUser('tenantId') tenantId: string,
     @Param('id') id: string,
@@ -280,6 +290,7 @@ export class ProductsController {
   }
 
   @Delete(':id')
+  @RequirePermissions(APP_PERMISSIONS.PRODUCTS_DELETE)
   async remove(
     @CurrentUser('tenantId') tenantId: string,
     @Param('id') id: string,
@@ -288,6 +299,7 @@ export class ProductsController {
   }
 
   @Put('variants/:variantId/tags')
+  @RequirePermissions(APP_PERMISSIONS.PRODUCTS_EDIT)
   async updateVariantTags(
     @CurrentUser('tenantId') tenantId: string,
     @Param('variantId') variantId: string,
@@ -299,6 +311,7 @@ export class ProductsController {
   }
 
   @Post('validate-import')
+  @RequirePermissions(APP_PERMISSIONS.PRODUCTS_IMPORT)
   async validateImport(
     @CurrentUser('tenantId') tenantId: string,
     @Body() dto: ValidateImportProductsDto,
@@ -309,6 +322,7 @@ export class ProductsController {
   }
 
   @Post('import')
+  @RequirePermissions(APP_PERMISSIONS.PRODUCTS_IMPORT)
   async importProducts(
     @CurrentUser('tenantId') tenantId: string,
     @Body() dto: ImportProductsDto,

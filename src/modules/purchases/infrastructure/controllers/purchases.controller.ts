@@ -12,6 +12,8 @@ import { ImportPurchasesCommand } from '../../application/commands/import-purcha
 import { ValidateImportPurchasesQuery } from '../../application/queries/validate-import-purchases/validate-import-purchases.query';
 import { GetPurchasesQuery } from '../../application/queries/get-purchases/get-purchases.query';
 import { GetPurchasesByProductQuery } from '../../application/queries/get-purchases-by-product/get-purchases-by-product.query';
+import { RequirePermissions } from '../../../auth/decorators/permissions.decorator';
+import { APP_PERMISSIONS } from '../../../../common/enums/permissions.enum';
 
 @Controller('purchases')
 export class PurchasesController {
@@ -21,6 +23,7 @@ export class PurchasesController {
   ) {}
 
   @Post('suppliers')
+  @RequirePermissions(APP_PERMISSIONS.PURCHASES_CREATE)
   async createSupplier(
     @CurrentUser('tenantId') tenantId: string,
     @Body() dto: CreateSupplierDto,
@@ -38,11 +41,13 @@ export class PurchasesController {
   }
 
   @Get('suppliers')
+  @RequirePermissions(APP_PERMISSIONS.VIEW_PURCHASES)
   async findSuppliers(@CurrentUser('tenantId') tenantId: string) {
     return this.queryBus.execute(new GetSuppliersQuery(tenantId));
   }
 
   @Post()
+  @RequirePermissions(APP_PERMISSIONS.PURCHASES_CREATE)
   async registerPurchase(
     @CurrentUser('tenantId') tenantId: string,
     @Body() dto: RegisterPurchaseDto,

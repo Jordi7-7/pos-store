@@ -45,6 +45,7 @@ export class PinLoginHandler implements ICommandHandler<PinLoginCommand> {
       .getRepository(User)
       .createQueryBuilder('user')
       .leftJoinAndSelect('user.tenant', 'tenant')
+      .leftJoinAndSelect('user.roleEntity', 'roleEntity')
       .addSelect('user.pin')
       .where('user.tenantId = :tenantId', { tenantId: tenant.id })
       .andWhere('user.isActive = true')
@@ -69,11 +70,24 @@ export class PinLoginHandler implements ICommandHandler<PinLoginCommand> {
       throw new UnauthorizedException('Invalid PIN');
     }
 
+    // Resolving effective permissions
+    let effectivePermissions: string[] = [];
+    if (matchedUser.role === 'OWNER') {
+      effectivePermissions = ['*'];
+    } else {
+      const rolePerms = matchedUser.roleEntity?.permissions || [];
+      const customPerms = matchedUser.customPermissions || [];
+      effectivePermissions = Array.from(new Set([...rolePerms, ...customPerms]));
+    }
+
     const payload = {
       sub: matchedUser.id,
       tenantId: matchedUser.tenantId,
       email: matchedUser.email,
       role: matchedUser.role,
+      roleId: matchedUser.roleId || null,
+      roleName: matchedUser.roleEntity?.name || matchedUser.role,
+      permissions: effectivePermissions,
       name: matchedUser.name,
     };
 
@@ -103,6 +117,9 @@ export class PinLoginHandler implements ICommandHandler<PinLoginCommand> {
         name: matchedUser.name,
         email: matchedUser.email,
         role: matchedUser.role,
+        roleId: matchedUser.roleId || null,
+        roleName: matchedUser.roleEntity?.name || matchedUser.role,
+        permissions: effectivePermissions,
         tenantId: matchedUser.tenantId,
         timezone: matchedUser.tenant.timezone,
       },

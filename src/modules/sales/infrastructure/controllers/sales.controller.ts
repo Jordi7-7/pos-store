@@ -21,6 +21,8 @@ import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
 import { CashSession } from '../../domain/entities/cash-session.entity';
 import { Expense } from '../../domain/entities/expense.entity';
 import { Refund } from '../../domain/entities/refund.entity';
+import { RequirePermissions } from '../../../auth/decorators/permissions.decorator';
+import { APP_PERMISSIONS } from '../../../../common/enums/permissions.enum';
 
 @Controller('sales')
 export class SalesController {
@@ -125,6 +127,7 @@ export class SalesController {
   }
 
   @Post('cash-sessions/open')
+  @RequirePermissions(APP_PERMISSIONS.CASH_OPEN_CLOSE)
   async openSession(
     @CurrentUser('tenantId') tenantId: string,
     @CurrentUser('sub') userId: string,
@@ -141,6 +144,7 @@ export class SalesController {
   }
 
   @Post('cash-sessions/:id/close')
+  @RequirePermissions(APP_PERMISSIONS.CASH_OPEN_CLOSE)
   async closeSession(
     @CurrentUser('tenantId') tenantId: string,
     @Param('id') id: string,
@@ -156,6 +160,7 @@ export class SalesController {
   }
 
   @Post('expenses')
+  @RequirePermissions(APP_PERMISSIONS.CASH_CREATE_EXPENSE)
   async registerExpense(
     @CurrentUser('tenantId') tenantId: string,
     @Body() dto: RegisterExpenseDto,
@@ -192,6 +197,7 @@ export class SalesController {
   }
 
   @Post('refunds')
+  @RequirePermissions(APP_PERMISSIONS.SALES_REFUND)
   async processRefund(
     @CurrentUser('tenantId') tenantId: string,
     @CurrentUser('sub') userId: string,

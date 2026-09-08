@@ -44,6 +44,7 @@ export class LoginHandler implements ICommandHandler<LoginCommand> {
       .getRepository(User)
       .createQueryBuilder('user')
       .leftJoinAndSelect('user.tenant', 'tenant')
+      .leftJoinAndSelect('user.roleEntity', 'roleEntity')
       .addSelect('user.password')
       .where('user.tenantId = :tenantId', { tenantId: tenant.id })
       .andWhere('(LOWER(user.email) = LOWER(:identifier) OR LOWER(user.username) = LOWER(:identifier))', {
@@ -67,11 +68,24 @@ export class LoginHandler implements ICommandHandler<LoginCommand> {
       throw new UnauthorizedException('Invalid email/username or password');
     }
 
+    // Resolving effective permissions: roleEntity permissions + customPermissions
+    let effectivePermissions: string[] = [];
+    if (user.role === 'OWNER') {
+      effectivePermissions = ['*'];
+    } else {
+      const rolePerms = user.roleEntity?.permissions || [];
+      const customPerms = user.customPermissions || [];
+      effectivePermissions = Array.from(new Set([...rolePerms, ...customPerms]));
+    }
+
     const payload = {
       sub: user.id,
       tenantId: user.tenantId,
       email: user.email,
       role: user.role,
+      roleId: user.roleId || null,
+      roleName: user.roleEntity?.name || user.role,
+      permissions: effectivePermissions,
       name: user.name,
     };
 
@@ -102,6 +116,9 @@ export class LoginHandler implements ICommandHandler<LoginCommand> {
         name: user.name,
         email: user.email,
         role: user.role,
+        roleId: user.roleId || null,
+        roleName: user.roleEntity?.name || user.role,
+        permissions: effectivePermissions,
         tenantId: user.tenantId,
         timezone: user.tenant.timezone,
       },

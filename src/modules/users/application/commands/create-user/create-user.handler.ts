@@ -15,11 +15,11 @@ export class CreateUserHandler implements ICommandHandler<CreateUserCommand> {
   ) {}
 
   async execute(command: CreateUserCommand): Promise<User> {
-    const { tenantId, name, email, password, role, username, pin } = command;
+    const { tenantId, name, email, password, role, username, pin, roleId, customPermissions } = command;
     const cleanEmail = email.toLowerCase().trim();
     const cleanUsername = username ? username.toLowerCase().trim() : undefined;
 
-    this.logger.log(`Creating user: ${cleanEmail} with role: ${role} for Tenant: ${tenantId}`);
+    this.logger.log(`Creating user: ${cleanEmail} for Tenant: ${tenantId}`);
 
     const userRepo = this.entityManager.getRepository(User);
 
@@ -41,6 +41,39 @@ export class CreateUserHandler implements ICommandHandler<CreateUserCommand> {
       }
     }
 
+    // Resolve Role entity: roleId is strictly required
+    let resolvedRoleId: string | null = null;
+    let resolvedRoleName: string = 'CASHIER';
+
+    if (roleId) {
+      const roleEntity = await this.entityManager.query(
+        `SELECT id, name FROM "roles" WHERE "id" = $1 AND "tenant_id" = $2`,
+        [roleId, tenantId],
+      );
+      if (roleEntity.length === 0) {
+        throw new BadRequestException('El rol especificado no existe para esta tienda.');
+      }
+      resolvedRoleId = roleEntity[0].id;
+      const nameUpper = roleEntity[0].name.toUpperCase();
+      if (nameUpper.includes('ADMIN')) resolvedRoleName = 'ADMIN';
+      else if (nameUpper.includes('GERENTE') || nameUpper.includes('SUPERVISOR')) resolvedRoleName = 'MANAGER';
+      else if (nameUpper.includes('PROPIETARIO') || nameUpper.includes('OWNER')) resolvedRoleName = 'OWNER';
+      else resolvedRoleName = 'CASHIER';
+    } else if (role) {
+      // Backward compatibility fallback if role string was passed
+      const roleEntity = await this.entityManager.query(
+        `SELECT id, name FROM "roles" WHERE "tenant_id" = $1 AND ("name" ILIKE $2 OR "name" ILIKE $3) LIMIT 1`,
+        [tenantId, role, role === 'CASHIER' ? 'Cajero' : role === 'ADMIN' ? 'Administrador' : role === 'MANAGER' ? 'Gerente%' : 'Propietario'],
+      );
+      if (roleEntity.length === 0) {
+        throw new BadRequestException('No se encontró un rol predeterminado para asignar al usuario.');
+      }
+      resolvedRoleId = roleEntity[0].id;
+      resolvedRoleName = role;
+    } else {
+      throw new BadRequestException('Debes seleccionar un rol para el usuario.');
+    }
+
     const hashedPassword = await this.hashService.hash(password);
 
     const user = new User();
@@ -49,7 +82,9 @@ export class CreateUserHandler implements ICommandHandler<CreateUserCommand> {
     user.email = cleanEmail;
     user.username = cleanUsername || undefined;
     user.password = hashedPassword;
-    user.role = role;
+    user.role = resolvedRoleName;
+    user.roleId = resolvedRoleId;
+    user.customPermissions = customPermissions || null;
     user.isActive = true;
 
     if (pin && pin.trim()) {

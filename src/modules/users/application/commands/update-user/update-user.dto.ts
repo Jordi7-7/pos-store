@@ -25,6 +25,13 @@ export class UpdateUserDto {
 
   @IsString()
   @IsOptional()
+  roleId?: string;
+
+  @IsOptional()
+  customPermissions?: string[];
+
+  @IsString()
+  @IsOptional()
   pin?: string;
 
   @IsBoolean()

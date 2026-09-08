@@ -8,6 +8,8 @@ import { UpdateUserCommand } from '../../application/commands/update-user/update
 import { GeneratePinCommand } from '../../application/commands/generate-pin/generate-pin.command';
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
 import { Roles } from '../../../auth/decorators/roles.decorator';
+import { RequirePermissions } from '../../../auth/decorators/permissions.decorator';
+import { APP_PERMISSIONS } from '../../../../common/enums/permissions.enum';
 import { UserRole } from '../../enums/user-role.enum';
 import { User } from '../../domain/entities/user.entity';
 
@@ -19,6 +21,7 @@ export class UsersController {
   ) {}
 
   @Post()
+  @RequirePermissions(APP_PERMISSIONS.USERS_MANAGE)
   @Roles(UserRole.OWNER, UserRole.ADMIN)
   async create(
     @CurrentUser('tenantId') tenantId: string,
@@ -33,11 +36,14 @@ export class UsersController {
         dto.role,
         dto.username,
         dto.pin,
+        dto.roleId,
+        dto.customPermissions,
       ),
     );
   }
 
   @Put(':id')
+  @RequirePermissions(APP_PERMISSIONS.USERS_MANAGE)
   @Roles(UserRole.OWNER, UserRole.ADMIN)
   async update(
     @CurrentUser('tenantId') tenantId: string,
@@ -50,6 +56,7 @@ export class UsersController {
   }
 
   @Post(':id/generate-pin')
+  @RequirePermissions(APP_PERMISSIONS.USERS_MANAGE)
   @Roles(UserRole.OWNER, UserRole.ADMIN)
   async generatePin(
     @CurrentUser('tenantId') tenantId: string,
@@ -61,11 +68,13 @@ export class UsersController {
   }
 
   @Get()
+  @RequirePermissions(APP_PERMISSIONS.VIEW_USERS)
   @Roles(UserRole.OWNER, UserRole.ADMIN)
   async list(@CurrentUser('tenantId') tenantId: string) {
     const rawUsers = await this.entityManager
       .getRepository(User)
       .createQueryBuilder('user')
+      .leftJoinAndSelect('user.roleEntity', 'roleEntity')
       .addSelect('CASE WHEN user.pin IS NOT NULL AND user.pin != \'\' THEN true ELSE false END', 'hasPin')
       .where('user.tenantId = :tenantId', { tenantId })
       .orderBy('user.createdAt', 'ASC')
@@ -73,6 +82,7 @@ export class UsersController {
 
     return rawUsers.entities.map((user, idx) => ({
       ...user,
+      roleName: user.roleEntity?.name || user.role,
       hasPin: rawUsers.raw[idx]?.hasPin === true || rawUsers.raw[idx]?.hasPin === 'true',
     }));
   }

@@ -61,8 +61,38 @@ export class UpdateUserHandler implements ICommandHandler<UpdateUserCommand> {
       user.password = await this.hashService.hash(dto.password);
     }
 
-    if (dto.role !== undefined) {
+    if (dto.roleId !== undefined) {
+      if (dto.roleId) {
+        const roleEntity = await this.entityManager.query(
+          `SELECT id, name FROM "roles" WHERE "id" = $1 AND "tenant_id" = $2`,
+          [dto.roleId, tenantId],
+        );
+        if (roleEntity.length === 0) {
+          throw new BadRequestException('El rol especificado no existe para esta tienda.');
+        }
+        user.roleId = roleEntity[0].id;
+        const nameUpper = roleEntity[0].name.toUpperCase();
+        if (nameUpper.includes('ADMIN')) user.role = 'ADMIN';
+        else if (nameUpper.includes('GERENTE') || nameUpper.includes('SUPERVISOR')) user.role = 'MANAGER';
+        else if (nameUpper.includes('PROPIETARIO') || nameUpper.includes('OWNER')) user.role = 'OWNER';
+        else user.role = 'CASHIER';
+      } else {
+        throw new BadRequestException('Un usuario debe tener un rol asignado.');
+      }
+    } else if (dto.role !== undefined) {
       user.role = dto.role;
+      // Sync roleId if found
+      const roleEntity = await this.entityManager.query(
+        `SELECT id FROM "roles" WHERE "tenant_id" = $1 AND ("name" ILIKE $2 OR "name" ILIKE $3) LIMIT 1`,
+        [tenantId, dto.role, dto.role === 'CASHIER' ? 'Cajero' : dto.role === 'ADMIN' ? 'Administrador' : dto.role === 'MANAGER' ? 'Gerente%' : 'Propietario'],
+      );
+      if (roleEntity.length > 0) {
+        user.roleId = roleEntity[0].id;
+      }
+    }
+
+    if (dto.customPermissions !== undefined) {
+      user.customPermissions = dto.customPermissions;
     }
 
     if (dto.pin !== undefined) {

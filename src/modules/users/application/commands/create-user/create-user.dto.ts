@@ -18,7 +18,15 @@ export class CreateUserDto {
   password: string;
 
   @IsEnum(UserRole)
-  role: UserRole;
+  @IsOptional()
+  role?: UserRole;
+
+  @IsString()
+  @IsOptional()
+  roleId?: string;
+
+  @IsOptional()
+  customPermissions?: string[];
 
   @IsString()
   @IsOptional()

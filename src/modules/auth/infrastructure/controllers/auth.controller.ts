@@ -75,16 +75,29 @@ export class AuthController {
   async getProfile(@CurrentUser('sub') userId: string) {
     const user = await this.entityManager.findOne(User, {
       where: { id: userId },
-      relations: { tenant: true },
+      relations: { tenant: true, roleEntity: true },
     });
     if (!user) {
       throw new UnauthorizedException('User not found');
     }
+
+    let effectivePermissions: string[] = [];
+    if (user.role === 'OWNER') {
+      effectivePermissions = ['*'];
+    } else {
+      const rolePerms = user.roleEntity?.permissions || [];
+      const customPerms = user.customPermissions || [];
+      effectivePermissions = Array.from(new Set([...rolePerms, ...customPerms]));
+    }
+
     return {
       id: user.id,
       name: user.name,
       email: user.email,
       role: user.role,
+      roleId: user.roleId || null,
+      roleName: user.roleEntity?.name || user.role,
+      permissions: effectivePermissions,
       tenant: {
         id: user.tenant.id,
         name: user.tenant.name,
