@@ -38,6 +38,10 @@ export class ImportProductItemDto {
   salePrice: number;
 
   @IsNumber()
+  @IsOptional()
+  wholesalePrice?: number;
+
+  @IsNumber()
   quantity: number;
 }
 

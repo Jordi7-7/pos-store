@@ -44,71 +44,101 @@ export class ImportProductsHandler implements ICommandHandler<ImportProductsComm
       const skus = items.map((it) => it.sku.trim());
       const existingVariants = await variantRepo.find({
         where: { sku: In(skus), tenantId },
+        select: { sku: true },
       });
 
       if (existingVariants.length > 0) {
-        const dupSkus = existingVariants.map((v) => v.sku).join(', ');
-        throw new BadRequestException(`Los siguientes SKUs ya existen en el sistema: ${dupSkus}`);
+        const dupSkus = existingVariants.map((v) => v.sku).slice(0, 10).join(', ');
+        const extraCount = existingVariants.length > 10 ? ` y ${existingVariants.length - 10} más` : '';
+        throw new BadRequestException(`Los siguientes SKUs ya existen en el sistema: ${dupSkus}${extraCount}`);
       }
 
-      let importedCount = 0;
+      // Batch processing in chunks for high performance and low memory footprint
+      const CHUNK_SIZE = 250;
+      let totalImported = 0;
 
-      for (const itemDto of items) {
-        const trimmedSku = itemDto.sku.trim();
-        const trimmedName = itemDto.name.trim();
+      for (let i = 0; i < items.length; i += CHUNK_SIZE) {
+        const chunk = items.slice(i, i + CHUNK_SIZE);
 
-        // 1. Create Product
-        const product = new Product();
-        product.tenantId = tenantId;
-        product.name = trimmedName;
-        product.description = '';
-        const savedProduct = await productRepo.save(product);
+        // 1. Bulk create Products for chunk
+        const productsToCreate = chunk.map((item) => {
+          const prod = new Product();
+          prod.tenantId = tenantId;
+          prod.name = item.name.trim();
+          prod.description = '';
+          return prod;
+        });
+        const savedProducts = await productRepo.save(productsToCreate);
 
-        // 2. Create ProductVariant
-        const variant = new ProductVariant();
-        variant.product = savedProduct;
-        variant.tenantId = tenantId;
-        variant.sku = trimmedSku;
-        variant.barcode = itemDto.barcode?.trim() || '';
-        variant.purchasePrice = Number(itemDto.purchasePrice) || 0;
-        variant.salePrice = Number(itemDto.salePrice) || 0;
-        variant.attributeValues = [];
-        const savedVariant = await variantRepo.save(variant);
+        // 2. Bulk create Variants for chunk
+        const variantsToCreate = chunk.map((item, idx) => {
+          const variant = new ProductVariant();
+          variant.productId = savedProducts[idx].id;
+          variant.tenantId = tenantId;
+          variant.sku = item.sku.trim();
+          variant.barcode = item.barcode?.trim() || '';
+          variant.purchasePrice = Number(item.purchasePrice) || 0;
+          variant.salePrice = Number(item.salePrice) || 0;
+          variant.wholesalePrice = item.wholesalePrice !== undefined && item.wholesalePrice !== null && Number(item.wholesalePrice) > 0
+            ? Number(item.wholesalePrice)
+            : null;
+          variant.attributeValues = [];
+          return variant;
+        });
+        const savedVariants = await variantRepo.save(variantsToCreate);
 
-        // 3. Create ProductStock & Batch if quantity > 0 and branchId is present
-        if (Number(itemDto.quantity) > 0 && branchId) {
-          const stock = new ProductStock();
-          stock.branchId = branchId;
-          stock.variantId = savedVariant.id;
-          stock.quantity = Number(itemDto.quantity);
-          await stockRepo.save(stock);
+        // 3. Bulk create Stocks, Batches and Movements if stock is provided and branchId is present
+        if (branchId) {
+          const stocksToCreate: ProductStock[] = [];
+          const batchesToCreate: ProductBatch[] = [];
+          const movementsToCreate: InventoryMovement[] = [];
 
-          const batch = new ProductBatch();
-          batch.tenantId = tenantId;
-          batch.branchId = branchId;
-          batch.variantId = savedVariant.id;
-          batch.purchaseOrderId = null;
-          batch.initialQuantity = Number(itemDto.quantity);
-          batch.remainingQuantity = Number(itemDto.quantity);
-          batch.unitCost = Number(savedVariant.purchasePrice);
-          await batchRepo.save(batch);
+          chunk.forEach((item, idx) => {
+            const qty = Number(item.quantity);
+            if (qty > 0) {
+              const variantId = savedVariants[idx].id;
+              const purchasePrice = Number(savedVariants[idx].purchasePrice) || 0;
 
-          const movement = new InventoryMovement();
-          movement.tenantId = tenantId;
-          movement.originBranchId = null;
-          movement.destinationBranchId = branchId;
-          movement.variantId = savedVariant.id;
-          movement.purchaseOrderId = null;
-          movement.quantity = Number(itemDto.quantity);
-          movement.type = 'IN';
-          movement.reason = InventoryMovementReason.INITIAL_STOCK;
-          await movementRepo.save(movement);
+              const stock = new ProductStock();
+              stock.branchId = branchId;
+              stock.variantId = variantId;
+              stock.quantity = qty;
+              stocksToCreate.push(stock);
+
+              const batch = new ProductBatch();
+              batch.tenantId = tenantId;
+              batch.branchId = branchId;
+              batch.variantId = variantId;
+              batch.purchaseOrderId = null;
+              batch.initialQuantity = qty;
+              batch.remainingQuantity = qty;
+              batch.unitCost = purchasePrice;
+              batchesToCreate.push(batch);
+
+              const movement = new InventoryMovement();
+              movement.tenantId = tenantId;
+              movement.originBranchId = null;
+              movement.destinationBranchId = branchId;
+              movement.variantId = variantId;
+              movement.purchaseOrderId = null;
+              movement.quantity = qty;
+              movement.type = 'IN';
+              movement.reason = InventoryMovementReason.INITIAL_STOCK;
+              movementsToCreate.push(movement);
+            }
+          });
+
+          if (stocksToCreate.length > 0) {
+            await stockRepo.save(stocksToCreate);
+            await batchRepo.save(batchesToCreate);
+            await movementRepo.save(movementsToCreate);
+          }
         }
 
-        importedCount++;
+        totalImported += chunk.length;
       }
 
-      return { importedCount };
+      return { importedCount: totalImported };
     });
   }
 }
