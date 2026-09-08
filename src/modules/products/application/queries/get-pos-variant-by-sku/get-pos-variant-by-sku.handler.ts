@@ -37,6 +37,7 @@ export class GetPosVariantBySkuHandler implements IQueryHandler<GetPosVariantByS
         barcode: variant.barcode,
         purchasePrice: variant.purchasePrice,
         salePrice: variant.salePrice,
+        wholesalePrice: variant.wholesalePrice !== null ? Number(variant.wholesalePrice) : null,
         productName: variant.product.name,
         stock: stockQuantity,
         attributeValues: variant.attributeValues || [],

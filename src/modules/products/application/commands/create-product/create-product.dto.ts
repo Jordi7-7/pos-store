@@ -29,6 +29,10 @@ export class ProductVariantDto {
   @IsNumber()
   salePrice: number;
 
+  @IsNumber()
+  @IsOptional()
+  wholesalePrice?: number;
+
   @IsArray()
   @IsUUID(4, { each: true })
   @IsOptional()
@@ -92,6 +96,10 @@ export class CreateSimpleProductDto {
 
   @IsNumber()
   salePrice: number;
+
+  @IsNumber()
+  @IsOptional()
+  wholesalePrice?: number;
 
   @IsUUID()
   @IsOptional()

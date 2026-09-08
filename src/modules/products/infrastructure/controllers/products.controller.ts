@@ -66,6 +66,7 @@ export class ProductsController {
         dto.barcode || '',
         dto.purchasePrice,
         dto.salePrice,
+        dto.wholesalePrice !== undefined ? Number(dto.wholesalePrice) : undefined,
         dto.categoryId,
         dto.imageIds,
         dto.stocks,

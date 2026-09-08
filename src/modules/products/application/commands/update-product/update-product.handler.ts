@@ -115,6 +115,9 @@ export class UpdateProductHandler implements ICommandHandler<UpdateProductComman
         variant.barcode = variantDto.barcode || '';
         variant.purchasePrice = Number(variantDto.purchasePrice) || 0;
         variant.salePrice = Number(variantDto.salePrice) || 0;
+        if (variantDto.wholesalePrice !== undefined) {
+          variant.wholesalePrice = variantDto.wholesalePrice !== null ? Number(variantDto.wholesalePrice) : null;
+        }
 
         // Sync variant images
         if (variantDto.imageIds !== undefined) {

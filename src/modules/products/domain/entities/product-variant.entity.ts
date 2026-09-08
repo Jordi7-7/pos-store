@@ -51,6 +51,16 @@ export class ProductVariant extends BaseEntity {
   })
   salePrice: number;
 
+  @Column({
+    name: 'wholesale_price',
+    type: 'numeric',
+    precision: 10,
+    scale: 2,
+    nullable: true,
+    transformer: new ColumnNumericTransformer(),
+  })
+  wholesalePrice: number | null;
+
   @ManyToMany(() => AttributeValue)
   @JoinTable({
     name: 'variant_attribute_values',

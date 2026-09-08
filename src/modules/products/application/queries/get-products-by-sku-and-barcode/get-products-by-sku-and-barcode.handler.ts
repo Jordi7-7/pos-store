@@ -40,6 +40,7 @@ export class GetProductsBySkuAndBarcodeHandler implements IQueryHandler<GetProdu
           barcode: variant.barcode,
           purchasePrice: Number(variant.purchasePrice),
           salePrice: Number(variant.salePrice),
+          wholesalePrice: variant.wholesalePrice !== null ? Number(variant.wholesalePrice) : null,
           stocks: variant.stocks,
           attributeValues: variant.attributeValues,
           tags: variant.tags,

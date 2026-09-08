@@ -7,6 +7,7 @@ export class CreateSimpleProductCommand {
     public readonly barcode: string,
     public readonly purchasePrice: number,
     public readonly salePrice: number,
+    public readonly wholesalePrice?: number,
     public readonly categoryId?: string,
     public readonly imageIds?: string[],
     public readonly stocks?: { branchId: string; quantity: number }[],

@@ -86,6 +86,7 @@ export class CreateProductHandler implements ICommandHandler<CreateProductComman
         variant.barcode = variantDto.barcode;
         variant.purchasePrice = variantDto.purchasePrice;
         variant.salePrice = variantDto.salePrice;
+        variant.wholesalePrice = variantDto.wholesalePrice !== undefined && variantDto.wholesalePrice !== null ? Number(variantDto.wholesalePrice) : null;
         variant.tenantId = tenantId;
 
 

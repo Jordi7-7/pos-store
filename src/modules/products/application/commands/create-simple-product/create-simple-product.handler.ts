@@ -28,6 +28,7 @@ export class CreateSimpleProductHandler implements ICommandHandler<CreateSimpleP
       barcode,
       purchasePrice,
       salePrice,
+      wholesalePrice,
       categoryId,
       imageIds,
       stocks,
@@ -105,6 +106,7 @@ export class CreateSimpleProductHandler implements ICommandHandler<CreateSimpleP
       variant.barcode = barcode || '';
       variant.purchasePrice = Number(purchasePrice) || 0;
       variant.salePrice = Number(salePrice) || 0;
+      variant.wholesalePrice = wholesalePrice !== undefined && wholesalePrice !== null ? Number(wholesalePrice) : null;
       variant.attributeValues = [];
       variant.images = product.images; // Default variant shares the same images
 
