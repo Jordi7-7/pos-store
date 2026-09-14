@@ -1,4 +1,4 @@
-import { Entity, Column, ManyToOne, JoinColumn, Index } from 'typeorm';
+import { Entity, Column, ManyToOne, JoinColumn, Index, ManyToMany, JoinTable } from 'typeorm';
 import { BaseEntity } from '../../../../common/database/base.entity';
 import { Tenant } from '../../../tenants/domain/entities/tenant.entity';
 
@@ -43,4 +43,20 @@ export class User extends BaseEntity {
 
   @Column({ name: 'is_active', type: 'boolean', default: true })
   isActive: boolean;
+
+  @ManyToMany('Branch', { cascade: false })
+  @JoinTable({
+    name: 'user_branches',
+    joinColumn: { name: 'user_id', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'branch_id', referencedColumnName: 'id' },
+  })
+  branches?: any[];
+
+  @ManyToMany('CashRegister', { cascade: false })
+  @JoinTable({
+    name: 'user_cash_registers',
+    joinColumn: { name: 'user_id', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'cash_register_id', referencedColumnName: 'id' },
+  })
+  cashRegisters?: any[];
 }

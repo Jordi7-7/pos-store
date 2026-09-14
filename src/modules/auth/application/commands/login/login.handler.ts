@@ -45,6 +45,8 @@ export class LoginHandler implements ICommandHandler<LoginCommand> {
       .createQueryBuilder('user')
       .leftJoinAndSelect('user.tenant', 'tenant')
       .leftJoinAndSelect('user.roleEntity', 'roleEntity')
+      .leftJoinAndSelect('user.branches', 'branches')
+      .leftJoinAndSelect('user.cashRegisters', 'cashRegisters')
       .addSelect('user.password')
       .where('user.tenantId = :tenantId', { tenantId: tenant.id })
       .andWhere('(LOWER(user.email) = LOWER(:identifier) OR LOWER(user.username) = LOWER(:identifier))', {
@@ -111,17 +113,6 @@ export class LoginHandler implements ICommandHandler<LoginCommand> {
     return {
       accessToken,
       refreshToken,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        roleId: user.roleId || null,
-        roleName: user.roleEntity?.name || user.role,
-        permissions: effectivePermissions,
-        tenantId: user.tenantId,
-        timezone: user.tenant.timezone,
-      },
     };
   }
 }

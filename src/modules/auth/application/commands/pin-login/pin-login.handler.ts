@@ -46,6 +46,8 @@ export class PinLoginHandler implements ICommandHandler<PinLoginCommand> {
       .createQueryBuilder('user')
       .leftJoinAndSelect('user.tenant', 'tenant')
       .leftJoinAndSelect('user.roleEntity', 'roleEntity')
+      .leftJoinAndSelect('user.branches', 'branches')
+      .leftJoinAndSelect('user.cashRegisters', 'cashRegisters')
       .addSelect('user.pin')
       .where('user.tenantId = :tenantId', { tenantId: tenant.id })
       .andWhere('user.isActive = true')
@@ -112,17 +114,6 @@ export class PinLoginHandler implements ICommandHandler<PinLoginCommand> {
     return {
       accessToken,
       refreshToken,
-      user: {
-        id: matchedUser.id,
-        name: matchedUser.name,
-        email: matchedUser.email,
-        role: matchedUser.role,
-        roleId: matchedUser.roleId || null,
-        roleName: matchedUser.roleEntity?.name || matchedUser.role,
-        permissions: effectivePermissions,
-        tenantId: matchedUser.tenantId,
-        timezone: matchedUser.tenant.timezone,
-      },
     };
   }
 }

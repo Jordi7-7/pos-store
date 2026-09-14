@@ -17,6 +17,7 @@ import { GetCashSessionDetailsQuery } from '../../application/queries/get-cash-s
 import { GetSaleByInvoiceQuery } from '../../application/queries/get-sale-by-invoice/get-sale-by-invoice.query';
 import { GetSalesByProductQuery } from '../../application/queries/get-sales-by-product/get-sales-by-product.query';
 import { GetSalesPaginatedQuery } from '../../application/queries/get-sales-paginated/get-sales-paginated.query';
+import { GetActiveCashSessionQuery } from '../../application/queries/get-active-cash-session/get-active-cash-session.query';
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
 import { CashSession } from '../../domain/entities/cash-session.entity';
 import { Expense } from '../../domain/entities/expense.entity';
@@ -36,35 +37,13 @@ export class SalesController {
   async getActiveSession(
     @CurrentUser('tenantId') tenantId: string,
     @CurrentUser('sub') userId: string,
+    @CurrentUser('role') userRole: string,
     @Query('branchId') branchId?: string,
+    @Query('cashRegisterId') cashRegisterId?: string,
   ) {
-    const cashSessionRepo = this.entityManager.getRepository(CashSession);
-
-    if (branchId) {
-      // Look for the active session in this branch under this tenant
-      const session = await cashSessionRepo.findOne({
-        where: {
-          branchId,
-          status: 'OPEN',
-          branch: { tenantId },
-        },
-        relations: { user: true, branch: true },
-        order: { openedAt: 'DESC' },
-      });
-      return session || null;
-    }
-
-    // Fallback if branchId is not passed: check active session of the user
-    const session = await cashSessionRepo.findOne({
-      where: {
-        userId,
-        status: 'OPEN',
-        branch: { tenantId },
-      },
-      relations: { user: true, branch: true },
-      order: { openedAt: 'DESC' },
-    });
-    return session || null;
+    return this.queryBus.execute(
+      new GetActiveCashSessionQuery(tenantId, userId, userRole, branchId, cashRegisterId),
+    );
   }
 
   @Post()
@@ -139,6 +118,7 @@ export class SalesController {
         userId,
         dto.branchId,
         dto.openingBalance,
+        dto.cashRegisterId,
       ),
     );
   }

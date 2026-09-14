@@ -3,6 +3,7 @@ import { Logger, BadRequestException } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { CreateUserCommand } from './create-user.command';
 import { User } from '../../../domain/entities/user.entity';
+import { Branch } from '../../../../branches/domain/entities/branch.entity';
 import { HashService } from '../../../../auth/services/hash.service';
 
 @CommandHandler(CreateUserCommand)
@@ -15,7 +16,7 @@ export class CreateUserHandler implements ICommandHandler<CreateUserCommand> {
   ) {}
 
   async execute(command: CreateUserCommand): Promise<User> {
-    const { tenantId, name, email, password, role, username, pin, roleId, customPermissions } = command;
+    const { tenantId, name, email, password, role, username, pin, roleId, customPermissions, branchIds, cashRegisterIds } = command;
     const cleanEmail = email.toLowerCase().trim();
     const cleanUsername = username ? username.toLowerCase().trim() : undefined;
 
@@ -94,6 +95,36 @@ export class CreateUserHandler implements ICommandHandler<CreateUserCommand> {
     }
 
     const savedUser = await userRepo.save(user);
+
+    // Save assigned branches (if empty/not specified, assign all active tenant branches)
+    let finalBranchIds = branchIds || [];
+    if (finalBranchIds.length === 0) {
+      const allBranches = await this.entityManager.find(Branch, {
+        where: { tenantId, isActive: true },
+        select: { id: true },
+      });
+      finalBranchIds = allBranches.map((b) => b.id);
+    }
+
+    if (finalBranchIds.length > 0) {
+      for (const bId of finalBranchIds) {
+        await this.entityManager.query(
+          `INSERT INTO "user_branches" ("user_id", "branch_id") VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+          [savedUser.id, bId],
+        );
+      }
+    }
+
+    // Save assigned cash registers if provided
+    if (cashRegisterIds && cashRegisterIds.length > 0) {
+      for (const crId of cashRegisterIds) {
+        await this.entityManager.query(
+          `INSERT INTO "user_cash_registers" ("user_id", "cash_register_id") VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+          [savedUser.id, crId],
+        );
+      }
+    }
+
     this.logger.log(`User created successfully: ${savedUser.email} (ID: ${savedUser.id})`);
 
     return savedUser;

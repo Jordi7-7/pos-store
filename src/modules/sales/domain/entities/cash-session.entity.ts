@@ -49,10 +49,10 @@ export class CashSession extends BaseEntity {
   @Column({ name: 'closed_at', type: 'timestamp with time zone', nullable: true })
   closedAt: Date | null;
 
-  @Column({ name: 'cash_register_id', type: 'uuid', nullable: true })
-  cashRegisterId: string | null;
+  @Column({ name: 'cash_register_id', type: 'uuid' })
+  cashRegisterId: string;
 
   @ManyToOne(() => CashRegister)
   @JoinColumn({ name: 'cash_register_id' })
-  cashRegister: CashRegister | null;
+  cashRegister: CashRegister;
 }

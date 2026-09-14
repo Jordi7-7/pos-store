@@ -1,4 +1,4 @@
-import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, Column, ManyToOne, JoinColumn, ManyToMany, JoinTable } from 'typeorm';
 import { BaseEntity } from '../../../../common/database/base.entity';
 import { Branch } from '../../../branches/domain/entities/branch.entity';
 import { Tenant } from '../../../tenants/domain/entities/tenant.entity';
@@ -30,4 +30,12 @@ export class CashRegister extends BaseEntity {
 
   @Column({ name: 'is_active', type: 'boolean', default: true })
   isActive: boolean;
+
+  @ManyToMany('User', { cascade: false })
+  @JoinTable({
+    name: 'user_cash_registers',
+    joinColumn: { name: 'cash_register_id', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'user_id', referencedColumnName: 'id' },
+  })
+  assignedUsers?: any[];
 }

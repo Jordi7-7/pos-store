@@ -75,7 +75,7 @@ export class AuthController {
   async getProfile(@CurrentUser('sub') userId: string) {
     const user = await this.entityManager.findOne(User, {
       where: { id: userId },
-      relations: { tenant: true, roleEntity: true },
+      relations: { tenant: true, roleEntity: true, branches: true, cashRegisters: true },
     });
     if (!user) {
       throw new UnauthorizedException('User not found');
@@ -98,6 +98,13 @@ export class AuthController {
       roleId: user.roleId || null,
       roleName: user.roleEntity?.name || user.role,
       permissions: effectivePermissions,
+      branchIds: (user.branches || []).map((b: any) => b.id),
+      cashRegisters: (user.cashRegisters || []).map((cr: any) => ({
+        id: cr.id,
+        name: cr.name,
+        code: cr.code,
+        branchId: cr.branchId,
+      })),
       tenant: {
         id: user.tenant.id,
         name: user.tenant.name,

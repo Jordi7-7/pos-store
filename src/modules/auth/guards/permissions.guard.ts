@@ -1,6 +1,6 @@
 import { CanActivate, ExecutionContext, Injectable, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { PERMISSIONS_KEY } from '../decorators/permissions.decorator';
+import { PERMISSIONS_KEY, REQUIRE_ANY_PERMISSIONS_KEY } from '../decorators/permissions.decorator';
 import { AppPermission } from '../../../common/enums/permissions.enum';
 
 @Injectable()
@@ -13,7 +13,15 @@ export class PermissionsGuard implements CanActivate {
       context.getClass(),
     ]);
 
-    if (!requiredPermissions || requiredPermissions.length === 0) {
+    const requireAnyPermissions = this.reflector.getAllAndOverride<AppPermission[]>(REQUIRE_ANY_PERMISSIONS_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+
+    if (
+      (!requiredPermissions || requiredPermissions.length === 0) &&
+      (!requireAnyPermissions || requireAnyPermissions.length === 0)
+    ) {
       return true;
     }
 
@@ -29,11 +37,20 @@ export class PermissionsGuard implements CanActivate {
 
     const userPermissions: string[] = Array.isArray(user.permissions) ? user.permissions : [];
 
-    // Verificar si el usuario tiene todos los permisos requeridos
-    const hasAll = requiredPermissions.every((perm) => userPermissions.includes(perm));
+    // Verificar si el usuario cumple con la regla ALL (RequirePermissions)
+    if (requiredPermissions && requiredPermissions.length > 0) {
+      const hasAll = requiredPermissions.every((perm) => userPermissions.includes(perm));
+      if (!hasAll) {
+        throw new ForbiddenException('No tienes permisos suficientes para realizar esta acción.');
+      }
+    }
 
-    if (!hasAll) {
-      throw new ForbiddenException('No tienes permisos suficientes para realizar esta acción.');
+    // Verificar si el usuario cumple con la regla ANY (RequireAnyPermissions)
+    if (requireAnyPermissions && requireAnyPermissions.length > 0) {
+      const hasAny = requireAnyPermissions.some((perm) => userPermissions.includes(perm));
+      if (!hasAny) {
+        throw new ForbiddenException('No tienes permisos suficientes para realizar esta acción.');
+      }
     }
 
     return true;

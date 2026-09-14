@@ -1,0 +1,2173 @@
+{
+  "info": {
+    "_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "name": "Aura POS & ERP API",
+    "description": "Colección completa y documentada de endpoints para Aura POS & ERP.\n\n### Autenticación y Variables\n- `baseUrl`: URL base del servidor (por defecto `http://localhost:3000`).\n- `authToken`: Token JWT obtenido en `/auth/login` o `/auth/pin-login`. Los requests de Login guardan este token automáticamente mediante Test Scripts.\n- `tenantSlug`: Slug de la tienda activa.\n- `branchId`, `cashRegisterId`, etc. se usan como variables reutilizables.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{authToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "authToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refreshToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "tenantSlug",
+      "value": "leiza",
+      "type": "string"
+    },
+    {
+      "key": "branchId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "cashRegisterId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "cashSessionId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "productId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "variantId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "customerId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "supplierId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "roleId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Autenticación & Perfil",
+      "description": "Endpoints para inicio de sesión, login con PIN, registro de tiendas (onboarding) y perfil de usuario.",
+      "item": [
+        {
+          "name": "Login con Contraseña",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var data = pm.response.json();",
+                  "    pm.collectionVariables.set('authToken', data.accessToken);",
+                  "    if (data.refreshToken) pm.collectionVariables.set('refreshToken', data.refreshToken);",
+                  "    console.log('Tokens guardados en la coleccion. Ahora llama a GET /auth/profile para cargar el perfil.');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@admin.com\",\n  \"password\": \"Password123!\",\n  \"tenantSlug\": \"{{tenantSlug}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Autenticación tradicional de usuarios y administradores con correo o username y contraseña.\nGuarda automáticamente `authToken` en las variables de la colección."
+          }
+        },
+        {
+          "name": "Login Rápido con PIN (Cajeros POS)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var data = pm.response.json();",
+                  "    pm.collectionVariables.set('authToken', data.accessToken);",
+                  "    console.log('PIN Auth Token configurado con éxito.');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pin\": \"1234\",\n  \"tenantSlug\": \"{{tenantSlug}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/pin-login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "pin-login"
+              ]
+            },
+            "description": "Inicio de sesión ágil para cajeros en terminal POS ingresando su PIN de 4 a 6 dígitos y el slug de la tienda."
+          }
+        },
+        {
+          "name": "Onboard Tenant (Crear Nueva Tienda)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tenantName\": \"Mi Negocio Demo\",\n  \"ruc\": \"0999999999001\",\n  \"country\": \"EC\",\n  \"currencyCode\": \"USD\",\n  \"currencySymbol\": \"$\",\n  \"timezone\": \"America/Guayaquil\",\n  \"adminName\": \"Juan Administrador\",\n  \"email\": \"demo@negocio.com\",\n  \"password\": \"Password123!\",\n  \"branchName\": \"Matriz Central\",\n  \"branchAddress\": \"Av. Principal 123\",\n  \"slug\": \"mi-negocio-demo\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/onboard",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "onboard"
+              ]
+            },
+            "description": "Crea una organización completa (tenant), asigna la sucursal matriz y configura al usuario Propietario inicial."
+          }
+        },
+        {
+          "name": "Obtener Perfil del Usuario Autenticado",
+          "event": [
+            {
+              listen: "test",
+              script: {
+                exec: [
+                  "if (pm.response.code === 200) {",
+                  "    var user = pm.response.json();",
+                  "    if (user.id) pm.collectionVariables.set('userId', user.id);",
+                  "    if (user.tenant && user.tenant.id) pm.collectionVariables.set('tenantId', user.tenant.id);",
+                  "    if (user.branchIds && user.branchIds.length > 0) pm.collectionVariables.set('branchId', user.branchIds[0]);",
+                  "    console.log('Perfil de usuario y variables cargadas con éxito.');",
+                  "}"
+                ],
+                type: "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "profile"
+              ]
+            },
+            "description": "Devuelve los datos del usuario en sesión, su rol, sucursales asignadas, cajas habilitadas y datos de la tienda."
+          }
+        },
+        {
+          "name": "Refrescar Token",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "refresh"
+              ]
+            },
+            "description": "Renueva el Access Token JWT expirado utilizando un Refresh Token válido."
+          }
+        },
+        {
+          "name": "Logout (Cerrar Sesión)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "logout"
+              ]
+            },
+            "description": "Invalida el refresh token del usuario en el almacén Redis."
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Negocio & Configuración (Tenants)",
+      "description": "Datos del negocio, slug público, monedas, zonas horarias y personalización.",
+      "item": [
+        {
+          "name": "Información Pública de Tienda por Slug",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/tenants/public/:slug",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tenants",
+                "public",
+                ":slug"
+              ],
+              "variable": [
+                {
+                  "key": "slug",
+                  "value": "{{tenantSlug}}"
+                }
+              ]
+            },
+            "description": "Devuelve nombre, logo, país y moneda pública para pintar la pantalla de bienvenida/login."
+          }
+        },
+        {
+          "name": "Metadatos Globales (Países, Monedas, Zonas Horarias)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/tenants/metadata",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tenants",
+                "metadata"
+              ]
+            },
+            "description": "Catálogo de países, monedas y zonas horarias compatibles con el sistema."
+          }
+        },
+        {
+          "name": "Obtener Configuración Actual del Negocio",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/tenants/current",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tenants",
+                "current"
+              ]
+            },
+            "description": "Obtiene los datos fiscales (RUC), moneda y ajustes del negocio autenticado."
+          }
+        },
+        {
+          "name": "Actualizar Configuración del Negocio",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Mi Tienda Oficial\",\n  \"slug\": \"mi-tienda-oficial\",\n  \"logoUrl\": \"https://r2.midominio.com/logos/logo.png\",\n  \"country\": \"EC\",\n  \"currencyCode\": \"USD\",\n  \"timezone\": \"America/Guayaquil\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/tenants/current",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "tenants",
+                "current"
+              ]
+            },
+            "description": "Permite cambiar nombre comercial, slug, logotipo y parámetros fiscales."
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Sucursales (Branches)",
+      "description": "Consulta de sucursales activas.",
+      "item": [
+        {
+          "name": "Listar Sucursales",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var list = pm.response.json();",
+                  "    if (list.length > 0) pm.collectionVariables.set('branchId', list[0].id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/branches",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "branches"
+              ]
+            },
+            "description": "Obtiene todas las sucursales configuradas para el tenant."
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Cajas Registradoras (Cash Registers)",
+      "description": "Gestión de cajas físicas por sucursal y asignación de cajeros autorizados.",
+      "item": [
+        {
+          "name": "Listar Cajas Registradoras",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var list = pm.response.json();",
+                  "    if (list.length > 0) pm.collectionVariables.set('cashRegisterId', list[0].id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/cash-registers?branchId={{branchId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cash-registers"
+              ],
+              "query": [
+                {
+                  "key": "branchId",
+                  "value": "{{branchId}}"
+                }
+              ]
+            },
+            "description": "Lista cajas registradoras indicando si están abiertas/cerradas, cajero que la opera y usuarios con permiso."
+          }
+        },
+        {
+          "name": "Crear Caja Registradora",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"branchId\": \"{{branchId}}\",\n  \"name\": \"Caja Secundaria 2\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/cash-registers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cash-registers"
+              ]
+            },
+            "description": "Crea una nueva caja registradora en la sucursal indicada."
+          }
+        },
+        {
+          "name": "Actualizar Caja Registradora",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Caja Principal - Entrada\",\n  \"isActive\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/cash-registers/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cash-registers",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{cashRegisterId}}"
+                }
+              ]
+            },
+            "description": "Edita el nombre o el estado activo/inactivo de una caja registradora."
+          }
+        },
+        {
+          "name": "Asignar Usuarios / Cajeros a Caja",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userIds\": [\n    \"{{userId}}\"\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/cash-registers/:id/assign-users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cash-registers",
+                ":id",
+                "assign-users"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{cashRegisterId}}"
+                }
+              ]
+            },
+            "description": "Asigna qué colaboradores tienen autorización de operar y abrir turno en esta caja."
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Ventas, Turnos & POS (Sales)",
+      "description": "Cobro de tickets en POS, apertura y cierre de caja, egresos de caja chica y devoluciones.",
+      "item": [
+        {
+          "name": "Verificar Turno Activo de Caja",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200 && pm.response.json()) {",
+                  "    var s = pm.response.json();",
+                  "    if (s && s.id) pm.collectionVariables.set('cashSessionId', s.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/sales/cash-sessions/active?branchId={{branchId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sales",
+                "cash-sessions",
+                "active"
+              ],
+              "query": [
+                {
+                  "key": "branchId",
+                  "value": "{{branchId}}"
+                }
+              ]
+            },
+            "description": "Consulta si el usuario autenticado tiene un turno de caja abierto en la sucursal."
+          }
+        },
+        {
+          "name": "Abrir Turno de Caja (Apertura)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201 || pm.response.code === 200) {",
+                  "    var data = pm.response.json();",
+                  "    if (data && data.id) pm.collectionVariables.set('cashSessionId', data.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"branchId\": \"{{branchId}}\",\n  \"cashRegisterId\": \"{{cashRegisterId}}\",\n  \"openingBalance\": 50\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/sales/cash-sessions/open",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sales",
+                "cash-sessions",
+                "open"
+              ]
+            },
+            "description": "Abre una sesión de caja con un fondo inicial en efectivo para el cajero."
+          }
+        },
+        {
+          "name": "Procesar Venta (Cobro en POS)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"branchId\": \"{{branchId}}\",\n  \"cashSessionId\": \"{{cashSessionId}}\",\n  \"customerId\": \"{{customerId}}\",\n  \"discountType\": \"PERCENTAGE\",\n  \"discountRate\": 0,\n  \"discountAmount\": 0,\n  \"items\": [\n    {\n      \"variantId\": \"{{variantId}}\",\n      \"quantity\": 1,\n      \"price\": 15.5,\n      \"discountType\": \"PERCENTAGE\",\n      \"discountRate\": 0,\n      \"discountAmount\": 0\n    }\n  ],\n  \"payments\": [\n    {\n      \"paymentMethod\": \"EFECTIVO\",\n      \"amount\": 20\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/sales",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sales"
+              ]
+            },
+            "description": "Registra y emite un comprobante de venta, descuenta stock de Kardex y vincula la venta al turno de caja."
+          }
+        },
+        {
+          "name": "Listar Ventas Paginadas (Historial)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/sales/paginated?startDate=2026-01-01&endDate=2026-12-31&page=1&limit=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sales",
+                "paginated"
+              ],
+              "query": [
+                {
+                  "key": "startDate",
+                  "value": "2026-01-01"
+                },
+                {
+                  "key": "endDate",
+                  "value": "2026-12-31"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Consulta el historial de ventas paginado con rangos de fechas."
+          }
+        },
+        {
+          "name": "Consultar Venta por Número de Factura",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/sales/invoice/:invoiceNumber",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sales",
+                "invoice",
+                ":invoiceNumber"
+              ],
+              "variable": [
+                {
+                  "key": "invoiceNumber",
+                  "value": "FAC-000001"
+                }
+              ]
+            },
+            "description": "Obtiene el detalle completo de una venta por su número de factura (ítems, pagos, devoluciones)."
+          }
+        },
+        {
+          "name": "Registrar Gasto Menor (Egreso de Caja)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"branchId\": \"{{branchId}}\",\n  \"cashSessionId\": \"{{cashSessionId}}\",\n  \"description\": \"Compra de útiles de aseo y papel\",\n  \"amount\": 8.5,\n  \"category\": \"Limpieza\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/sales/expenses",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sales",
+                "expenses"
+              ]
+            },
+            "description": "Registra una salida de dinero en efectivo de la caja chica durante el turno."
+          }
+        },
+        {
+          "name": "Listar Gastos Menores",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/sales/expenses?cashSessionId={{cashSessionId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sales",
+                "expenses"
+              ],
+              "query": [
+                {
+                  "key": "cashSessionId",
+                  "value": "{{cashSessionId}}"
+                }
+              ]
+            },
+            "description": "Lista egresos de caja chica filtrados por turno o por sucursal."
+          }
+        },
+        {
+          "name": "Procesar Devolución / Reembolso",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"branchId\": \"{{branchId}}\",\n  \"saleId\": \"00000000-0000-0000-0000-000000000000\",\n  \"cashSessionId\": \"{{cashSessionId}}\",\n  \"reason\": \"Producto defectuoso o talla incorrecta\",\n  \"items\": [\n    {\n      \"variantId\": \"{{variantId}}\",\n      \"quantity\": 1\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/sales/refunds",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sales",
+                "refunds"
+              ]
+            },
+            "description": "Procesa una devolución o nota de crédito, reingresa las unidades al stock en Kardex y devuelve dinero."
+          }
+        },
+        {
+          "name": "Listar Devoluciones",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/sales/refunds?cashSessionId={{cashSessionId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sales",
+                "refunds"
+              ],
+              "query": [
+                {
+                  "key": "cashSessionId",
+                  "value": "{{cashSessionId}}"
+                }
+              ]
+            },
+            "description": "Consulta devoluciones procesadas en una sesión o asociadas a una venta."
+          }
+        },
+        {
+          "name": "Listar Sesiones / Arqueos de Caja",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/sales/cash-sessions?branchId={{branchId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sales",
+                "cash-sessions"
+              ],
+              "query": [
+                {
+                  "key": "branchId",
+                  "value": "{{branchId}}"
+                }
+              ]
+            },
+            "description": "Historial de turnos de caja registrados con totales de apertura y cierre."
+          }
+        },
+        {
+          "name": "Detalles del Cuadre de un Turno de Caja",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/sales/cash-sessions/:id/details",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sales",
+                "cash-sessions",
+                ":id",
+                "details"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{cashSessionId}}"
+                }
+              ]
+            },
+            "description": "Devuelve el resumen de ventas en efectivo, tarjeta, egresos y cálculo del monto esperado para el arqueo."
+          }
+        },
+        {
+          "name": "Cerrar Turno de Caja (Arqueo Final)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"closingBalance\": 125.5\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/sales/cash-sessions/:id/close",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "sales",
+                "cash-sessions",
+                ":id",
+                "close"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{cashSessionId}}"
+                }
+              ]
+            },
+            "description": "Cierra el turno de caja asentando el saldo real contado por el cajero."
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Productos & Inventario (Products)",
+      "description": "Catálogo, creación simple, stock por sucursal, categorías, tags, importación masiva y Kardex.",
+      "item": [
+        {
+          "name": "Listar Productos Paginados",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var res = pm.response.json();",
+                  "    if (res.data && res.data.length > 0) {",
+                  "        pm.collectionVariables.set('productId', res.data[0].id);",
+                  "        if (res.data[0].variants && res.data[0].variants.length > 0) {",
+                  "            pm.collectionVariables.set('variantId', res.data[0].variants[0].id);",
+                  "        }",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products?page=1&limit=10&search=",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "search",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Consulta el catálogo con buscador por nombre, código de barras o SKU."
+          }
+        },
+        {
+          "name": "Crear Producto Simple con Stock Inicial",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Camiseta Deportiva Dry-Fit\",\n  \"description\": \"Camiseta 100% poliéster transpirable\",\n  \"sku\": \"CAM-DEP-001\",\n  \"barcode\": \"7861234567890\",\n  \"purchasePrice\": 6.5,\n  \"salePrice\": 15,\n  \"wholesalePrice\": 12,\n  \"categoryId\": \"00000000-0000-0000-0000-000000000000\",\n  \"imageIds\": [],\n  \"stocks\": [\n    {\n      \"branchId\": \"{{branchId}}\",\n      \"quantity\": 25\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/products/simple",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "simple"
+              ]
+            },
+            "description": "Crea un producto estándar asignando precios de venta, mayoreo y stock inicial por sucursal."
+          }
+        },
+        {
+          "name": "Obtener Producto por ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{productId}}"
+                }
+              ]
+            },
+            "description": "Devuelve la ficha detallada de un producto con sus variantes e imágenes."
+          }
+        },
+        {
+          "name": "Actualizar Producto",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Camiseta Deportiva Dry-Fit Pro\",\n  \"description\": \"Edición actualizada con costura reforzada\",\n  \"imageIds\": []\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/products/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{productId}}"
+                }
+              ]
+            },
+            "description": "Edita el nombre, descripción, categoría o imágenes de un producto."
+          }
+        },
+        {
+          "name": "Eliminar Producto",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{productId}}"
+                }
+              ]
+            },
+            "description": "Elimina un producto del catálogo (siempre que no tenga transacciones de venta bloqueantes)."
+          }
+        },
+        {
+          "name": "Catálogo Rápido para Grilla POS",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/pos/variants?branchId={{branchId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "pos",
+                "variants"
+              ],
+              "query": [
+                {
+                  "key": "branchId",
+                  "value": "{{branchId}}"
+                }
+              ]
+            },
+            "description": "Carga optimizada de productos y stock para la interfaz de cobro táctil del POS."
+          }
+        },
+        {
+          "name": "Buscar Variante POS por Código de Barras / SKU",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/pos/variant/sku/:sku?branchId={{branchId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "pos",
+                "variant",
+                "sku",
+                ":sku"
+              ],
+              "query": [
+                {
+                  "key": "branchId",
+                  "value": "{{branchId}}"
+                }
+              ],
+              "variable": [
+                {
+                  "key": "sku",
+                  "value": "CAM-DEP-001"
+                }
+              ]
+            },
+            "description": "Usado al escanear un código de barras con el lector en el POS para añadirlo al carrito."
+          }
+        },
+        {
+          "name": "Kardex: Movimientos de Inventario por Variante",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/inventory-movements-by-variant?variantId={{variantId}}&page=1&limit=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "inventory-movements-by-variant"
+              ],
+              "query": [
+                {
+                  "key": "variantId",
+                  "value": "{{variantId}}"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Historial completo de entradas, salidas, compras, ventas y ajustes de stock de un artículo."
+          }
+        },
+        {
+          "name": "Ajuste Manual de Inventario",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"branchId\": \"{{branchId}}\",\n  \"variantId\": \"{{variantId}}\",\n  \"quantity\": 2,\n  \"type\": \"IN\",\n  \"comment\": \"Ajuste por conteo físico mensual\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/products/stock-adjustments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "stock-adjustments"
+              ]
+            },
+            "description": "Permite sumar (IN) o restar (OUT) existencias por merma, rotura o corrección física."
+          }
+        },
+        {
+          "name": "Listar Categorías",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "categories"
+              ]
+            },
+            "description": "Lista todas las categorías de productos."
+          }
+        },
+        {
+          "name": "Crear Categoría",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Ropa Deportiva\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/products/categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "categories"
+              ]
+            },
+            "description": "Crea una nueva categoría de artículos."
+          }
+        },
+        {
+          "name": "Listar Etiquetas (Tags)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/tags",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "tags"
+              ]
+            },
+            "description": "Lista las etiquetas activas para filtrar productos en el POS."
+          }
+        },
+        {
+          "name": "Crear Etiqueta (Tag)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Más Vendidos\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/products/tags",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "tags"
+              ]
+            },
+            "description": "Crea una etiqueta o tag."
+          }
+        },
+        {
+          "name": "Asignar Tags a Variante de Producto",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tagIds\": []\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/products/variants/:variantId/tags",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "variants",
+                ":variantId",
+                "tags"
+              ],
+              "variable": [
+                {
+                  "key": "variantId",
+                  "value": "{{variantId}}"
+                }
+              ]
+            },
+            "description": "Vincula etiquetas a una variante de producto."
+          }
+        },
+        {
+          "name": "Validar Importación Masiva de Productos (Excel)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"sku\": \"DEMO-001\",\n      \"name\": \"Producto Prueba 1\"\n    },\n    {\n      \"sku\": \"DEMO-002\",\n      \"name\": \"Producto Prueba 2\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/products/validate-import",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "validate-import"
+              ]
+            },
+            "description": "Valida duplicados y formato del archivo Excel antes de insertar productos masivos."
+          }
+        },
+        {
+          "name": "Importar Productos Masivamente (Excel)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"branchId\": \"{{branchId}}\",\n  \"items\": [\n    {\n      \"sku\": \"DEMO-001\",\n      \"name\": \"Producto Prueba 1\",\n      \"purchasePrice\": 5,\n      \"salePrice\": 10,\n      \"stock\": 20\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/products/import",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "products",
+                "import"
+              ]
+            },
+            "description": "Ejecuta la creación masiva de productos e inicializa inventario en lote."
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Compras & Proveedores (Purchases)",
+      "description": "Directorio de proveedores, órdenes de compra e ingreso masivo de mercancía al costo.",
+      "item": [
+        {
+          "name": "Listar Proveedores",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var list = pm.response.json();",
+                  "    if (list.length > 0) pm.collectionVariables.set('supplierId', list[0].id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/purchases/suppliers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "purchases",
+                "suppliers"
+              ]
+            },
+            "description": "Lista los proveedores registrados."
+          }
+        },
+        {
+          "name": "Crear Proveedor",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"identityNumber\": \"1799999999001\",\n  \"name\": \"Distribuidora Textil S.A.\",\n  \"email\": \"ventas@distribuidora.com\",\n  \"phone\": \"+593987654321\",\n  \"address\": \"Parque Industrial Bodega 4\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/purchases/suppliers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "purchases",
+                "suppliers"
+              ]
+            },
+            "description": "Registra un nuevo proveedor con RUC o Cédula."
+          }
+        },
+        {
+          "name": "Registrar Orden de Compra (Ingreso de Mercancía)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"supplierId\": \"{{supplierId}}\",\n  \"branchId\": \"{{branchId}}\",\n  \"invoiceNumber\": \"FAC-PROV-9872\",\n  \"items\": [\n    {\n      \"variantId\": \"{{variantId}}\",\n      \"quantity\": 50,\n      \"purchasePrice\": 6.25\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/purchases",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "purchases"
+              ]
+            },
+            "description": "Registra una compra de mercadería ingresando stock al costo correspondiente en Kardex."
+          }
+        },
+        {
+          "name": "Listar Compras Realizadas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/purchases",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "purchases"
+              ]
+            },
+            "description": "Lista el historial de compras y notas de recepción."
+          }
+        },
+        {
+          "name": "Anular Orden de Compra",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/purchases/:id/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "purchases",
+                ":id",
+                "cancel"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "00000000-0000-0000-0000-000000000000"
+                }
+              ]
+            },
+            "description": "Anula la orden de compra si ninguno de sus productos ha sido vendido todavía."
+          }
+        },
+        {
+          "name": "Validar Importación Masiva de Compras (Excel)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"sku\": \"CAM-DEP-001\",\n      \"quantity\": 10\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/purchases/validate-import",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "purchases",
+                "validate-import"
+              ]
+            },
+            "description": "Valida la lista de SKUs y cantidades antes de ingresar compras masivas por Excel."
+          }
+        },
+        {
+          "name": "Importar Compras Masivamente (Excel)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"branchId\": \"{{branchId}}\",\n  \"items\": [\n    {\n      \"sku\": \"CAM-DEP-001\",\n      \"quantity\": 10,\n      \"purchasePrice\": 6.25\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/purchases/import",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "purchases",
+                "import"
+              ]
+            },
+            "description": "Ejecuta el ingreso masivo de inventario con costo unitario."
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Clientes (Customers)",
+      "description": "Directorio de clientes para emisión de comprobantes en el POS.",
+      "item": [
+        {
+          "name": "Listar Clientes",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var list = pm.response.json();",
+                  "    if (list.length > 0) pm.collectionVariables.set('customerId', list[0].id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/customers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers"
+              ]
+            },
+            "description": "Lista clientes registrados."
+          }
+        },
+        {
+          "name": "Crear Cliente",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Carlos Mendoza\",\n  \"identityNumber\": \"0921234567\",\n  \"email\": \"carlos@email.com\",\n  \"phone\": \"+593991234567\",\n  \"address\": \"Cdla. Los Sauces 4\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/customers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers"
+              ]
+            },
+            "description": "Crea un cliente para emisión de notas o facturas en el POS."
+          }
+        },
+        {
+          "name": "Actualizar Cliente",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Carlos Mendoza P.\",\n  \"phone\": \"+593998887766\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/customers/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{customerId}}"
+                }
+              ]
+            },
+            "description": "Actualiza los datos de un cliente."
+          }
+        },
+        {
+          "name": "Eliminar Cliente",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/customers/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "customers",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{customerId}}"
+                }
+              ]
+            },
+            "description": "Elimina un cliente."
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. Reportes & Analíticas (Reports)",
+      "description": "Resumen financiero del dashboard, utilidades, costo de ventas e inventario valorizado.",
+      "item": [
+        {
+          "name": "Resumen Financiero del Dashboard",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/reports/summary?startDate=2026-01-01&endDate=2026-12-31",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reports",
+                "summary"
+              ],
+              "query": [
+                {
+                  "key": "startDate",
+                  "value": "2026-01-01"
+                },
+                {
+                  "key": "endDate",
+                  "value": "2026-12-31"
+                }
+              ]
+            },
+            "description": "Métricas principales: ventas brutas, utilidades netas, costos de mercancía y volumen de transacciones."
+          }
+        },
+        {
+          "name": "Reporte de Costo de Ventas & Utilidad",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/reports/sales-cost?startDate=2026-01-01&endDate=2026-12-31",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reports",
+                "sales-cost"
+              ],
+              "query": [
+                {
+                  "key": "startDate",
+                  "value": "2026-01-01"
+                },
+                {
+                  "key": "endDate",
+                  "value": "2026-12-31"
+                }
+              ]
+            },
+            "description": "Análisis detallado ticket a ticket comparando precio de venta vs costo promedio para ver el margen real."
+          }
+        },
+        {
+          "name": "Inventario Valorizado",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/reports/valued-inventory?page=1&limit=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reports",
+                "valued-inventory"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Valor total del inventario actual calculado al costo de adquisición y a valor potencial de venta."
+          }
+        }
+      ]
+    },
+    {
+      "name": "10. Personal & Usuarios (Users)",
+      "description": "Administración de colaboradores, asignación de roles, PINs, cajas y sucursales.",
+      "item": [
+        {
+          "name": "Listar Usuarios",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var list = pm.response.json();",
+                  "    if (list.length > 0) pm.collectionVariables.set('userId', list[0].id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users"
+              ]
+            },
+            "description": "Devuelve a todo el personal indicando su rol, si tiene PIN, cajas y sucursales asignadas."
+          }
+        },
+        {
+          "name": "Crear Usuario",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Lucía Cajera\",\n  \"email\": \"lucia@tienda.com\",\n  \"username\": \"lucia.cajera\",\n  \"password\": \"Password123!\",\n  \"roleId\": \"{{roleId}}\",\n  \"pin\": \"1234\",\n  \"branchIds\": [\n    \"{{branchId}}\"\n  ],\n  \"cashRegisterIds\": [\n    \"{{cashRegisterId}}\"\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users"
+              ]
+            },
+            "description": "Crea un colaborador con credenciales de acceso, rol y sucursal/cajas vinculadas."
+          }
+        },
+        {
+          "name": "Actualizar Usuario",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Lucía Cajera Principal\",\n  \"isActive\": true,\n  \"branchIds\": [\n    \"{{branchId}}\"\n  ],\n  \"cashRegisterIds\": [\n    \"{{cashRegisterId}}\"\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{userId}}"
+                }
+              ]
+            },
+            "description": "Modifica datos, rol, estado activo o asignaciones de un colaborador."
+          }
+        },
+        {
+          "name": "Generar PIN Seguro para Usuario",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/:id/generate-pin",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                ":id",
+                "generate-pin"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{userId}}"
+                }
+              ]
+            },
+            "description": "Genera automáticamente un PIN aleatorio de 4 dígitos para el usuario."
+          }
+        }
+      ]
+    },
+    {
+      "name": "11. Roles & Permisos (Roles)",
+      "description": "Catálogo de permisos del sistema y roles personalizados.",
+      "item": [
+        {
+          "name": "Catálogo Oficial de Permisos y Módulos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/roles/permissions-catalog",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "roles",
+                "permissions-catalog"
+              ]
+            },
+            "description": "Devuelve todos los códigos de permisos y módulos disponibles para el diseñador de roles."
+          }
+        },
+        {
+          "name": "Listar Roles",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var list = pm.response.json();",
+                  "    if (list.length > 0) pm.collectionVariables.set('roleId', list[0].id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/roles",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "roles"
+              ]
+            },
+            "description": "Lista roles con su cantidad de usuarios asignados e indicador si es rol de sistema."
+          }
+        },
+        {
+          "name": "Crear Rol Personalizado",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Supervisor de Caja\",\n  \"description\": \"Encargado de arqueos y reembolsos en punto de venta\",\n  \"permissions\": [\n    \"view:pos\",\n    \"view:cash_registers\",\n    \"action:cash.open_close\",\n    \"action:cash.create_expense\",\n    \"action:sales.refund\",\n    \"view:sales\"\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/roles",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "roles"
+              ]
+            },
+            "description": "Crea un rol asignando una lista granular de permisos."
+          }
+        },
+        {
+          "name": "Actualizar Rol",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Supervisor de caja con permisos de reembolsos actualizados\",\n  \"permissions\": [\n    \"view:pos\",\n    \"action:cash.open_close\",\n    \"action:sales.refund\"\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/roles/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "roles",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{roleId}}"
+                }
+              ]
+            },
+            "description": "Edita los permisos o descripción de un rol (protege el rol Propietario)."
+          }
+        },
+        {
+          "name": "Eliminar Rol",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/roles/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "roles",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{roleId}}"
+                }
+              ]
+            },
+            "description": "Elimina un rol (valida que no sea el rol Propietario y que no tenga usuarios asignados)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "12. Multimedia & Cloud Storage (Media)",
+      "description": "Generación de URLs firmadas para subida directa a Cloudflare R2 / AWS S3 y registro de fotos.",
+      "item": [
+        {
+          "name": "Obtener Presigned URL para Subida S3 / R2",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/media/presigned-url?filename=foto-producto.jpg&contentType=image/jpeg",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "media",
+                "presigned-url"
+              ],
+              "query": [
+                {
+                  "key": "filename",
+                  "value": "foto-producto.jpg"
+                },
+                {
+                  "key": "contentType",
+                  "value": "image/jpeg"
+                }
+              ]
+            },
+            "description": "Genera una URL firmada segura para subir imágenes directamente desde el cliente al bucket S3/R2."
+          }
+        },
+        {
+          "name": "Listar Galería de Imágenes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/media",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "media"
+              ]
+            },
+            "description": "Lista todas las imágenes registradas por el tenant."
+          }
+        },
+        {
+          "name": "Registrar Imagen Subida",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url\": \"https://r2.midominio.com/productos/foto-1.jpg\",\n  \"description\": \"Foto frontal de camiseta\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/media/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "media",
+                "register"
+              ]
+            },
+            "description": "Asienta en la base de datos la URL física tras finalizar la subida al bucket."
+          }
+        },
+        {
+          "name": "Subir Imagen desde URL Externa (Drag & Drop web)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url\": \"https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=500\",\n  \"description\": \"Imagen importada desde internet\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/media/upload-by-url",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "media",
+                "upload-by-url"
+              ]
+            },
+            "description": "El backend descarga una imagen remota y la almacena de inmediato en el bucket R2/S3 propio."
+          }
+        },
+        {
+          "name": "Eliminar Imagen",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/media/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "media",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "00000000-0000-0000-0000-000000000000"
+                }
+              ]
+            },
+            "description": "Elimina físicamente el archivo del bucket y su registro (valida que ningún producto la esté usando)."
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -8,12 +8,14 @@ import { JwtService } from '@nestjs/jwt';
 import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class AuthGuard implements CanActivate {
   constructor(
     private readonly jwtService: JwtService,
     private readonly reflector: Reflector,
+    private readonly configService: ConfigService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -31,8 +33,9 @@ export class AuthGuard implements CanActivate {
       throw new UnauthorizedException('Missing authentication token');
     }
     try {
+      const jwtSecret = this.configService.get<string>('JWT_SECRET') || process.env.JWT_SECRET || 'fallback_secret';
       const payload = await this.jwtService.verifyAsync(token, {
-        secret: process.env.JWT_SECRET || 'fallback_secret',
+        secret: jwtSecret,
       });
       request['user'] = payload;
     } catch {

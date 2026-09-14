@@ -38,6 +38,8 @@ export class UsersController {
         dto.pin,
         dto.roleId,
         dto.customPermissions,
+        dto.branchIds,
+        dto.cashRegisterIds,
       ),
     );
   }
@@ -75,6 +77,8 @@ export class UsersController {
       .getRepository(User)
       .createQueryBuilder('user')
       .leftJoinAndSelect('user.roleEntity', 'roleEntity')
+      .leftJoinAndSelect('user.branches', 'branches')
+      .leftJoinAndSelect('user.cashRegisters', 'cashRegisters')
       .addSelect('CASE WHEN user.pin IS NOT NULL AND user.pin != \'\' THEN true ELSE false END', 'hasPin')
       .where('user.tenantId = :tenantId', { tenantId })
       .orderBy('user.createdAt', 'ASC')
@@ -84,6 +88,8 @@ export class UsersController {
       ...user,
       roleName: user.roleEntity?.name || user.role,
       hasPin: rawUsers.raw[idx]?.hasPin === true || rawUsers.raw[idx]?.hasPin === 'true',
+      branchIds: (user.branches || []).map((b: any) => b.id),
+      cashRegisterIds: (user.cashRegisters || []).map((cr: any) => cr.id),
     }));
   }
 }

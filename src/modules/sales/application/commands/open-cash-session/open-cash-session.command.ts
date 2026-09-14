@@ -4,5 +4,6 @@ export class OpenCashSessionCommand {
     public readonly userId: string,
     public readonly branchId: string,
     public readonly openingBalance: number,
+    public readonly cashRegisterId: string,
   ) {}
 }

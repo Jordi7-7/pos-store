@@ -37,4 +37,10 @@ export class UpdateUserDto {
   @IsBoolean()
   @IsOptional()
   isActive?: boolean;
+
+  @IsOptional()
+  branchIds?: string[];
+
+  @IsOptional()
+  cashRegisterIds?: string[];
 }

@@ -11,5 +11,7 @@ export class CreateUserCommand {
     public readonly pin?: string,
     public readonly roleId?: string,
     public readonly customPermissions?: string[],
+    public readonly branchIds?: string[],
+    public readonly cashRegisterIds?: string[],
   ) {}
 }

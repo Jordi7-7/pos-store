@@ -20,7 +20,14 @@ import { GetCashSessionDetailsHandler } from './application/queries/get-cash-ses
 import { GetSaleByInvoiceHandler } from './application/queries/get-sale-by-invoice/get-sale-by-invoice.handler';
 import { GetSalesByProductHandler } from './application/queries/get-sales-by-product/get-sales-by-product.handler';
 import { GetSalesPaginatedHandler } from './application/queries/get-sales-paginated/get-sales-paginated.handler';
+import { GetActiveCashSessionHandler } from './application/queries/get-active-cash-session/get-active-cash-session.handler';
+import { GetCashRegistersHandler } from './application/queries/get-cash-registers/get-cash-registers.handler';
+import { GetMyCashRegistersHandler } from './application/queries/get-my-cash-registers/get-my-cash-registers.handler';
+import { CreateCashRegisterHandler } from './application/commands/create-cash-register/create-cash-register.handler';
+import { UpdateCashRegisterHandler } from './application/commands/update-cash-register/update-cash-register.handler';
+import { AssignUsersToCashRegisterHandler } from './application/commands/assign-users-to-cash-register/assign-users-to-cash-register.handler';
 import { SalesController } from './infrastructure/controllers/sales.controller';
+import { CashRegistersController } from './infrastructure/controllers/cash-registers.controller';
 
 @Module({
   imports: [
@@ -36,7 +43,7 @@ import { SalesController } from './infrastructure/controllers/sales.controller';
     ]),
     CqrsModule,
   ],
-  controllers: [SalesController],
+  controllers: [SalesController, CashRegistersController],
   providers: [
     ProcessSaleHandler,
     OpenCashSessionHandler,
@@ -49,6 +56,12 @@ import { SalesController } from './infrastructure/controllers/sales.controller';
     GetSaleByInvoiceHandler,
     GetSalesByProductHandler,
     GetSalesPaginatedHandler,
+    GetActiveCashSessionHandler,
+    GetCashRegistersHandler,
+    GetMyCashRegistersHandler,
+    CreateCashRegisterHandler,
+    UpdateCashRegisterHandler,
+    AssignUsersToCashRegisterHandler,
   ],
 })
 export class SalesModule {}

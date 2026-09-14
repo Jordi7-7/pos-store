@@ -6,7 +6,6 @@ export const APP_PERMISSIONS = {
   VIEW_PRODUCTS: 'view:products',
   VIEW_PURCHASES: 'view:purchases',
   VIEW_CUSTOMERS: 'view:customers',
-  VIEW_CASH_SESSIONS: 'view:cash_sessions',
   VIEW_REPORTS: 'view:reports',
   VIEW_USERS: 'view:users',
   VIEW_MEDIA: 'view:media',
@@ -28,6 +27,9 @@ export const APP_PERMISSIONS = {
   PURCHASES_CREATE: 'action:purchases.create',
 
   // Cajas y Egresos
+  VIEW_CASH_SESSIONS: 'view:cash_sessions',
+  VIEW_CASH_REGISTERS: 'view:cash_registers',
+  CASH_REGISTERS_MANAGE: 'action:cash_registers.manage',
   CASH_OPEN_CLOSE: 'action:cash.open_close',
   CASH_CREATE_EXPENSE: 'action:cash.create_expense',
 
@@ -156,6 +158,19 @@ export const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
     label: 'Ver Historial de Cajas',
     description: 'Permite consultar arqueos de caja y cierres de turno anteriores.',
     module: 'cash',
+  },
+  {
+    code: APP_PERMISSIONS.VIEW_CASH_REGISTERS,
+    label: 'Ver Cajas Registradoras',
+    description: 'Permite consultar las cajas registradoras de cada sucursal y su estado.',
+    module: 'cash',
+  },
+  {
+    code: APP_PERMISSIONS.CASH_REGISTERS_MANAGE,
+    label: 'Administrar Cajas y Asignaciones',
+    description: 'Permite crear o editar cajas registradoras y asignar personal a cada una.',
+    module: 'cash',
+    isDangerous: true,
   },
   {
     code: APP_PERMISSIONS.CASH_OPEN_CLOSE,

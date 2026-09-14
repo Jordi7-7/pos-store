@@ -31,4 +31,10 @@ export class CreateUserDto {
   @IsString()
   @IsOptional()
   pin?: string;
+
+  @IsOptional()
+  branchIds?: string[];
+
+  @IsOptional()
+  cashRegisterIds?: string[];
 }
