@@ -7,7 +7,7 @@ export async function parseReportDates(
   tenantId: string,
   startDate?: string,
   endDate?: string,
-): Promise<{ start: Date; end: Date }> {
+): Promise<{ start: Date; end: Date; timezone: string }> {
   const tenant = await entityManager.findOne(Tenant, {
     where: { id: tenantId }
   });
@@ -21,5 +21,5 @@ export async function parseReportDates(
     ? DateTime.fromISO(endDate, { zone: timezone }).endOf('day').toJSDate()
     : DateTime.now().setZone(timezone).endOf('day').toJSDate();
 
-  return { start, end };
+  return { start, end, timezone };
 }

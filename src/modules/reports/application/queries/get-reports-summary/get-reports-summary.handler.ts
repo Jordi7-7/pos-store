@@ -1,5 +1,6 @@
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
 import { EntityManager, Between } from 'typeorm';
+import { DateTime } from 'luxon';
 import { GetReportsSummaryQuery } from './get-reports-summary.query';
 import { Sale } from '../../../../sales/domain/entities/sale.entity';
 import { PurchaseOrder } from '../../../../purchases/domain/entities/purchase-order.entity';
@@ -11,7 +12,7 @@ export class GetReportsSummaryHandler implements IQueryHandler<GetReportsSummary
   constructor(private readonly entityManager: EntityManager) {}
 
   async execute(query: GetReportsSummaryQuery) {
-    const { start, end } = await parseReportDates(
+    const { start, end, timezone } = await parseReportDates(
       this.entityManager,
       query.tenantId,
       query.startDateStr,
@@ -86,20 +87,19 @@ export class GetReportsSummaryHandler implements IQueryHandler<GetReportsSummary
     // Create daily breakdown map
     const dailyMap: Record<string, { date: string; sales: number; purchases: number; expenses: number; profit: number }> = {};
 
-    // Helper to generate YYYY-MM-DD
+    // Helper to generate YYYY-MM-DD in the tenant's timezone
     const formatDateKey = (d: Date) => {
-      const year = d.getUTCFullYear();
-      const month = String(d.getUTCMonth() + 1).padStart(2, '0');
-      const day = String(d.getUTCDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
+      return DateTime.fromJSDate(d).setZone(timezone).toFormat('yyyy-MM-dd');
     };
 
-    // Initialize map for each day in range
-    const current = new Date(start);
-    while (current <= end) {
-      const key = formatDateKey(current);
+    // Initialize map for each day in range using tenant timezone
+    let currentDt = DateTime.fromJSDate(start).setZone(timezone).startOf('day');
+    const endDt = DateTime.fromJSDate(end).setZone(timezone).endOf('day');
+
+    while (currentDt <= endDt) {
+      const key = currentDt.toFormat('yyyy-MM-dd');
       dailyMap[key] = { date: key, sales: 0, purchases: 0, expenses: 0, profit: 0 };
-      current.setUTCDate(current.getUTCDate() + 1);
+      currentDt = currentDt.plus({ days: 1 });
     }
 
     // Fill sales
