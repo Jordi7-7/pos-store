@@ -93,7 +93,7 @@ import { PermissionsGuard } from './modules/auth/guards/permissions.guard';
         Tag,
       ],
       synchronize: false,
-      logging: process.env.DB_LOGGING === 'true',
+      logging: process.env.DB_LOGGING === 'all' ? true : process.env.DB_LOGGING === 'true' ? ['error', 'warn', 'migration'] : false,
     }),
     RedisModule,
     AuthModule,
