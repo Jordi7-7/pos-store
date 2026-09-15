@@ -1,4 +1,5 @@
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
+import { Logger } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { GetMyCashRegistersQuery } from './get-my-cash-registers.query';
 import { CashRegister } from '../../../domain/entities/cash-register.entity';
@@ -17,10 +18,13 @@ export interface MyCashRegisterDto {
 
 @QueryHandler(GetMyCashRegistersQuery)
 export class GetMyCashRegistersHandler implements IQueryHandler<GetMyCashRegistersQuery> {
+  private readonly logger = new Logger(GetMyCashRegistersHandler.name);
+
   constructor(private readonly entityManager: EntityManager) {}
 
   async execute(query: GetMyCashRegistersQuery): Promise<MyCashRegisterDto[]> {
     const { tenantId, userId, userRole, branchId } = query;
+    this.logger.log(`Fetching cash registers for User: ${userId} (Role: ${userRole}), Branch: ${branchId || 'ALL'}, Tenant: ${tenantId}`);
 
     const registerRepo = this.entityManager.getRepository(CashRegister);
     const qb = registerRepo
@@ -30,11 +34,11 @@ export class GetMyCashRegistersHandler implements IQueryHandler<GetMyCashRegiste
       .andWhere('cr.isActive = true')
       .orderBy('cr.code', 'ASC');
 
-    if (branchId) {
+    if (branchId && branchId !== 'null' && branchId !== 'undefined') {
       qb.andWhere('cr.branchId = :branchId', { branchId });
     }
 
-    const isOwner = userRole === UserRole.OWNER;
+    const isOwner = String(userRole).toUpperCase() === 'OWNER';
 
     // Si no es OWNER, filtrar estrictamente por las cajas asignadas al usuario
     if (!isOwner) {
@@ -44,12 +48,14 @@ export class GetMyCashRegistersHandler implements IQueryHandler<GetMyCashRegiste
       });
       const assignedIds = (user?.cashRegisters || []).map((cr) => cr.id);
       if (assignedIds.length === 0) {
+        this.logger.warn(`User ${userId} has no assigned cash registers in tenant ${tenantId}`);
         return [];
       }
       qb.andWhere('cr.id IN (:...assignedIds)', { assignedIds });
     }
 
     const registers = await qb.getMany();
+    this.logger.log(`Found ${registers.length} active cash register(s) for User ${userId}`);
     if (registers.length === 0) {
       return [];
     }

@@ -11,14 +11,17 @@ import { Request, Response } from 'express';
 
 @Injectable()
 export class LoggingInterceptor implements NestInterceptor {
-  private readonly logger = new Logger('HTTP');
-
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const ctx = context.switchToHttp();
     const req = ctx.getRequest<Request>();
     const res = ctx.getResponse<Response>();
 
-    const { method, originalUrl, ip } = req;
+    const controllerName = context.getClass()?.name || 'HTTP';
+    const handlerName = context.getHandler()?.name || '';
+    const loggerContext = handlerName ? `${controllerName}#${handlerName}` : controllerName;
+    const logger = new Logger(loggerContext);
+
+    const { method, originalUrl } = req;
     const startTime = Date.now();
 
     return next.handle().pipe(
@@ -27,7 +30,7 @@ export class LoggingInterceptor implements NestInterceptor {
           const duration = Date.now() - startTime;
           const statusCode = res.statusCode;
           const statusText = this.colorizeStatus(statusCode);
-          this.logger.log(
+          logger.log(
             `${method} ${originalUrl} ${statusText} +${duration}ms`
           );
         },
@@ -36,7 +39,7 @@ export class LoggingInterceptor implements NestInterceptor {
           const statusCode = err.status || err.statusCode || 500;
           const statusText = `\x1b[31m${statusCode}\x1b[0m`;
           const message = err.message || 'Internal server error';
-          this.logger.error(
+          logger.error(
             `${method} ${originalUrl} ${statusText} +${duration}ms - Error: ${message}`
           );
         },
