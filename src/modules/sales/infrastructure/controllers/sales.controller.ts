@@ -160,18 +160,13 @@ export class SalesController {
   @Get('expenses')
   async findExpenses(
     @CurrentUser('tenantId') tenantId: string,
-    @Query('cashSessionId') cashSessionId?: string,
-    @Query('branchId') branchId?: string,
+    @Query('cashSessionId') cashSessionId: string,
   ) {
-    const whereClause: any = { tenantId };
-    if (cashSessionId) {
-      whereClause.cashSessionId = cashSessionId;
-    }
-    if (branchId) {
-      whereClause.branchId = branchId;
+    if (!cashSessionId) {
+      return [];
     }
     return this.entityManager.getRepository(Expense).find({
-      where: whereClause,
+      where: { tenantId, cashSessionId },
       order: { createdAt: 'DESC' },
     });
   }

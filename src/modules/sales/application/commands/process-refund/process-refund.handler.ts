@@ -84,15 +84,18 @@ export class ProcessRefundHandler implements ICommandHandler<ProcessRefundComman
           throw new BadRequestException(`Refund quantity for variant ${itemDto.variantId} exceeds the original sold quantity`);
         }
 
-        // Calculate refund amount for this variant
-        const priceRefunded = Number(saleItem.price) * itemDto.quantity;
-        totalRefunded += priceRefunded;
+        // Calculate net unit price paid after discounts
+        const soldQty = Number(saleItem.quantity) || 1;
+        const discountPerUnit = Number(saleItem.discountAmount || 0) / soldQty;
+        const netUnitPrice = Math.max(0, Number(saleItem.price) - discountPerUnit);
+        const lineRefundAmount = Math.round(netUnitPrice * itemDto.quantity * 100) / 100;
+        totalRefunded += lineRefundAmount;
 
         // Build Refund Item record
         const refundItem = new RefundItem();
         refundItem.variantId = itemDto.variantId;
         refundItem.quantity = itemDto.quantity;
-        refundItem.priceRefunded = Number(saleItem.price);
+        refundItem.priceRefunded = netUnitPrice;
         refundItemsToSave.push(refundItem);
 
         // Restore branch inventory stock (locked for concurrent updates)

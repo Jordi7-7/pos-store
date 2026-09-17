@@ -40,6 +40,26 @@ export class CashSession extends BaseEntity {
   })
   closingBalance: number | null;
 
+  @Column({
+    name: 'expected_balance',
+    type: 'numeric',
+    precision: 10,
+    scale: 2,
+    nullable: true,
+    transformer: new ColumnNumericTransformer(),
+  })
+  expectedBalance: number | null;
+
+  @Column({
+    name: 'difference',
+    type: 'numeric',
+    precision: 10,
+    scale: 2,
+    nullable: true,
+    transformer: new ColumnNumericTransformer(),
+  })
+  difference: number | null;
+
   @Column()
   status: string;
 

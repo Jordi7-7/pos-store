@@ -10,9 +10,13 @@ export class LogoutHandler implements ICommandHandler<LogoutCommand> {
   constructor(private readonly redisService: RedisService) {}
 
   async execute(command: LogoutCommand): Promise<void> {
-    this.logger.log(`Logout request for User ID: ${command.userId}`);
-    const redisKey = `refresh_token:${command.userId}`;
-    await this.redisService.del(redisKey);
-    this.logger.log(`Session cleared in Redis for User ID: ${command.userId}`);
+    if (command.userId) {
+      this.logger.log(`Logout request for User ID: ${command.userId}`);
+      const redisKey = `refresh_token:${command.userId}`;
+      await this.redisService.del(redisKey);
+      this.logger.log(`Session cleared in Redis for User ID: ${command.userId}`);
+    } else {
+      this.logger.log(`Logout request received without user ID (already anonymous or expired)`);
+    }
   }
 }

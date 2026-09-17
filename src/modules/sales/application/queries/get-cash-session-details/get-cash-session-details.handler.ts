@@ -38,9 +38,29 @@ export class GetCashSessionDetailsHandler implements IQueryHandler<GetCashSessio
 
     const sales = await this.saleRepository.find({
       where: { cashSessionId: sessionId, tenantId },
+      select: {
+        id: true,
+        invoiceNumber: true,
+        total: true,
+        status: true,
+        createdAt: true,
+        customer: { id: true, name: true },
+        payments: { id: true, paymentMethod: true, amount: true, referenceNumber: true },
+        items: {
+          id: true,
+          quantity: true,
+          price: true,
+          discountAmount: true,
+          variant: {
+            id: true,
+            sku: true,
+            product: { id: true, name: true },
+            attributeValues: { id: true, value: true, attribute: { id: true, name: true } },
+          },
+        },
+      },
       relations: {
         customer: true,
-        user: true,
         items: { variant: { product: true, attributeValues: { attribute: true } } },
         payments: true,
       },
@@ -49,12 +69,44 @@ export class GetCashSessionDetailsHandler implements IQueryHandler<GetCashSessio
 
     const expenses = await this.expenseRepository.find({
       where: { cashSessionId: sessionId, tenantId },
+      select: {
+        id: true,
+        description: true,
+        amount: true,
+        category: true,
+        createdAt: true,
+      },
       order: { createdAt: 'ASC' },
     });
 
     const refunds = await this.refundRepository.find({
       where: { cashSessionId: sessionId, tenantId },
-      relations: { user: true, items: { variant: { product: true } }, sale: true },
+      select: {
+        id: true,
+        reason: true,
+        totalRefunded: true,
+        createdAt: true,
+        items: {
+          id: true,
+          quantity: true,
+          priceRefunded: true,
+          variant: {
+            id: true,
+            sku: true,
+            product: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      },
+      relations: {
+        items: {
+          variant: {
+            product: true,
+          },
+        },
+      },
       order: { createdAt: 'ASC' },
     });
 

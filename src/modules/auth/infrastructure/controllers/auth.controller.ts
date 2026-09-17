@@ -55,10 +55,11 @@ export class AuthController {
     return this.commandBus.execute(new RefreshTokenCommand(dto.refreshToken));
   }
 
+  @Public()
   @Post('logout')
   @HttpCode(HttpStatus.OK)
-  async logout(@CurrentUser('sub') userId: string) {
-    await this.commandBus.execute(new LogoutCommand(userId));
+  async logout(@CurrentUser('sub') userId?: string) {
+    await this.commandBus.execute(new LogoutCommand(userId || null));
     return { message: 'Logged out successfully' };
   }
 

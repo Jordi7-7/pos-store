@@ -134,6 +134,8 @@ export class AppModule implements NestModule {
         { path: '/health', method: RequestMethod.GET },
         { path: '/auth/onboard', method: RequestMethod.POST },
         { path: '/auth/login', method: RequestMethod.POST },
+        { path: '/auth/pin-login', method: RequestMethod.POST },
+        { path: '/auth/logout', method: RequestMethod.POST },
         { path: '/auth/refresh', method: RequestMethod.POST },
       )
       .forRoutes('*');
