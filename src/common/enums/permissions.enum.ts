@@ -22,6 +22,7 @@ export const APP_PERMISSIONS = {
   PRODUCTS_DELETE: 'action:products.delete',
   PRODUCTS_IMPORT: 'action:products.import',
   PRODUCTS_ADJUST_STOCK: 'action:products.adjust_stock',
+  PRODUCTS_PRINT_BARCODES: 'action:products.print_barcodes',
 
   // Compras
   PURCHASES_CREATE: 'action:purchases.create',
@@ -136,6 +137,12 @@ export const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
     description: 'Permite sumar o restar existencias directamente sin orden de compra.',
     module: 'products',
     isDangerous: true,
+  },
+  {
+    code: APP_PERMISSIONS.PRODUCTS_PRINT_BARCODES,
+    label: 'Generar e Imprimir Códigos de Barra',
+    description: 'Permite imprimir etiquetas y códigos de barra de productos en impresora térmica.',
+    module: 'products',
   },
 
   // Compras
