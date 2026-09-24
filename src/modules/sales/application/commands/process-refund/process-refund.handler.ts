@@ -4,6 +4,7 @@ import { EntityManager } from 'typeorm';
 import { ProcessRefundCommand } from './process-refund.command';
 import { Refund } from '../../../domain/entities/refund.entity';
 import { InventoryMovementReason } from '../../../../../common/enums/inventory-movement-reason.enum';
+import { InventoryMovementType } from '../../../../../common/enums/inventory-movement-type.enum';
 import { RefundItem } from '../../../domain/entities/refund-item.entity';
 import { Sale } from '../../../domain/entities/sale.entity';
 import { CashSession } from '../../../domain/entities/cash-session.entity';
@@ -65,6 +66,24 @@ export class ProcessRefundHandler implements ICommandHandler<ProcessRefundComman
         throw new NotFoundException(`Sale with ID ${saleId} not found`);
       }
 
+      if (sale.status === 'REFUNDED') {
+        throw new BadRequestException(`La venta ${sale.invoiceNumber || saleId} ya ha sido devuelta en su totalidad.`);
+      }
+
+      // 4.1 Cargar reembolsos previos existentes para saber cuántas piezas quedan pendientes por devolver
+      const previousRefunds = await refundRepo.find({
+        where: { saleId },
+        relations: { items: true },
+      });
+
+      const alreadyRefundedByVariant: Record<string, number> = {};
+      for (const pr of previousRefunds) {
+        for (const pri of pr.items) {
+          alreadyRefundedByVariant[pri.variantId] =
+            (alreadyRefundedByVariant[pri.variantId] || 0) + Number(pri.quantity);
+        }
+      }
+
       let totalRefunded = 0;
       const refundItemsToSave: RefundItem[] = [];
       const inventoryMovements: InventoryMovement[] = [];
@@ -78,11 +97,21 @@ export class ProcessRefundHandler implements ICommandHandler<ProcessRefundComman
           throw new BadRequestException(`Product variant ${itemDto.variantId} was not purchased in this sale`);
         }
 
-        // Validate quantity does not exceed original sold quantity
-        if (itemDto.quantity > Number(saleItem.quantity)) {
-          this.logger.warn(`Refund failed: refund quantity (${itemDto.quantity}) exceeds sold quantity (${saleItem.quantity})`);
-          throw new BadRequestException(`Refund quantity for variant ${itemDto.variantId} exceeds the original sold quantity`);
+        // Validate quantity does not exceed original remaining refundable quantity
+        const alreadyRefunded = alreadyRefundedByVariant[itemDto.variantId] || 0;
+        const remainingRefundable = Math.max(0, Number(saleItem.quantity) - alreadyRefunded);
+
+        if (itemDto.quantity > remainingRefundable) {
+          this.logger.warn(
+            `Refund failed: requested ${itemDto.quantity} for variant ${itemDto.variantId}, but only ${remainingRefundable} remain refundable (sold: ${saleItem.quantity}, already returned: ${alreadyRefunded})`,
+          );
+          throw new BadRequestException(
+            `No se puede devolver ${itemDto.quantity} pieza(s). Solo quedan ${remainingRefundable} pieza(s) disponible(s) para devolución de este producto en la venta.`,
+          );
         }
+
+        // Actualizar acumulado en memoria para evitar duplicados en la misma petición
+        alreadyRefundedByVariant[itemDto.variantId] = alreadyRefunded + itemDto.quantity;
 
         // Calculate net unit price paid after discounts
         const soldQty = Number(saleItem.quantity) || 1;
@@ -131,7 +160,7 @@ export class ProcessRefundHandler implements ICommandHandler<ProcessRefundComman
         movement.destinationBranchId = branchId;
         movement.variantId = itemDto.variantId;
         movement.quantity = itemDto.quantity;
-        movement.type = 'IN';
+        movement.type = InventoryMovementType.IN;
         movement.reason = InventoryMovementReason.DEVOLUCION;
         inventoryMovements.push(movement);
       }
