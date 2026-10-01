@@ -66,4 +66,14 @@ export class SaleItem extends BaseEntity {
     transformer: new ColumnNumericTransformer(),
   })
   discountAmount: number;
+
+  @Column({
+    name: 'refunded_quantity',
+    type: 'numeric',
+    precision: 10,
+    scale: 2,
+    default: 0,
+    transformer: new ColumnNumericTransformer(),
+  })
+  refundedQuantity: number;
 }

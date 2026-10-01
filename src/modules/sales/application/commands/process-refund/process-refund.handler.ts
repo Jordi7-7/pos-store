@@ -13,6 +13,8 @@ import { ProductStock } from '../../../../products/domain/entities/product-stock
 import { InventoryMovement } from '../../../../products/domain/entities/inventory-movement.entity';
 import { ProductBatch } from '../../../../products/domain/entities/product-batch.entity';
 
+import { SaleItem } from '../../../domain/entities/sale-item.entity';
+
 @CommandHandler(ProcessRefundCommand)
 export class ProcessRefundHandler implements ICommandHandler<ProcessRefundCommand> {
   private readonly logger = new Logger(ProcessRefundHandler.name);
@@ -28,6 +30,7 @@ export class ProcessRefundHandler implements ICommandHandler<ProcessRefundComman
       const branchRepo = transactionalManager.getRepository(Branch);
       const cashSessionRepo = transactionalManager.getRepository(CashSession);
       const saleRepo = transactionalManager.getRepository(Sale);
+      const saleItemRepo = transactionalManager.getRepository(SaleItem);
       const stockRepo = transactionalManager.getRepository(ProductStock);
       const refundRepo = transactionalManager.getRepository(Refund);
       const inventoryRepo = transactionalManager.getRepository(InventoryMovement);
@@ -126,6 +129,10 @@ export class ProcessRefundHandler implements ICommandHandler<ProcessRefundComman
         refundItem.quantity = itemDto.quantity;
         refundItem.priceRefunded = netUnitPrice;
         refundItemsToSave.push(refundItem);
+
+        // Update refundedQuantity in saleItem
+        saleItem.refundedQuantity = Number(saleItem.refundedQuantity || 0) + itemDto.quantity;
+        await saleItemRepo.save(saleItem);
 
         // Restore branch inventory stock (locked for concurrent updates)
         let stock = await stockRepo.findOne({
