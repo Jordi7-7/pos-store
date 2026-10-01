@@ -144,20 +144,6 @@ export class UpdateProductHandler implements ICommandHandler<UpdateProductComman
           }
         }
 
-        // Sync stocks (we assume standard stock update)
-        if (variantDto.stocks !== undefined) {
-          for (const stockDto of variantDto.stocks) {
-            let stock = variant.stocks.find(s => s.branchId === stockDto.branchId);
-            if (!stock) {
-              stock = new ProductStock();
-              stock.variant = variant;
-              stock.branchId = stockDto.branchId;
-              variant.stocks.push(stock);
-            }
-            stock.quantity = Number(stockDto.quantity) || 0;
-          }
-        }
-
         updatedVariants.push(variant);
       }
 

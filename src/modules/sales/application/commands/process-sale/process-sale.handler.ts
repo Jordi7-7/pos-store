@@ -13,6 +13,7 @@ import { CashSession } from '../../../domain/entities/cash-session.entity';
 import { CashRegister } from '../../../domain/entities/cash-register.entity';
 import { Customer } from '../../../../customers/domain/entities/customer.entity';
 import { InventoryMovementReason } from '../../../../../common/enums/inventory-movement-reason.enum';
+import { InventoryMovementType } from '../../../../../common/enums/inventory-movement-type.enum';
 
 @CommandHandler(ProcessSaleCommand)
 export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
@@ -196,12 +197,26 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
         movement.destinationBranchId = null;
         movement.variantId = itemDto.variantId;
         movement.quantity = itemDto.quantity;
-        movement.type = 'OUT';
+        movement.type = InventoryMovementType.OUT;
         movement.reason = InventoryMovementReason.VENTA;
         inventoryMovements.push(movement);
       }
 
       const total = Number((subtotal - (discountAmount || 0)).toFixed(2));
+
+      // 4.1 Validar que los métodos de pago cubran el total de la venta
+      const totalPaid = payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+      const roundedTotalPaid = Math.round(totalPaid * 100) / 100;
+      const roundedTotal = Math.round(total * 100) / 100;
+
+      if (roundedTotalPaid < roundedTotal) {
+        this.logger.warn(
+          `Sale failed: Paid amount ($${roundedTotalPaid}) is less than sale total ($${roundedTotal}) for Tenant ${tenantId}`,
+        );
+        throw new BadRequestException(
+          `El monto pagado ($${roundedTotalPaid.toFixed(2)}) es menor al total de la venta ($${roundedTotal.toFixed(2)}).`,
+        );
+      }
 
       // 5. Create and save Sale
       const sale = new Sale();
