@@ -2,7 +2,7 @@ import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
 import { EntityManager } from 'typeorm';
 import { GetPurchasesQuery } from './get-purchases.query';
 import { PurchaseOrder } from '../../../domain/entities/purchase-order.entity';
-import { ProductBatch } from '../../../../products/domain/entities/product-batch.entity';
+import { Batch } from '../../../../batches/domain/entities/batch.entity';
 
 @QueryHandler(GetPurchasesQuery)
 export class GetPurchasesHandler implements IQueryHandler<GetPurchasesQuery> {
@@ -11,7 +11,7 @@ export class GetPurchasesHandler implements IQueryHandler<GetPurchasesQuery> {
   async execute(query: GetPurchasesQuery): Promise<any[]> {
     const { tenantId } = query;
     const purchaseRepo = this.entityManager.getRepository(PurchaseOrder);
-    const batchRepo = this.entityManager.getRepository(ProductBatch);
+    const batchHeaderRepo = this.entityManager.getRepository(Batch);
 
     const orders = await purchaseRepo.find({
       where: { tenantId },
@@ -31,9 +31,12 @@ export class GetPurchasesHandler implements IQueryHandler<GetPurchasesQuery> {
           return { ...order, isCancellable: false };
         }
 
-        const batches = await batchRepo.find({
+        const batchHeaders = await batchHeaderRepo.find({
           where: { purchaseOrderId: order.id },
+          relations: { items: true },
         });
+
+        const batches = batchHeaders.flatMap((bh) => bh.items || []);
 
         const allIntact = batches.every(
           (b) => Number(b.remainingQuantity) === Number(b.initialQuantity),

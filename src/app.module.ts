@@ -46,6 +46,8 @@ import { BranchesModule } from './modules/branches/branches.module';
 import { CustomersModule } from './modules/customers/customers.module';
 import { Category } from './modules/products/domain/entities/category.entity';
 import { ProductBatch } from './modules/products/domain/entities/product-batch.entity';
+import { Batch } from './modules/batches/domain/entities/batch.entity';
+import { BatchesModule } from './modules/batches/batches.module';
 import { PurchaseOrderItem } from './modules/purchases/domain/entities/purchase-order-item.entity';
 import { TenantsModule } from './modules/tenants/tenants.module';
 import { ReportsModule } from './modules/reports/reports.module';
@@ -89,6 +91,7 @@ import { PermissionsGuard } from './modules/auth/guards/permissions.guard';
         ProductImage,
         Category,
         ProductBatch,
+        Batch,
         PurchaseOrderItem,
         Tag,
       ],
@@ -98,6 +101,7 @@ import { PermissionsGuard } from './modules/auth/guards/permissions.guard';
     RedisModule,
     AuthModule,
     ProductsModule,
+    BatchesModule,
     SalesModule,
     UsersModule,
     RolesModule,

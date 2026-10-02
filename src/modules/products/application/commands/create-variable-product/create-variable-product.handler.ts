@@ -9,6 +9,7 @@ import { ProductStock } from '../../../domain/entities/product-stock.entity';
 import { ProductImage } from '../../../domain/entities/product-image.entity';
 import { Category } from '../../../domain/entities/category.entity';
 import { ProductBatch } from '../../../domain/entities/product-batch.entity';
+import { Batch, BatchOriginType } from '../../../../batches/domain/entities/batch.entity';
 import { InventoryMovement } from '../../../domain/entities/inventory-movement.entity';
 import { Branch } from '../../../../branches/domain/entities/branch.entity';
 import { InventoryMovementReason } from '../../../../../common/enums/inventory-movement-reason.enum';
@@ -169,14 +170,23 @@ export class CreateVariableProductHandler implements ICommandHandler<CreateVaria
         // Save initial batches and movements
         const batchesToSave: ProductBatch[] = [];
         const movementsToSave: InventoryMovement[] = [];
+        const batchHeaderRepo = transactionalManager.getRepository(Batch);
 
         for (const stock of savedVariant.stocks) {
           if (Number(stock.quantity) > 0) {
+            const batchHeader = new Batch();
+            batchHeader.tenantId = tenantId;
+            batchHeader.branchId = stock.branchId;
+            batchHeader.purchaseOrderId = null;
+            batchHeader.code = `LOT-INIT-${savedVariant.sku || savedVariant.id.slice(0, 6)}`;
+            batchHeader.originType = BatchOriginType.INITIAL_STOCK;
+            const savedBatchHeader = await batchHeaderRepo.save(batchHeader);
+
             const batch = new ProductBatch();
             batch.tenantId = tenantId;
             batch.branchId = stock.branchId;
+            batch.batchId = savedBatchHeader.id;
             batch.variantId = savedVariant.id;
-            batch.purchaseOrderId = null;
             batch.initialQuantity = Number(stock.quantity);
             batch.remainingQuantity = Number(stock.quantity);
             batch.unitCost = Number(savedVariant.purchasePrice);

@@ -6,6 +6,7 @@ import { Product } from '../../../domain/entities/product.entity';
 import { ProductVariant } from '../../../domain/entities/product-variant.entity';
 import { ProductStock } from '../../../domain/entities/product-stock.entity';
 import { ProductBatch } from '../../../domain/entities/product-batch.entity';
+import { Batch, BatchOriginType } from '../../../../batches/domain/entities/batch.entity';
 import { InventoryMovement } from '../../../domain/entities/inventory-movement.entity';
 import { Branch } from '../../../../branches/domain/entities/branch.entity';
 import { InventoryMovementReason } from '../../../../../common/enums/inventory-movement-reason.enum';
@@ -89,6 +90,15 @@ export class ImportProductsHandler implements ICommandHandler<ImportProductsComm
 
         // 3. Bulk create Stocks, Batches and Movements if stock is provided and branchId is present
         if (branchId) {
+          const batchHeaderRepo = tm.getRepository(Batch);
+          const batchHeader = new Batch();
+          batchHeader.tenantId = tenantId;
+          batchHeader.branchId = branchId;
+          batchHeader.purchaseOrderId = null;
+          batchHeader.code = `IMP-PROD-${Date.now().toString().slice(-6)}`;
+          batchHeader.originType = BatchOriginType.INITIAL_STOCK;
+          const savedBatchHeader = await batchHeaderRepo.save(batchHeader);
+
           const stocksToCreate: ProductStock[] = [];
           const batchesToCreate: ProductBatch[] = [];
           const movementsToCreate: InventoryMovement[] = [];
@@ -108,8 +118,8 @@ export class ImportProductsHandler implements ICommandHandler<ImportProductsComm
               const batch = new ProductBatch();
               batch.tenantId = tenantId;
               batch.branchId = branchId;
+              batch.batchId = savedBatchHeader.id;
               batch.variantId = variantId;
-              batch.purchaseOrderId = null;
               batch.initialQuantity = qty;
               batch.remainingQuantity = qty;
               batch.unitCost = purchasePrice;

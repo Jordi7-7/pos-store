@@ -1,9 +1,10 @@
-export class GetProductBatchesQuery {
+export class GetBatchesQuery {
   constructor(
     public readonly tenantId: string,
     public readonly branchId?: string,
+    public readonly startDateStr?: string,
+    public readonly endDateStr?: string,
     public readonly search?: string,
-    public readonly status?: 'all' | 'active' | 'exhausted',
     public readonly page = 1,
     public readonly limit = 10,
   ) {}

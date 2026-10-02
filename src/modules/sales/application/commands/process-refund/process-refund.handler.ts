@@ -12,6 +12,7 @@ import { Branch } from '../../../../branches/domain/entities/branch.entity';
 import { ProductStock } from '../../../../products/domain/entities/product-stock.entity';
 import { InventoryMovement } from '../../../../products/domain/entities/inventory-movement.entity';
 import { ProductBatch } from '../../../../products/domain/entities/product-batch.entity';
+import { Batch, BatchOriginType } from '../../../../batches/domain/entities/batch.entity';
 
 import { SaleItem } from '../../../domain/entities/sale-item.entity';
 
@@ -149,12 +150,23 @@ export class ProcessRefundHandler implements ICommandHandler<ProcessRefundComman
         stock.quantity = Number(stock.quantity) + itemDto.quantity;
         await stockRepo.save(stock);
 
+        // Create Batch header for the returned merchandise
+        const batchHeaderRepo = transactionalManager.getRepository(Batch);
+        const batchHeader = new Batch();
+        batchHeader.tenantId = tenantId;
+        batchHeader.branchId = branchId;
+        batchHeader.purchaseOrderId = null;
+        batchHeader.code = `DEV-${sale.invoiceNumber || sale.id.slice(0, 6)}`;
+        batchHeader.originType = BatchOriginType.REFUND;
+        batchHeader.notes = reason || 'Devolución de cliente';
+        const savedBatchHeader = await batchHeaderRepo.save(batchHeader);
+
         // Create a new Product Batch representing the returned inventory (using historical cost)
         const batch = new ProductBatch();
         batch.tenantId = tenantId;
         batch.branchId = branchId;
+        batch.batchId = savedBatchHeader.id;
         batch.variantId = itemDto.variantId;
-        batch.purchaseOrderId = null; // returned stock, not new PO
         batch.initialQuantity = itemDto.quantity;
         batch.remainingQuantity = itemDto.quantity;
         batch.unitCost = Number(saleItem.cost);

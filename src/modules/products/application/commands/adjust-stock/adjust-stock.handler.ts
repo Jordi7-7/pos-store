@@ -5,6 +5,7 @@ import { AdjustStockCommand } from './adjust-stock.command';
 import { ProductVariant } from '../../../domain/entities/product-variant.entity';
 import { ProductStock } from '../../../domain/entities/product-stock.entity';
 import { ProductBatch } from '../../../domain/entities/product-batch.entity';
+import { Batch, BatchOriginType } from '../../../../batches/domain/entities/batch.entity';
 import { InventoryMovement } from '../../../domain/entities/inventory-movement.entity';
 import { Branch } from '../../../../branches/domain/entities/branch.entity';
 import { InventoryMovementReason } from '../../../../../common/enums/inventory-movement-reason.enum';
@@ -97,12 +98,23 @@ export class AdjustStockHandler implements ICommandHandler<AdjustStockCommand> {
       } else {
         branchStock.quantity = Number(branchStock.quantity) + quantity;
 
-        // Crear un nuevo lote de entrada con el costo unitario de la ficha
+        // Crear cabecera de lote para el ajuste de entrada
+        const batchHeaderRepo = transactionalManager.getRepository(Batch);
+        const batchHeader = new Batch();
+        batchHeader.tenantId = tenantId;
+        batchHeader.branchId = branchId;
+        batchHeader.purchaseOrderId = null;
+        batchHeader.code = `AJUSTE-IN-${Date.now().toString().slice(-6)}`;
+        batchHeader.originType = BatchOriginType.ADJUSTMENT;
+        batchHeader.notes = comment || null;
+        const savedBatchHeader = await batchHeaderRepo.save(batchHeader);
+
+        // Crear un nuevo lote de entrada con el costo unitario de la ficha vinculado al batch header
         const newBatch = new ProductBatch();
         newBatch.tenantId = tenantId;
         newBatch.branchId = branchId;
+        newBatch.batchId = savedBatchHeader.id;
         newBatch.variantId = variantId;
-        newBatch.purchaseOrderId = null;
         newBatch.initialQuantity = quantity;
         newBatch.remainingQuantity = quantity;
         newBatch.unitCost = Number(variant.purchasePrice) || 0;

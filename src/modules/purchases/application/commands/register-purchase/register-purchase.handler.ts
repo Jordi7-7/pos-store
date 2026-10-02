@@ -10,6 +10,7 @@ import { ProductVariant } from '../../../../products/domain/entities/product-var
 import { ProductStock } from '../../../../products/domain/entities/product-stock.entity';
 import { InventoryMovement } from '../../../../products/domain/entities/inventory-movement.entity';
 import { ProductBatch } from '../../../../products/domain/entities/product-batch.entity';
+import { Batch, BatchOriginType } from '../../../../batches/domain/entities/batch.entity';
 import { InventoryMovementReason } from '../../../../../common/enums/inventory-movement-reason.enum';
 
 @CommandHandler(RegisterPurchaseCommand)
@@ -31,6 +32,7 @@ export class RegisterPurchaseHandler implements ICommandHandler<RegisterPurchase
       const stockRepo = transactionalManager.getRepository(ProductStock);
       const inventoryRepo = transactionalManager.getRepository(InventoryMovement);
       const batchRepo = transactionalManager.getRepository(ProductBatch);
+      const batchHeaderRepo = transactionalManager.getRepository(Batch);
       const purchaseOrderItemRepo = transactionalManager.getRepository(PurchaseOrderItem);
 
       // 2. Resolve Supplier
@@ -86,6 +88,15 @@ export class RegisterPurchaseHandler implements ICommandHandler<RegisterPurchase
       const savedPurchase = await purchaseRepo.save(purchaseOrder);
       const inventoryMovements: InventoryMovement[] = [];
 
+      // Create physical Batch header for this purchase
+      const batchHeader = new Batch();
+      batchHeader.tenantId = tenantId;
+      batchHeader.branchId = branchId;
+      batchHeader.purchaseOrderId = savedPurchase.id;
+      batchHeader.code = invoiceNumber || `OC-${savedPurchase.id.slice(0, 8)}`;
+      batchHeader.originType = BatchOriginType.PURCHASE;
+      const savedBatchHeader = await batchHeaderRepo.save(batchHeader);
+
       // 6. Process items (Update PMP cost and add branch stocks)
       for (const itemDto of items) {
         // Validate variant exists and belongs to this tenant
@@ -135,12 +146,12 @@ export class RegisterPurchaseHandler implements ICommandHandler<RegisterPurchase
         branchStock.quantity = Number(branchStock.quantity) + newQty;
         await stockRepo.save(branchStock);
 
-        // Create Product Batch for FIFO tracking
+        // Create Product Batch for FIFO tracking linked to the Batch header
         const batch = new ProductBatch();
         batch.tenantId = tenantId;
         batch.branchId = branchId;
+        batch.batchId = savedBatchHeader.id;
         batch.variantId = itemDto.variantId;
-        batch.purchaseOrderId = savedPurchase.id;
         batch.initialQuantity = newQty;
         batch.remainingQuantity = newQty;
         batch.unitCost = newPrice;

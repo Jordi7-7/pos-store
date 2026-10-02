@@ -3,8 +3,8 @@ import { BaseEntity } from '../../../../common/database/base.entity';
 import { Tenant } from '../../../tenants/domain/entities/tenant.entity';
 import { Branch } from '../../../branches/domain/entities/branch.entity';
 import { ProductVariant } from './product-variant.entity';
-import { PurchaseOrder } from '../../../purchases/domain/entities/purchase-order.entity';
 import { ColumnNumericTransformer } from '../../../../common/database/numeric-transformer';
+import { Batch } from '../../../batches/domain/entities/batch.entity';
 
 @Entity('product_batches')
 @Index(['branchId', 'variantId'])
@@ -23,19 +23,19 @@ export class ProductBatch extends BaseEntity {
   @JoinColumn({ name: 'branch_id' })
   branch: Branch;
 
+  @Column({ name: 'batch_id', type: 'uuid' })
+  batchId: string;
+
+  @ManyToOne(() => Batch, (batch) => batch.items, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'batch_id' })
+  batch: Batch;
+
   @Column({ name: 'variant_id', type: 'uuid' })
   variantId: string;
 
   @ManyToOne(() => ProductVariant, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'variant_id' })
   variant: ProductVariant;
-
-  @Column({ name: 'purchase_order_id', type: 'uuid', nullable: true })
-  purchaseOrderId: string | null;
-
-  @ManyToOne(() => PurchaseOrder, { nullable: true, onDelete: 'SET NULL' })
-  @JoinColumn({ name: 'purchase_order_id' })
-  purchaseOrder: PurchaseOrder | null;
 
   @Column({
     name: 'initial_quantity',
@@ -64,4 +64,5 @@ export class ProductBatch extends BaseEntity {
   })
   unitCost: number;
 }
+
 export default ProductBatch;

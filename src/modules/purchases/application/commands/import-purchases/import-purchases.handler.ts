@@ -9,6 +9,7 @@ import { Branch } from '../../../../branches/domain/entities/branch.entity';
 import { ProductVariant } from '../../../../products/domain/entities/product-variant.entity';
 import { ProductStock } from '../../../../products/domain/entities/product-stock.entity';
 import { ProductBatch } from '../../../../products/domain/entities/product-batch.entity';
+import { Batch, BatchOriginType } from '../../../../batches/domain/entities/batch.entity';
 import { InventoryMovement } from '../../../../products/domain/entities/inventory-movement.entity';
 import { InventoryMovementReason } from '../../../../../common/enums/inventory-movement-reason.enum';
 
@@ -34,6 +35,7 @@ export class ImportPurchasesHandler implements ICommandHandler<ImportPurchasesCo
       const variantRepo = tm.getRepository(ProductVariant);
       const stockRepo = tm.getRepository(ProductStock);
       const batchRepo = tm.getRepository(ProductBatch);
+      const batchHeaderRepo = tm.getRepository(Batch);
       const movementRepo = tm.getRepository(InventoryMovement);
 
       // Verify branch exists
@@ -95,6 +97,15 @@ export class ImportPurchasesHandler implements ICommandHandler<ImportPurchasesCo
       purchaseOrder.status = 'COMPLETED';
       const savedPurchase = await purchaseRepo.save(purchaseOrder);
 
+      // Create physical Batch header for this imported purchase
+      const batchHeader = new Batch();
+      batchHeader.tenantId = tenantId;
+      batchHeader.branchId = branchId;
+      batchHeader.purchaseOrderId = savedPurchase.id;
+      batchHeader.code = 'COMPRA-MASIVA';
+      batchHeader.originType = BatchOriginType.PURCHASE;
+      const savedBatchHeader = await batchHeaderRepo.save(batchHeader);
+
       const inventoryMovements: InventoryMovement[] = [];
 
       for (const itemDto of items) {
@@ -125,12 +136,12 @@ export class ImportPurchasesHandler implements ICommandHandler<ImportPurchasesCo
         branchStock.quantity = Number(branchStock.quantity) + qty;
         await stockRepo.save(branchStock);
 
-        // Create Batch for FIFO tracking
+        // Create ProductBatch linked to the Batch header
         const batch = new ProductBatch();
         batch.tenantId = tenantId;
         batch.branchId = branchId;
+        batch.batchId = savedBatchHeader.id;
         batch.variantId = variant.id;
-        batch.purchaseOrderId = savedPurchase.id;
         batch.initialQuantity = qty;
         batch.remainingQuantity = qty;
         batch.unitCost = cost;

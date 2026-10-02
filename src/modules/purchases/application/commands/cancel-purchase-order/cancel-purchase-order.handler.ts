@@ -11,6 +11,7 @@ import { PurchaseOrder } from '../../../domain/entities/purchase-order.entity';
 import { PurchaseOrderItem } from '../../../domain/entities/purchase-order-item.entity';
 import { ProductStock } from '../../../../products/domain/entities/product-stock.entity';
 import { ProductBatch } from '../../../../products/domain/entities/product-batch.entity';
+import { Batch, BatchStatus } from '../../../../batches/domain/entities/batch.entity';
 import { InventoryMovement } from '../../../../products/domain/entities/inventory-movement.entity';
 import { InventoryMovementReason } from '../../../../../common/enums/inventory-movement-reason.enum';
 
@@ -35,6 +36,7 @@ export class CancelPurchaseOrderHandler
       const stockRepo = tm.getRepository(ProductStock);
       const batchRepo = tm.getRepository(ProductBatch);
       const movementRepo = tm.getRepository(InventoryMovement);
+      const batchHeaderRepo = tm.getRepository(Batch);
 
       // 1. Find and validate the purchase order
       const order = await purchaseRepo.findOne({
@@ -61,9 +63,11 @@ export class CancelPurchaseOrderHandler
       }
 
       // 2. Verify no items have been sold: all batches must be fully intact
-      const batches = await batchRepo.find({
+      const batchHeaders = await batchHeaderRepo.find({
         where: { purchaseOrderId },
+        relations: { items: true },
       });
+      const batches = batchHeaders.flatMap((bh) => bh.items || []);
 
       for (const batch of batches) {
         const initial = Number(batch.initialQuantity);
@@ -126,7 +130,13 @@ export class CancelPurchaseOrderHandler
 
       await movementRepo.save(movements);
 
-      // 4. Mark order as cancelled
+      // 4. Mark all batch headers associated with this purchase order as CANCELLED
+      for (const batchHeader of batchHeaders) {
+        batchHeader.status = BatchStatus.CANCELLED;
+        await batchHeaderRepo.save(batchHeader);
+      }
+
+      // 5. Mark order as cancelled
       order.status = 'CANCELLED';
       await purchaseRepo.save(order);
 
