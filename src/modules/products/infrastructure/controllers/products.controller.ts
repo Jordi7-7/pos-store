@@ -31,6 +31,7 @@ import { ValidateImportProductsQuery } from '../../application/queries/validate-
 import { GetAttributesQuery } from '../../application/queries/get-attributes/get-attributes.query';
 import { GetInventoryMovementsQuery } from '../../application/queries/get-inventory-movements/get-inventory-movements.query';
 import { GetInventoryMovementsByVariantQuery } from '../../application/queries/get-inventory-movements-by-variant/get-inventory-movements-by-variant.query';
+import { GetProductBatchesQuery } from '../../application/queries/get-product-batches/get-product-batches.query';
 import { GetTagsQuery } from '../../application/queries/get-tags/get-tags.query';
 import { CreateTagCommand } from '../../application/commands/create-tag/create-tag.command';
 import { UpdateVariantTagsCommand } from '../../application/commands/update-variant-tags/update-variant-tags.command';
@@ -208,6 +209,27 @@ export class ProductsController {
       page ? Number(page) : 1,
       limit ? Number(limit) : 10,
     ));
+  }
+
+  @Get('batches')
+  async getProductBatches(
+    @CurrentUser('tenantId') tenantId: string,
+    @Query('branchId') branchId?: string,
+    @Query('search') search?: string,
+    @Query('status') status?: 'all' | 'active' | 'exhausted',
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.queryBus.execute(
+      new GetProductBatchesQuery(
+        tenantId,
+        branchId,
+        search,
+        status,
+        page ? Number(page) : 1,
+        limit ? Number(limit) : 10,
+      ),
+    );
   }
 
   @Post('stock-adjustments')

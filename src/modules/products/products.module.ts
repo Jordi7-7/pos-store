@@ -10,6 +10,7 @@ import { InventoryMovement } from './domain/entities/inventory-movement.entity';
 import { ProductImage } from './domain/entities/product-image.entity';
 import { Category } from './domain/entities/category.entity';
 import { Tag } from './domain/entities/tag.entity';
+import { ProductBatch } from './domain/entities/product-batch.entity';
 import { CreateProductHandler } from './application/commands/create-product/create-product.handler';
 import { CreateSimpleProductHandler } from './application/commands/create-simple-product/create-simple-product.handler';
 import { CreateVariableProductHandler } from './application/commands/create-variable-product/create-variable-product.handler';
@@ -29,6 +30,7 @@ import { ValidateImportProductsHandler } from './application/queries/validate-im
 import { GetAttributesHandler } from './application/queries/get-attributes/get-attributes.handler';
 import { GetInventoryMovementsHandler } from './application/queries/get-inventory-movements/get-inventory-movements.handler';
 import { GetInventoryMovementsByVariantHandler } from './application/queries/get-inventory-movements-by-variant/get-inventory-movements-by-variant.handler';
+import { GetProductBatchesHandler } from './application/queries/get-product-batches/get-product-batches.handler';
 import { GetTagsHandler } from './application/queries/get-tags/get-tags.handler';
 import { CreateTagHandler } from './application/commands/create-tag/create-tag.handler';
 import { UpdateVariantTagsHandler } from './application/commands/update-variant-tags/update-variant-tags.handler';
@@ -46,6 +48,7 @@ import { ProductsController } from './infrastructure/controllers/products.contro
       Attribute,
       AttributeValue,
       ProductStock,
+      ProductBatch,
       InventoryMovement,
       ProductImage,
       Category,
@@ -74,6 +77,7 @@ import { ProductsController } from './infrastructure/controllers/products.contro
     GetAttributesHandler,
     GetInventoryMovementsHandler,
     GetInventoryMovementsByVariantHandler,
+    GetProductBatchesHandler,
     GetTagsHandler,
     CreateTagHandler,
     UpdateVariantTagsHandler,
