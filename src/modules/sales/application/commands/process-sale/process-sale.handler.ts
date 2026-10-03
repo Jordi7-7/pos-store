@@ -178,17 +178,18 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
         const averageUnitCost = Number((totalCost / itemDto.quantity).toFixed(2));
 
         // Build Sale Item
+        const itemDiscountAmount = itemDto.discountAmount !== undefined ? Number(itemDto.discountAmount) : 0;
+        const hasItemDiscount = itemDiscountAmount > 0;
+
         const saleItem = new SaleItem();
         saleItem.variantId = itemDto.variantId;
         saleItem.quantity = itemDto.quantity;
         saleItem.price = itemDto.price;
         saleItem.cost = averageUnitCost;
-        saleItem.discountType = itemDto.discountType || null;
-        saleItem.discountRate = itemDto.discountRate !== undefined ? Number(itemDto.discountRate) : null;
-        saleItem.discountAmount = itemDto.discountAmount !== undefined ? Number(itemDto.discountAmount) : 0;
+        saleItem.discountType = hasItemDiscount ? (itemDto.discountType || null) : null;
+        saleItem.discountRate = hasItemDiscount && itemDto.discountRate !== undefined ? Number(itemDto.discountRate) : null;
+        saleItem.discountAmount = itemDiscountAmount;
         saleItemsToSave.push(saleItem);
-
-        subtotal += (itemDto.price - (itemDto.discountAmount || 0)) * itemDto.quantity;
 
         // Build inventory movement (Kardex)
         const movement = new InventoryMovement();
@@ -202,7 +203,18 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
         inventoryMovements.push(movement);
       }
 
-      const total = Number((subtotal - (discountAmount || 0)).toFixed(2));
+      // Totales agregados:
+      // grossSubtotal: Suma de precios de lista (quantity * price)
+      // totalItemsDiscount: Suma de descuentos propios de los productos
+      // netBaseAfterItemsDiscount: Base imponible sobre la cual se aplica el descuento global
+      const grossSubtotal = saleItemsToSave.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+      const totalItemsDiscount = saleItemsToSave.reduce((sum, item) => sum + item.discountAmount, 0);
+      const netBaseAfterItemsDiscount = Number((grossSubtotal - totalItemsDiscount).toFixed(2));
+
+      const totalGlobalDiscountAmount = discountAmount !== undefined ? Number(discountAmount) : 0;
+      const hasSaleDiscount = totalGlobalDiscountAmount > 0;
+      const total = Number((netBaseAfterItemsDiscount - totalGlobalDiscountAmount).toFixed(2));
+      const overallDiscountAmount = Number((totalItemsDiscount + totalGlobalDiscountAmount).toFixed(2));
 
       // 4.1 Validar que los métodos de pago cubran el total de la venta
       const totalPaid = payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
@@ -218,6 +230,35 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
         );
       }
 
+      // 4.2 Prorratear descuento global en cada ítem y calcular subtotal bruto y total neto
+      if (hasSaleDiscount && netBaseAfterItemsDiscount > 0) {
+        let accumulatedProrated = 0;
+        saleItemsToSave.forEach((item, index) => {
+          const rawSubtotal = Number((item.price * item.quantity).toFixed(2));
+          item.subtotal = rawSubtotal;
+
+          const itemBase = rawSubtotal - item.discountAmount;
+          if (index === saleItemsToSave.length - 1) {
+            // El último ítem absorbe el ajuste de centavos por redondeo
+            const remainingProrated = Number((totalGlobalDiscountAmount - accumulatedProrated).toFixed(2));
+            item.globalDiscountAmount = Math.max(0, remainingProrated);
+          } else {
+            const ratio = itemBase / netBaseAfterItemsDiscount;
+            const prorated = Number((totalGlobalDiscountAmount * ratio).toFixed(2));
+            item.globalDiscountAmount = prorated;
+            accumulatedProrated += prorated;
+          }
+          item.total = Number((itemBase - item.globalDiscountAmount).toFixed(2));
+        });
+      } else {
+        saleItemsToSave.forEach((item) => {
+          const rawSubtotal = Number((item.price * item.quantity).toFixed(2));
+          item.subtotal = rawSubtotal;
+          item.globalDiscountAmount = 0;
+          item.total = Number((rawSubtotal - item.discountAmount).toFixed(2));
+        });
+      }
+
       // 5. Create and save Sale
       const sale = new Sale();
       sale.tenantId = tenantId;
@@ -225,11 +266,13 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
       sale.cashSessionId = cashSessionId;
       sale.invoiceNumber = invoiceNumber;
       sale.customerId = customerId || null;
-      sale.subtotal = Number(subtotal.toFixed(2));
+      sale.subtotal = Number(grossSubtotal.toFixed(2));
       sale.total = total;
-      sale.discountType = discountType || null;
-      sale.discountRate = discountRate !== undefined ? Number(discountRate) : null;
-      sale.discountAmount = discountAmount !== undefined ? Number(discountAmount) : 0;
+      sale.itemsDiscountAmount = Number(totalItemsDiscount.toFixed(2));
+      sale.globalDiscountAmount = totalGlobalDiscountAmount;
+      sale.discountAmount = overallDiscountAmount;
+      sale.discountType = hasSaleDiscount ? (discountType || null) : null;
+      sale.discountRate = hasSaleDiscount && discountRate !== undefined ? Number(discountRate) : null;
       sale.status = 'COMPLETED';
       sale.userId = userId || null;
       sale.items = saleItemsToSave;

@@ -68,6 +68,34 @@ export class SaleItem extends BaseEntity {
   discountAmount: number;
 
   @Column({
+    name: 'global_discount_amount',
+    type: 'numeric',
+    precision: 10,
+    scale: 2,
+    default: 0,
+    transformer: new ColumnNumericTransformer(),
+  })
+  globalDiscountAmount: number;
+
+  @Column({
+    type: 'numeric',
+    precision: 10,
+    scale: 2,
+    default: 0,
+    transformer: new ColumnNumericTransformer(),
+  })
+  subtotal: number;
+
+  @Column({
+    type: 'numeric',
+    precision: 10,
+    scale: 2,
+    default: 0,
+    transformer: new ColumnNumericTransformer(),
+  })
+  total: number;
+
+  @Column({
     name: 'refunded_quantity',
     type: 'numeric',
     precision: 10,

@@ -74,25 +74,11 @@ export class ProcessRefundHandler implements ICommandHandler<ProcessRefundComman
         throw new BadRequestException(`La venta ${sale.invoiceNumber || saleId} ya ha sido devuelta en su totalidad.`);
       }
 
-      // 4.1 Cargar reembolsos previos existentes para saber cuántas piezas quedan pendientes por devolver
-      const previousRefunds = await refundRepo.find({
-        where: { saleId },
-        relations: { items: true },
-      });
-
-      const alreadyRefundedByVariant: Record<string, number> = {};
-      for (const pr of previousRefunds) {
-        for (const pri of pr.items) {
-          alreadyRefundedByVariant[pri.variantId] =
-            (alreadyRefundedByVariant[pri.variantId] || 0) + Number(pri.quantity);
-        }
-      }
-
       let totalRefunded = 0;
       const refundItemsToSave: RefundItem[] = [];
       const inventoryMovements: InventoryMovement[] = [];
 
-      // 5. Validate and process refund items
+      // 4. Validate and process refund items using saleItem.refundedQuantity directly
       for (const itemDto of items) {
         // Find matching item in original sale
         const saleItem = sale.items.find((si) => si.variantId === itemDto.variantId);
@@ -102,7 +88,7 @@ export class ProcessRefundHandler implements ICommandHandler<ProcessRefundComman
         }
 
         // Validate quantity does not exceed original remaining refundable quantity
-        const alreadyRefunded = alreadyRefundedByVariant[itemDto.variantId] || 0;
+        const alreadyRefunded = Number(saleItem.refundedQuantity || 0);
         const remainingRefundable = Math.max(0, Number(saleItem.quantity) - alreadyRefunded);
 
         if (itemDto.quantity > remainingRefundable) {
@@ -114,13 +100,9 @@ export class ProcessRefundHandler implements ICommandHandler<ProcessRefundComman
           );
         }
 
-        // Actualizar acumulado en memoria para evitar duplicados en la misma petición
-        alreadyRefundedByVariant[itemDto.variantId] = alreadyRefunded + itemDto.quantity;
-
-        // Calculate net unit price paid after discounts
+        // Calculate net unit price paid after all discounts (item + prorated global)
         const soldQty = Number(saleItem.quantity) || 1;
-        const discountPerUnit = Number(saleItem.discountAmount || 0) / soldQty;
-        const netUnitPrice = Math.max(0, Number(saleItem.price) - discountPerUnit);
+        const netUnitPrice = Number((Number(saleItem.total || (saleItem.price * soldQty)) / soldQty).toFixed(2));
         const lineRefundAmount = Math.round(netUnitPrice * itemDto.quantity * 100) / 100;
         totalRefunded += lineRefundAmount;
 
@@ -198,21 +180,9 @@ export class ProcessRefundHandler implements ICommandHandler<ProcessRefundComman
       const savedRefund = await refundRepo.save(refund);
       await inventoryRepo.save(inventoryMovements);
 
-      // 7. Update Sale status based on total refunded quantities across ALL refunds for this sale
-      const allRefunds = await refundRepo.find({
-        where: { saleId },
-        relations: { items: true },
-      });
-      // Accumulate total refunded quantity per variant
-      const totalRefundedQtyByVariant: Record<string, number> = {};
-      for (const r of allRefunds) {
-        for (const ri of r.items) {
-          totalRefundedQtyByVariant[ri.variantId] = (totalRefundedQtyByVariant[ri.variantId] || 0) + Number(ri.quantity);
-        }
-      }
-      // Compare against sold quantities: full refund if every sold item is fully returned
+      // 6. Update Sale status based on refundedQuantity of sale.items
       const isFullRefund = sale.items.every((si) =>
-        Number(totalRefundedQtyByVariant[si.variantId] || 0) >= Number(si.quantity)
+        Number(si.refundedQuantity || 0) >= Number(si.quantity)
       );
       sale.status = isFullRefund ? 'REFUNDED' : 'PARTIALLY_REFUNDED';
       await saleRepo.save(sale);

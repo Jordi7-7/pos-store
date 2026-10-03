@@ -47,15 +47,6 @@ export class GetSaleByInvoiceHandler implements IQueryHandler<GetSaleByInvoiceQu
       order: { createdAt: 'ASC' },
     });
 
-    // Accumulate total refunded qty per variantId
-    const refundedQtyByVariant: Record<string, number> = {};
-    for (const refund of existingRefunds) {
-      for (const ri of refund.items) {
-        refundedQtyByVariant[ri.variantId] =
-          (refundedQtyByVariant[ri.variantId] ?? 0) + Number(ri.quantity);
-      }
-    }
-
     // Map to a clean response the frontend can consume
     return {
       id: sale.id,
@@ -100,8 +91,14 @@ export class GetSaleByInvoiceHandler implements IQueryHandler<GetSaleByInvoiceQu
           .map((av) => `${av.attribute?.name ?? ''}: ${av.value}`)
           .join(' / ');
 
-        const refundedQty = refundedQtyByVariant[item.variantId] ?? 0;
-        const refundableQty = Math.max(0, Number(item.quantity) - refundedQty);
+        const originalQty = Number(item.quantity || 0);
+        const refundedQty = Number(item.refundedQuantity || 0);
+        const refundableQty = Math.max(0, originalQty - refundedQty);
+        const unitPrice = Number(item.price || 0);
+        const fallbackSubtotal = unitPrice * originalQty;
+        const lineDiscount = Number(item.discountAmount || 0);
+        const globalDiscount = Number(item.globalDiscountAmount || 0);
+        const fallbackTotal = Math.max(0, fallbackSubtotal - lineDiscount - globalDiscount);
 
         return {
           saleItemId: item.id,
@@ -109,13 +106,15 @@ export class GetSaleByInvoiceHandler implements IQueryHandler<GetSaleByInvoiceQu
           productName: item.variant?.product?.name ?? 'Producto',
           sku: item.variant?.sku ?? '',
           attributes: attrs,
-          quantity: Number(item.quantity),       // original qty sold
-          refundedQty,                            // already refunded
-          refundableQty,                          // remaining available to refund
-          price: Number(item.price),
-          cost: Number(item.cost),
-          discountAmount: Number(item.discountAmount),
-          lineTotal: Number(item.price) * Number(item.quantity) - Number(item.discountAmount),
+          quantity: originalQty,
+          refundedQty,
+          refundableQty,
+          price: unitPrice,
+          cost: Number(item.cost || 0),
+          discountAmount: lineDiscount,
+          globalDiscountAmount: globalDiscount,
+          subtotal: Number(item.subtotal ?? fallbackSubtotal),
+          lineTotal: Number(item.total ?? fallbackTotal),
         };
       }),
     };

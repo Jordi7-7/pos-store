@@ -69,6 +69,26 @@ export class Sale extends BaseEntity {
   discountRate: number | null;
 
   @Column({
+    name: 'items_discount_amount',
+    type: 'numeric',
+    precision: 10,
+    scale: 2,
+    default: 0,
+    transformer: new ColumnNumericTransformer(),
+  })
+  itemsDiscountAmount: number;
+
+  @Column({
+    name: 'global_discount_amount',
+    type: 'numeric',
+    precision: 10,
+    scale: 2,
+    default: 0,
+    transformer: new ColumnNumericTransformer(),
+  })
+  globalDiscountAmount: number;
+
+  @Column({
     name: 'discount_amount',
     type: 'numeric',
     precision: 10,

@@ -64,10 +64,11 @@ export class GetSalesCostReportHandler implements IQueryHandler<GetSalesCostRepo
           const unitCost = Number(item.cost || 0);
           const unitPrice = Number(item.price || 0);
 
-          // Costo y venta netos (descontando piezas devueltas)
+          // Costo y venta netos (descontando piezas devueltas y prorrateo global)
           const lineCost = unitCost * netQty;
           const soldQty = qty || 1;
-          const discountPerUnit = Number(item.discountAmount || 0) / soldQty;
+          const totalItemDiscount = Number(item.discountAmount || 0) + Number(item.globalDiscountAmount || 0);
+          const discountPerUnit = totalItemDiscount / soldQty;
           const netLineDiscount = discountPerUnit * netQty;
           const lineSale = unitPrice * netQty - netLineDiscount;
           const lineProfit = lineSale - lineCost;
@@ -87,9 +88,9 @@ export class GetSalesCostReportHandler implements IQueryHandler<GetSalesCostRepo
             unitCost,
             totalCost: lineCost,
             unitPrice,
-            discountAmount: netLineDiscount,
-            totalPrice: lineSale,
-            profit: lineProfit,
+            discountAmount: Number(netLineDiscount.toFixed(2)),
+            totalPrice: Number(lineSale.toFixed(2)),
+            profit: Number(lineProfit.toFixed(2)),
           });
         }
       }
