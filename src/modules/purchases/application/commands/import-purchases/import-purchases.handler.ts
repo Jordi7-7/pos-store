@@ -27,6 +27,12 @@ export class ImportPurchasesHandler implements ICommandHandler<ImportPurchasesCo
       throw new BadRequestException('No se proporcionaron registros para importar.');
     }
 
+    if (items.length > 3000) {
+      throw new BadRequestException(
+        `El archivo contiene ${items.length} filas. El límite máximo permitido por importación es de 3,000 registros.`,
+      );
+    }
+
     return this.entityManager.transaction(async (tm) => {
       const purchaseRepo = tm.getRepository(PurchaseOrder);
       const itemRepo = tm.getRepository(PurchaseOrderItem);

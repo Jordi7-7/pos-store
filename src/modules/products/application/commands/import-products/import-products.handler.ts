@@ -25,6 +25,12 @@ export class ImportProductsHandler implements ICommandHandler<ImportProductsComm
       throw new BadRequestException('No se proporcionaron productos para importar.');
     }
 
+    if (items.length > 3000) {
+      throw new BadRequestException(
+        `El archivo contiene ${items.length} productos. El límite máximo permitido por importación es de 3,000 productos.`,
+      );
+    }
+
     return this.entityManager.transaction(async (tm) => {
       const productRepo = tm.getRepository(Product);
       const variantRepo = tm.getRepository(ProductVariant);
@@ -41,17 +47,39 @@ export class ImportProductsHandler implements ICommandHandler<ImportProductsComm
         }
       }
 
-      // Check if any SKU already exists in this Tenant
+      // Check if any SKU already exists in this Tenant (chunked to prevent Postgres param limits)
       const skus = items.map((it) => it.sku.trim());
-      const existingVariants = await variantRepo.find({
-        where: { sku: In(skus), tenantId },
-        select: { sku: true },
-      });
+      const duplicateSkus: string[] = [];
+      const CHUNK_QUERY_SIZE = 500;
 
-      if (existingVariants.length > 0) {
-        const dupSkus = existingVariants.map((v) => v.sku).slice(0, 10).join(', ');
-        const extraCount = existingVariants.length > 10 ? ` y ${existingVariants.length - 10} más` : '';
+      for (let i = 0; i < skus.length; i += CHUNK_QUERY_SIZE) {
+        const chunkSkus = skus.slice(i, i + CHUNK_QUERY_SIZE);
+        const existingVariants = await variantRepo.find({
+          where: { sku: In(chunkSkus), tenantId },
+          select: { sku: true },
+        });
+        if (existingVariants.length > 0) {
+          duplicateSkus.push(...existingVariants.map((v) => v.sku));
+        }
+      }
+
+      if (duplicateSkus.length > 0) {
+        const dupSkus = duplicateSkus.slice(0, 10).join(', ');
+        const extraCount = duplicateSkus.length > 10 ? ` y ${duplicateSkus.length - 10} más` : '';
         throw new BadRequestException(`Los siguientes SKUs ya existen en el sistema: ${dupSkus}${extraCount}`);
+      }
+
+      // Create a single physical Batch header for the entire import operation if branchId is present
+      let savedBatchHeader: Batch | null = null;
+      if (branchId) {
+        const batchHeaderRepo = tm.getRepository(Batch);
+        const batchHeader = new Batch();
+        batchHeader.tenantId = tenantId;
+        batchHeader.branchId = branchId;
+        batchHeader.purchaseOrderId = null;
+        batchHeader.code = `IMP-PROD-${Date.now().toString().slice(-6)}`;
+        batchHeader.originType = BatchOriginType.INITIAL_STOCK;
+        savedBatchHeader = await batchHeaderRepo.save(batchHeader);
       }
 
       // Batch processing in chunks for high performance and low memory footprint
@@ -89,16 +117,7 @@ export class ImportProductsHandler implements ICommandHandler<ImportProductsComm
         const savedVariants = await variantRepo.save(variantsToCreate);
 
         // 3. Bulk create Stocks, Batches and Movements if stock is provided and branchId is present
-        if (branchId) {
-          const batchHeaderRepo = tm.getRepository(Batch);
-          const batchHeader = new Batch();
-          batchHeader.tenantId = tenantId;
-          batchHeader.branchId = branchId;
-          batchHeader.purchaseOrderId = null;
-          batchHeader.code = `IMP-PROD-${Date.now().toString().slice(-6)}`;
-          batchHeader.originType = BatchOriginType.INITIAL_STOCK;
-          const savedBatchHeader = await batchHeaderRepo.save(batchHeader);
-
+        if (branchId && savedBatchHeader) {
           const stocksToCreate: ProductStock[] = [];
           const batchesToCreate: ProductBatch[] = [];
           const movementsToCreate: InventoryMovement[] = [];

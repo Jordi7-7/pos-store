@@ -1,4 +1,5 @@
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
+import { BadRequestException } from '@nestjs/common';
 import { EntityManager, In } from 'typeorm';
 import { ValidateImportProductsQuery } from './validate-import-products.query';
 import { ProductVariant } from '../../../domain/entities/product-variant.entity';
@@ -16,12 +17,22 @@ export class ValidateImportProductsHandler implements IQueryHandler<ValidateImpo
       return { errors: {} };
     }
 
-    const existingVariants = await variantRepo.find({
-      where: { sku: In(skus), tenantId },
-      select: { sku: true },
-    });
+    if (items.length > 3000) {
+      throw new BadRequestException(
+        `El archivo contiene ${items.length} productos. El límite máximo permitido por importación es de 3,000 productos.`,
+      );
+    }
 
-    const existingSkusSet = new Set(existingVariants.map((v) => v.sku.toLowerCase()));
+    const existingSkusSet = new Set<string>();
+    const CHUNK_SIZE = 500;
+    for (let i = 0; i < skus.length; i += CHUNK_SIZE) {
+      const chunk = skus.slice(i, i + CHUNK_SIZE);
+      const existingVariants = await variantRepo.find({
+        where: { sku: In(chunk), tenantId },
+        select: { sku: true },
+      });
+      existingVariants.forEach((v) => existingSkusSet.add(v.sku.toLowerCase()));
+    }
     const errors: Record<string, string> = {};
     const fileSkusSet = new Set<string>();
 

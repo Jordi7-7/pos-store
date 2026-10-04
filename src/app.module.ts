@@ -1,5 +1,6 @@
 import { Module, NestModule, MiddlewareConsumer, RequestMethod } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { json, urlencoded } from 'express';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { APP_GUARD } from '@nestjs/core';
 import { AppController } from './app.controller';
@@ -131,6 +132,16 @@ import { PermissionsGuard } from './modules/auth/guards/permissions.guard';
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
+    // 10MB parser exclusivamente para endpoints de importación masiva de Excel/JSON
+    consumer
+      .apply(json({ limit: '10mb' }), urlencoded({ extended: true, limit: '10mb' }))
+      .forRoutes(
+        'products/import',
+        'products/validate-import',
+        'purchases/import',
+        'purchases/validate-import',
+      );
+
     consumer
       .apply(TenantMiddleware)
       .exclude(
