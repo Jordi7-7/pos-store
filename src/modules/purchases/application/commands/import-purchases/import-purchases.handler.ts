@@ -133,7 +133,11 @@ export class ImportPurchasesHandler implements ICommandHandler<ImportPurchasesCo
           branchStock.variantId = variant.id;
           branchStock.quantity = 0;
         }
-        branchStock.quantity = Number(branchStock.quantity) + qty;
+        const previousStock = Number(branchStock.quantity);
+        const negativeDebt = previousStock < 0 ? Math.abs(previousStock) : 0;
+        const remainingForFutureSales = Math.max(0, qty - negativeDebt);
+
+        branchStock.quantity = previousStock + qty;
         await stockRepo.save(branchStock);
 
         // Create ProductBatch linked to the Batch header
@@ -143,7 +147,7 @@ export class ImportPurchasesHandler implements ICommandHandler<ImportPurchasesCo
         batch.batchId = savedBatchHeader.id;
         batch.variantId = variant.id;
         batch.initialQuantity = qty;
-        batch.remainingQuantity = qty;
+        batch.remainingQuantity = remainingForFutureSales;
         batch.unitCost = cost;
         await batchRepo.save(batch);
 

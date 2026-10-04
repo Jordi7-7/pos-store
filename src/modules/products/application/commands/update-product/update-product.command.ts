@@ -5,7 +5,6 @@ export class UpdateProductCommand {
     public readonly name?: string,
     public readonly description?: string,
     public readonly imageIds?: string[],
-    public readonly categoryId?: string,
-    public readonly variants?: any[],
+    public readonly categoryId?: string | null,
   ) {}
 }

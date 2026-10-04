@@ -26,15 +26,14 @@ export class DeleteProductHandler implements ICommandHandler<DeleteProductComman
       throw new NotFoundException(`Product with ID ${id} not found`);
     }
 
-    // Validar que el producto no tenga existencias activas en ninguna variante
-    const totalStock = product.variants.reduce(
-      (sum, v) => sum + (v.stocks?.reduce((sSum, s) => sSum + s.quantity, 0) || 0),
-      0,
+    // Validar que el producto no tenga existencias activas ni saldos negativos en ninguna variante
+    const hasNonZeroStock = product.variants.some((v) =>
+      v.stocks?.some((s) => Number(s.quantity) !== 0),
     );
 
-    if (totalStock > 0) {
+    if (hasNonZeroStock) {
       throw new BadRequestException(
-        `No se puede eliminar el producto porque tiene stock disponible en inventario (${totalStock} pzs). Ajusta el stock a 0 primero.`,
+        'No se puede eliminar el producto porque tiene existencias activas o saldos negativos en inventario. Todas las cantidades deben estar en 0.',
       );
     }
 

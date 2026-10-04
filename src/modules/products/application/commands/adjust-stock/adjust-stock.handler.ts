@@ -96,7 +96,11 @@ export class AdjustStockHandler implements ICommandHandler<AdjustStockCommand> {
           if (remainingToDeduct === 0) break;
         }
       } else {
-        branchStock.quantity = Number(branchStock.quantity) + quantity;
+        const previousStock = Number(branchStock.quantity);
+        const negativeDebt = previousStock < 0 ? Math.abs(previousStock) : 0;
+        const remainingForFutureSales = Math.max(0, quantity - negativeDebt);
+
+        branchStock.quantity = previousStock + quantity;
 
         // Crear cabecera de lote para el ajuste de entrada
         const batchHeaderRepo = transactionalManager.getRepository(Batch);
@@ -116,7 +120,7 @@ export class AdjustStockHandler implements ICommandHandler<AdjustStockCommand> {
         newBatch.batchId = savedBatchHeader.id;
         newBatch.variantId = variantId;
         newBatch.initialQuantity = quantity;
-        newBatch.remainingQuantity = quantity;
+        newBatch.remainingQuantity = remainingForFutureSales;
         newBatch.unitCost = Number(variant.purchasePrice) || 0;
         await batchRepo.save(newBatch);
       }

@@ -11,7 +11,6 @@ import { ProductImage } from './domain/entities/product-image.entity';
 import { Category } from './domain/entities/category.entity';
 import { Tag } from './domain/entities/tag.entity';
 import { ProductBatch } from './domain/entities/product-batch.entity';
-import { CreateProductHandler } from './application/commands/create-product/create-product.handler';
 import { CreateSimpleProductHandler } from './application/commands/create-simple-product/create-simple-product.handler';
 import { CreateVariableProductHandler } from './application/commands/create-variable-product/create-variable-product.handler';
 import { CreateAttributeHandler } from './application/commands/create-attribute/create-attribute.handler';
@@ -22,6 +21,8 @@ import { GetProductsHandler } from './application/queries/get-products/get-produ
 import { GetProductByIdHandler } from './application/queries/get-product-by-id/get-product-by-id.handler';
 import { GetVariantBySkuHandler } from './application/queries/get-variant-by-sku/get-variant-by-sku.handler';
 import { UpdateProductHandler } from './application/commands/update-product/update-product.handler';
+import { UpdateSimpleProductHandler } from './application/commands/update-simple-product/update-simple-product.handler';
+import { UpdateVariantHandler } from './application/commands/update-variant/update-variant.handler';
 import { DeleteProductHandler } from './application/commands/delete-product/delete-product.handler';
 import { CreateVariantHandler } from './application/commands/create-variant/create-variant.handler';
 import { AdjustStockHandler } from './application/commands/adjust-stock/adjust-stock.handler';
@@ -57,7 +58,6 @@ import { ProductsController } from './infrastructure/controllers/products.contro
   ],
   controllers: [ProductsController],
   providers: [
-    CreateProductHandler,
     CreateSimpleProductHandler,
     CreateVariableProductHandler,
     CreateAttributeHandler,
@@ -68,6 +68,8 @@ import { ProductsController } from './infrastructure/controllers/products.contro
     GetProductByIdHandler,
     GetVariantBySkuHandler,
     UpdateProductHandler,
+    UpdateSimpleProductHandler,
+    UpdateVariantHandler,
     DeleteProductHandler,
     CreateVariantHandler,
     AdjustStockHandler,

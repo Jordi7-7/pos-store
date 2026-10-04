@@ -12,14 +12,10 @@ export class UpdateProductDto {
 
   @IsUUID()
   @IsOptional()
-  categoryId?: string;
+  categoryId?: string | null;
 
   @IsArray()
   @IsUUID(4, { each: true })
   @IsOptional()
   imageIds?: string[];
-
-  @IsArray()
-  @IsOptional()
-  variants?: any[];
 }

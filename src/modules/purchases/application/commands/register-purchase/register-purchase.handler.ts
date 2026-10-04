@@ -143,7 +143,11 @@ export class RegisterPurchaseHandler implements ICommandHandler<RegisterPurchase
           branchStock.quantity = 0;
         }
 
-        branchStock.quantity = Number(branchStock.quantity) + newQty;
+        const previousStock = Number(branchStock.quantity);
+        const negativeDebt = previousStock < 0 ? Math.abs(previousStock) : 0;
+        const remainingForFutureSales = Math.max(0, newQty - negativeDebt);
+
+        branchStock.quantity = previousStock + newQty;
         await stockRepo.save(branchStock);
 
         // Create Product Batch for FIFO tracking linked to the Batch header
@@ -153,7 +157,7 @@ export class RegisterPurchaseHandler implements ICommandHandler<RegisterPurchase
         batch.batchId = savedBatchHeader.id;
         batch.variantId = itemDto.variantId;
         batch.initialQuantity = newQty;
-        batch.remainingQuantity = newQty;
+        batch.remainingQuantity = remainingForFutureSales;
         batch.unitCost = newPrice;
         await batchRepo.save(batch);
 

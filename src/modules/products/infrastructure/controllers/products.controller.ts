@@ -1,7 +1,6 @@
 import { Controller, Post, Get, Put, Delete, Body, Param, Query } from '@nestjs/common';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
-import { CreateVariableProductDto, ProductVariantDto, CreateSimpleProductDto } from '../../application/commands/create-product/create-product.dto';
-import { CreateProductCommand } from '../../application/commands/create-product/create-product.command';
+import { CreateVariableProductDto, ProductVariantDto, CreateSimpleProductDto } from '../../application/dtos/create-product.dto';
 import { CreateSimpleProductCommand } from '../../application/commands/create-simple-product/create-simple-product.command';
 import { CreateVariableProductCommand } from '../../application/commands/create-variable-product/create-variable-product.command';
 import { CreateVariantCommand } from '../../application/commands/create-variant/create-variant.command';
@@ -21,6 +20,10 @@ import { GetPosVariantBySkuQuery } from '../../application/queries/get-pos-varia
 import { GetPosVariantsQuery } from '../../application/queries/get-pos-variants/get-pos-variants.query';
 import { UpdateProductDto } from '../../application/commands/update-product/update-product.dto';
 import { UpdateProductCommand } from '../../application/commands/update-product/update-product.command';
+import { UpdateSimpleProductDto } from '../../application/commands/update-simple-product/update-simple-product.dto';
+import { UpdateSimpleProductCommand } from '../../application/commands/update-simple-product/update-simple-product.command';
+import { UpdateVariantDto } from '../../application/commands/update-variant/update-variant.dto';
+import { UpdateVariantCommand } from '../../application/commands/update-variant/update-variant.command';
 import { DeleteProductCommand } from '../../application/commands/delete-product/delete-product.command';
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
 import { AdjustStockDto } from '../../application/commands/adjust-stock/adjust-stock.dto';
@@ -43,17 +46,6 @@ export class ProductsController {
     private readonly commandBus: CommandBus,
     private readonly queryBus: QueryBus,
   ) {}
-
-  @Post()
-  @RequirePermissions(APP_PERMISSIONS.PRODUCTS_CREATE)
-  async create(
-    @CurrentUser('tenantId') tenantId: string,
-    @Body() dto: CreateVariableProductDto,
-  ) {
-    return this.commandBus.execute(
-      new CreateProductCommand(tenantId, dto.name, dto.description, dto.variants, dto.imageIds, dto.categoryId),
-    );
-  }
 
   @Post('simple')
   @RequirePermissions(APP_PERMISSIONS.PRODUCTS_CREATE)
@@ -277,6 +269,30 @@ export class ProductsController {
     return this.queryBus.execute(new GetProductByIdQuery(tenantId, id));
   }
 
+  @Put(':id/simple')
+  @RequirePermissions(APP_PERMISSIONS.PRODUCTS_EDIT)
+  async updateSimple(
+    @CurrentUser('tenantId') tenantId: string,
+    @Param('id') id: string,
+    @Body() dto: UpdateSimpleProductDto,
+  ) {
+    return this.commandBus.execute(
+      new UpdateSimpleProductCommand(
+        tenantId,
+        id,
+        dto.name,
+        dto.description,
+        dto.categoryId,
+        dto.imageIds,
+        dto.sku,
+        dto.barcode,
+        dto.purchasePrice,
+        dto.salePrice,
+        dto.wholesalePrice,
+      ),
+    );
+  }
+
   @Put(':id')
   @RequirePermissions(APP_PERMISSIONS.PRODUCTS_EDIT)
   async update(
@@ -285,7 +301,28 @@ export class ProductsController {
     @Body() dto: UpdateProductDto,
   ) {
     return this.commandBus.execute(
-      new UpdateProductCommand(tenantId, id, dto.name, dto.description, dto.imageIds, dto.categoryId, dto.variants),
+      new UpdateProductCommand(tenantId, id, dto.name, dto.description, dto.imageIds, dto.categoryId),
+    );
+  }
+
+  @Put('variants/:variantId')
+  @RequirePermissions(APP_PERMISSIONS.PRODUCTS_EDIT)
+  async updateVariant(
+    @CurrentUser('tenantId') tenantId: string,
+    @Param('variantId') variantId: string,
+    @Body() dto: UpdateVariantDto,
+  ) {
+    return this.commandBus.execute(
+      new UpdateVariantCommand(
+        tenantId,
+        variantId,
+        dto.sku,
+        dto.barcode,
+        dto.purchasePrice,
+        dto.salePrice,
+        dto.wholesalePrice,
+        dto.imageIds,
+      ),
     );
   }
 
@@ -295,7 +332,8 @@ export class ProductsController {
     @CurrentUser('tenantId') tenantId: string,
     @Param('id') id: string,
   ) {
-    return this.commandBus.execute(new DeleteProductCommand(tenantId, id));
+    await this.commandBus.execute(new DeleteProductCommand(tenantId, id));
+    return { success: true, message: 'Producto eliminado correctamente' };
   }
 
   @Put('variants/:variantId/tags')
