@@ -6,14 +6,14 @@ import { SaleItem } from '../sales/domain/entities/sale-item.entity';
 import { PurchaseOrder } from '../purchases/domain/entities/purchase-order.entity';
 import { Expense } from '../sales/domain/entities/expense.entity';
 import { ReportsController } from './infrastructure/controllers/reports.controller';
-import { GetReportsSummaryHandler } from './application/queries/get-reports-summary/get-reports-summary.handler';
 import { GetSalesCostReportHandler } from './application/queries/get-sales-cost-report/get-sales-cost-report.handler';
 import { GetValuedInventoryHandler } from './application/queries/get-valued-inventory/get-valued-inventory.handler';
+import { GetProductSalesReportHandler } from './application/queries/get-product-sales-report/get-product-sales-report.handler';
 
 const QueryHandlers = [
-  GetReportsSummaryHandler,
   GetSalesCostReportHandler,
   GetValuedInventoryHandler,
+  GetProductSalesReportHandler,
 ];
 
 @Module({
