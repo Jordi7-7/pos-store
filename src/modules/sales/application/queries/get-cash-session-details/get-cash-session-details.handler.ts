@@ -38,6 +38,7 @@ export class GetCashSessionDetailsHandler implements IQueryHandler<GetCashSessio
 
     const sales = await this.saleRepository.find({
       where: { cashSessionId: sessionId, tenantId },
+      withDeleted: true,
       select: {
         id: true,
         invoiceNumber: true,
@@ -81,6 +82,7 @@ export class GetCashSessionDetailsHandler implements IQueryHandler<GetCashSessio
 
     const refunds = await this.refundRepository.find({
       where: { cashSessionId: sessionId, tenantId },
+      withDeleted: true,
       select: {
         id: true,
         reason: true,

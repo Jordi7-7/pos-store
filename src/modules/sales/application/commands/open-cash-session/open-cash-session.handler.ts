@@ -92,18 +92,6 @@ export class OpenCashSessionHandler implements ICommandHandler<OpenCashSessionCo
         throw new BadRequestException(`La ${register.name} ya tiene un turno abierto (por ${openedByName}). Debes cerrar ese turno o seleccionar otra caja.`);
       }
 
-      // 4. Ensure this user does not already have an open session elsewhere
-      const userActiveSession = await cashSessionRepo.findOne({
-        where: {
-          userId,
-          status: 'OPEN',
-        },
-        relations: { cashRegister: true, branch: true },
-      });
-      if (userActiveSession) {
-        throw new BadRequestException(`Ya tienes un turno de caja abierto en ${userActiveSession.branch?.name || 'otra sucursal'} (${userActiveSession.cashRegister?.name || 'Caja'}). Ciérralo antes de abrir una nueva.`);
-      }
-
       const session = new CashSession();
       session.branchId = branchId;
       session.userId = userId;

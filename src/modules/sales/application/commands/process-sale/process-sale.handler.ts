@@ -35,6 +35,11 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
       discountAmount 
     } = command;
     this.logger.log(`Processing sale for Tenant: ${tenantId}, Branch: ${branchId}, Cash Session: ${cashSessionId}`);
+
+    if (!cashSessionId) {
+      throw new BadRequestException('Debes tener una sesión de caja abierta para registrar una venta.');
+    }
+
     return this.entityManager.transaction(async (transactionalManager) => {
       // 1. Grouped Repository Initialization (Pattern 3)
       const cashSessionRepo = transactionalManager.getRepository(CashSession);

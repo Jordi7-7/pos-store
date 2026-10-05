@@ -12,6 +12,7 @@ export class GetSalesHandler implements IQueryHandler<GetSalesQuery> {
     const saleRepo = this.entityManager.getRepository(Sale);
     return saleRepo.find({
       where: { tenantId },
+      withDeleted: true,
       relations: {
         branch: true,
         customer: true,

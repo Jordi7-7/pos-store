@@ -20,6 +20,7 @@ export class GetSaleByInvoiceHandler implements IQueryHandler<GetSaleByInvoiceQu
 
     const sale = await this.saleRepo.findOne({
       where: { tenantId, invoiceNumber },
+      withDeleted: true,
       relations: {
         items: {
           variant: {
@@ -43,6 +44,7 @@ export class GetSaleByInvoiceHandler implements IQueryHandler<GetSaleByInvoiceQu
     // Load all refunds for this sale to know already-refunded quantities per variant
     const existingRefunds = await this.refundRepo.find({
       where: { saleId: sale.id },
+      withDeleted: true,
       relations: { items: { variant: { product: true } }, user: true },
       order: { createdAt: 'ASC' },
     });
