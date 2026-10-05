@@ -3,6 +3,7 @@ import { BaseEntity } from '../../../../common/database/base.entity';
 import { Tenant } from '../../../tenants/domain/entities/tenant.entity';
 import { Branch } from '../../../branches/domain/entities/branch.entity';
 import { CashSession } from './cash-session.entity';
+import { User } from '../../../users/domain/entities/user.entity';
 import { ColumnNumericTransformer } from '../../../../common/database/numeric-transformer';
 
 @Entity('expenses')
@@ -27,6 +28,13 @@ export class Expense extends BaseEntity {
   @ManyToOne(() => CashSession, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'cash_session_id' })
   cashSession: CashSession | null;
+
+  @Column({ name: 'user_id', type: 'uuid', nullable: true })
+  userId: string | null;
+
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'user_id' })
+  user: User | null;
 
   @Column()
   description: string;

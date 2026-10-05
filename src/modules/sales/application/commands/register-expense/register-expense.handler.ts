@@ -49,6 +49,7 @@ export class RegisterExpenseHandler implements ICommandHandler<RegisterExpenseCo
       expense.description = description;
       expense.amount = amount;
       expense.category = category;
+      expense.userId = command.userId || null;
 
       const savedExpense = await expenseRepo.save(expense);
       this.logger.log(`Expense registered successfully: ID ${savedExpense.id}`);
