@@ -143,7 +143,7 @@ export class SalesController {
   @RequirePermissions(APP_PERMISSIONS.CASH_CREATE_EXPENSE)
   async registerExpense(
     @CurrentUser('tenantId') tenantId: string,
-    @CurrentUser('userId') userId: string,
+    @CurrentUser('sub') userId: string,
     @Body() dto: RegisterExpenseDto,
   ) {
     return this.commandBus.execute(
