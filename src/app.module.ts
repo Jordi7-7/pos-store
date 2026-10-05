@@ -56,6 +56,8 @@ import { Role } from './modules/roles/domain/entities/role.entity';
 import { RolesModule } from './modules/roles/roles.module';
 import { PermissionsGuard } from './modules/auth/guards/permissions.guard';
 
+import { DashboardModule } from './modules/dashboard/dashboard.module';
+
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
@@ -111,6 +113,7 @@ import { PermissionsGuard } from './modules/auth/guards/permissions.guard';
     CustomersModule,
     TenantsModule,
     ReportsModule,
+    DashboardModule,
   ],
   controllers: [AppController],
   providers: [
