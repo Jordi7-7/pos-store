@@ -69,6 +69,7 @@ export class GetBatchesHandler implements IQueryHandler<GetBatchesQuery> {
       let totalInitialQuantity = 0;
       let totalRemainingQuantity = 0;
       let totalCostValue = 0;
+      let totalInitialCostValue = 0;
 
       const items = (batch.items || []).map((item) => {
         const initialQty = Number(item.initialQuantity || 0);
@@ -76,10 +77,12 @@ export class GetBatchesHandler implements IQueryHandler<GetBatchesQuery> {
         const consumedQty = Math.max(0, initialQty - remainingQty);
         const unitCost = Number(item.unitCost || 0);
         const itemTotalCostValue = Number((remainingQty * unitCost).toFixed(2));
+        const itemInitialCostValue = Number((initialQty * unitCost).toFixed(2));
 
         totalInitialQuantity += initialQty;
         totalRemainingQuantity += remainingQty;
         totalCostValue += itemTotalCostValue;
+        totalInitialCostValue += itemInitialCostValue;
 
         return {
           id: item.id,
@@ -93,6 +96,7 @@ export class GetBatchesHandler implements IQueryHandler<GetBatchesQuery> {
           consumedQuantity: consumedQty,
           unitCost,
           totalCostValue: itemTotalCostValue,
+          initialCostValue: itemInitialCostValue,
         };
       });
 
@@ -109,6 +113,7 @@ export class GetBatchesHandler implements IQueryHandler<GetBatchesQuery> {
         totalInitialQuantity,
         totalRemainingQuantity,
         totalCostValue: Number(totalCostValue.toFixed(2)),
+        totalInitialCostValue: Number(totalInitialCostValue.toFixed(2)),
         status:
           batch.status === 'CANCELLED'
             ? 'CANCELLED'
