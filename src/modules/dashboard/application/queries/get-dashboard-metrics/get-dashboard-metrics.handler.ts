@@ -73,10 +73,24 @@ export class GetDashboardMetricsHandler implements IQueryHandler<GetDashboardMet
     const startOfPrevWeek = now.minus({ weeks: 1 }).startOf('week').toJSDate();
     const endOfPrevWeek = now.minus({ weeks: 1 }).endOf('week').toJSDate();
 
+    const sixMonthsAgo = now.minus({ months: 6 }).startOf('day').toJSDate();
+
     const branchFilterSql = branchId ? 'AND s.branch_id = $2' : '';
     const queryParamsToday: any[] = branchId ? [tenantId, branchId, startOfToday, endOfToday] : [tenantId, startOfToday, endOfToday];
     const todayStartIdx = branchId ? '$3' : '$2';
     const todayEndIdx = branchId ? '$4' : '$3';
+
+    const yesterdayStartIdx = branchId ? '$3' : '$2';
+    const yesterdayEndIdx = branchId ? '$4' : '$3';
+
+    const weekStartIdx = branchId ? '$3' : '$2';
+    const weekEndIdx = branchId ? '$4' : '$3';
+
+    const prevWeekStartIdx = branchId ? '$3' : '$2';
+    const prevWeekEndIdx = branchId ? '$4' : '$3';
+
+    const lowStockParams: any[] = branchId ? [tenantId, branchId, sixMonthsAgo] : [tenantId, sixMonthsAgo];
+    const lowStockDateIdx = branchId ? '$3' : '$2';
 
     // 2. Ejecutar consultas optimizadas en paralelo
     const [
@@ -151,7 +165,7 @@ export class GetDashboardMetricsHandler implements IQueryHandler<GetDashboardMet
         branchId ? [tenantId, branchId] : [tenantId],
       ),
 
-      // D. Productos con Poco Inventario (<= 5 unidades en la sucursal)
+      // D. Productos con Poco Inventario (<= 5 unidades en la sucursal, creados o con lotes en los últimos 6 meses)
       this.entityManager.query(
         `
         SELECT 
@@ -164,15 +178,23 @@ export class GetDashboardMetricsHandler implements IQueryHandler<GetDashboardMet
         LEFT JOIN product_stocks ps ON ps.variant_id = pv.id ${branchId ? 'AND ps.branch_id = $2' : ''}
         WHERE pv.tenant_id = $1
           AND pv.deleted_at IS NULL
+          AND (
+            pv.created_at >= ${lowStockDateIdx}
+            OR EXISTS (
+              SELECT 1 FROM product_batches pb
+              WHERE pb.variant_id = pv.id
+                AND pb.created_at >= ${lowStockDateIdx}
+                ${branchId ? 'AND pb.branch_id = $2' : ''}
+            )
+          )
         GROUP BY pv.id, p.name, pv.sku
         HAVING COALESCE(SUM(ps.quantity), 0) <= 5
         ORDER BY "stock" ASC
-        LIMIT 6
         `,
-        branchId ? [tenantId, branchId] : [tenantId],
+        lowStockParams,
       ),
 
-      // E. Productos Vendidos el Día Anterior (Ayer) con su Stock Actual
+      // E. Productos Vendidos el Día Anterior (Ayer) con su Stock Actual (sin límite para permitir scroll)
       this.entityManager.query(
         `
         SELECT DISTINCT
@@ -193,8 +215,8 @@ export class GetDashboardMetricsHandler implements IQueryHandler<GetDashboardMet
         WHERE s.tenant_id = $1
           ${branchFilterSql}
           AND s.status != 'REFUNDED'
-          AND s.created_at BETWEEN ${todayStartIdx} AND ${todayEndIdx}
-        LIMIT 6
+          AND s.created_at BETWEEN ${yesterdayStartIdx} AND ${yesterdayEndIdx}
+        ORDER BY p.name ASC
         `,
         branchId ? [tenantId, branchId, startOfYesterday, endOfYesterday] : [tenantId, startOfYesterday, endOfYesterday],
       ),
@@ -210,7 +232,7 @@ export class GetDashboardMetricsHandler implements IQueryHandler<GetDashboardMet
         WHERE s.tenant_id = $1
           ${branchFilterSql}
           AND s.status != 'REFUNDED'
-          AND s.created_at BETWEEN ${todayStartIdx} AND ${todayEndIdx}
+          AND s.created_at BETWEEN ${weekStartIdx} AND ${weekEndIdx}
         GROUP BY "dateKey", "dayOfWeek"
         ORDER BY "dateKey" ASC
         `,
@@ -225,7 +247,7 @@ export class GetDashboardMetricsHandler implements IQueryHandler<GetDashboardMet
         WHERE s.tenant_id = $1
           ${branchFilterSql}
           AND s.status != 'REFUNDED'
-          AND s.created_at BETWEEN ${todayStartIdx} AND ${todayEndIdx}
+          AND s.created_at BETWEEN ${prevWeekStartIdx} AND ${prevWeekEndIdx}
         `,
         branchId ? [tenantId, branchId, startOfPrevWeek, endOfPrevWeek] : [tenantId, startOfPrevWeek, endOfPrevWeek],
       ),
