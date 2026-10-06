@@ -15,6 +15,7 @@ export class GetProductsHandler implements IQueryHandler<GetProductsQuery> {
 
     const [variants, total] = await repo.createQueryBuilder('variant')
       .innerJoinAndSelect('variant.product', 'product')
+      .leftJoinAndSelect('product.category', 'category')
       .leftJoinAndSelect('product.images', 'productImages')
       .leftJoinAndSelect('variant.images', 'variantImages')
       .leftJoinAndSelect('variant.stocks', 'stocks')
@@ -37,6 +38,8 @@ export class GetProductsHandler implements IQueryHandler<GetProductsQuery> {
         id: variant.product.id,
         name: variant.product.name,
         description: variant.product.description,
+        categoryId: variant.product.categoryId,
+        category: variant.product.category ? { id: variant.product.category.id, name: variant.product.category.name } : null,
         imageIds: parentImages.map(img => img.id),
         images: parentImages.map(img => ({ id: img.id, url: img.url, description: img.description })),
         variants: [

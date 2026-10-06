@@ -16,6 +16,7 @@ import { GetCashSessionsQuery } from '../../application/queries/get-cash-session
 import { GetCashSessionDetailsQuery } from '../../application/queries/get-cash-session-details/get-cash-session-details.query';
 import { GetSaleByInvoiceQuery } from '../../application/queries/get-sale-by-invoice/get-sale-by-invoice.query';
 import { GetSalesByProductQuery } from '../../application/queries/get-sales-by-product/get-sales-by-product.query';
+import { GetSalesByVariantQuery } from '../../application/queries/get-sales-by-variant/get-sales-by-variant.query';
 import { GetSalesPaginatedQuery } from '../../application/queries/get-sales-paginated/get-sales-paginated.query';
 import { GetActiveCashSessionQuery } from '../../application/queries/get-active-cash-session/get-active-cash-session.query';
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
@@ -85,6 +86,21 @@ export class SalesController {
       tenantId,
       startDate,
       endDate,
+      page ? Number(page) : 1,
+      limit ? Number(limit) : 10,
+    ));
+  }
+
+  @Get('by-variant/:variantId')
+  async findSalesByVariant(
+    @CurrentUser('tenantId') tenantId: string,
+    @Param('variantId') variantId: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.queryBus.execute(new GetSalesByVariantQuery(
+      tenantId,
+      variantId,
       page ? Number(page) : 1,
       limit ? Number(limit) : 10,
     ));

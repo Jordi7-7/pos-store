@@ -16,6 +16,7 @@ export class GetProductByIdHandler implements IQueryHandler<GetProductByIdQuery>
     let product = await repo.findOne({
       where: { id, tenantId },
       relations: {
+        category: true,
         images: true,
         variants: {
           stocks: true,
@@ -35,6 +36,7 @@ export class GetProductByIdHandler implements IQueryHandler<GetProductByIdQuery>
           variants: { id }
         },
         relations: {
+          category: true,
           images: true,
           variants: {
             stocks: true,

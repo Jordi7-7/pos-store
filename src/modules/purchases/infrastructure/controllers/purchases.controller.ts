@@ -12,6 +12,7 @@ import { ImportPurchasesCommand } from '../../application/commands/import-purcha
 import { ValidateImportPurchasesQuery } from '../../application/queries/validate-import-purchases/validate-import-purchases.query';
 import { GetPurchasesQuery } from '../../application/queries/get-purchases/get-purchases.query';
 import { GetPurchasesByProductQuery } from '../../application/queries/get-purchases-by-product/get-purchases-by-product.query';
+import { GetPurchasesByVariantQuery } from '../../application/queries/get-purchases-by-variant/get-purchases-by-variant.query';
 import { RequirePermissions } from '../../../auth/decorators/permissions.decorator';
 import { APP_PERMISSIONS } from '../../../../common/enums/permissions.enum';
 
@@ -66,6 +67,21 @@ export class PurchasesController {
   @Get()
   async getPurchases(@CurrentUser('tenantId') tenantId: string) {
     return this.queryBus.execute(new GetPurchasesQuery(tenantId));
+  }
+
+  @Get('by-variant/:variantId')
+  async getPurchasesByVariant(
+    @CurrentUser('tenantId') tenantId: string,
+    @Param('variantId') variantId: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.queryBus.execute(new GetPurchasesByVariantQuery(
+      tenantId,
+      variantId,
+      page ? Number(page) : 1,
+      limit ? Number(limit) : 10,
+    ));
   }
 
   @Get('by-product/:productId')

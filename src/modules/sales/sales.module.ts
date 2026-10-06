@@ -19,6 +19,7 @@ import { GetCashSessionsHandler } from './application/queries/get-cash-sessions/
 import { GetCashSessionDetailsHandler } from './application/queries/get-cash-session-details/get-cash-session-details.handler';
 import { GetSaleByInvoiceHandler } from './application/queries/get-sale-by-invoice/get-sale-by-invoice.handler';
 import { GetSalesByProductHandler } from './application/queries/get-sales-by-product/get-sales-by-product.handler';
+import { GetSalesByVariantHandler } from './application/queries/get-sales-by-variant/get-sales-by-variant.handler';
 import { GetSalesPaginatedHandler } from './application/queries/get-sales-paginated/get-sales-paginated.handler';
 import { GetActiveCashSessionHandler } from './application/queries/get-active-cash-session/get-active-cash-session.handler';
 import { GetCashRegistersHandler } from './application/queries/get-cash-registers/get-cash-registers.handler';
@@ -55,6 +56,7 @@ import { CashRegistersController } from './infrastructure/controllers/cash-regis
     GetCashSessionDetailsHandler,
     GetSaleByInvoiceHandler,
     GetSalesByProductHandler,
+    GetSalesByVariantHandler,
     GetSalesPaginatedHandler,
     GetActiveCashSessionHandler,
     GetCashRegistersHandler,
