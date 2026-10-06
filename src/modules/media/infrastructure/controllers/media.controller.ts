@@ -28,12 +28,53 @@ export class MediaController {
   @Get()
   async getImages(
     @CurrentUser('tenantId') tenantId: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('search') search?: string,
   ) {
+    const isPaginated = page !== undefined || limit !== undefined;
+    const p = page ? Math.max(1, Number(page)) : 1;
+    const l = limit ? Math.max(1, Number(limit)) : 20;
+
     const imageRepo = this.entityManager.getRepository(ProductImage);
-    return imageRepo.find({
-      where: { tenantId },
-      order: { createdAt: 'DESC' },
-    });
+    const qb = imageRepo.createQueryBuilder('image')
+      .where('image.tenantId = :tenantId', { tenantId });
+
+    if (search && search.trim() !== '') {
+      qb.andWhere('image.description ILIKE :search', { search: `%${search.trim()}%` });
+    }
+
+    qb.orderBy('image.createdAt', 'DESC');
+
+    if (isPaginated) {
+      const skip = (p - 1) * l;
+      qb.skip(skip).take(l);
+      const [images, total] = await qb.getManyAndCount();
+
+      return {
+        data: images,
+        meta: {
+          total,
+          page: p,
+          limit: l,
+          totalPages: Math.ceil(total / l) || 1,
+        },
+      };
+    }
+
+    // Default when no pagination params are sent: return all images (up to 1000)
+    qb.take(1000);
+    const [images, total] = await qb.getManyAndCount();
+
+    return {
+      data: images,
+      meta: {
+        total,
+        page: 1,
+        limit: total,
+        totalPages: 1,
+      },
+    };
   }
 
   @Post('register')

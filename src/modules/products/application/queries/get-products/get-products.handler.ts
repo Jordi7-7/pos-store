@@ -15,6 +15,7 @@ export class GetProductsHandler implements IQueryHandler<GetProductsQuery> {
 
     const [variants, total] = await repo.createQueryBuilder('variant')
       .innerJoinAndSelect('variant.product', 'product')
+      .leftJoinAndSelect('product.images', 'productImages')
       .leftJoinAndSelect('variant.images', 'variantImages')
       .leftJoinAndSelect('variant.stocks', 'stocks')
       .leftJoinAndSelect('variant.attributeValues', 'attributeValues')
@@ -26,26 +27,35 @@ export class GetProductsHandler implements IQueryHandler<GetProductsQuery> {
       .take(take)
       .getManyAndCount();
 
-    const data = variants.map(variant => ({
-      id: variant.product.id,
-      name: variant.product.name,
-      description: variant.product.description,
-      imageIds: variant.images ? variant.images.map(img => img.id) : [],
-      variants: [
-        {
-          id: variant.id,
-          sku: variant.sku,
-          barcode: variant.barcode,
-          purchasePrice: Number(variant.purchasePrice),
-          salePrice: Number(variant.salePrice),
-          wholesalePrice: variant.wholesalePrice !== null ? Number(variant.wholesalePrice) : null,
-          stocks: variant.stocks,
-          attributeValues: variant.attributeValues,
-          tags: variant.tags,
-          imageIds: variant.images ? variant.images.map(img => img.id) : [],
-        }
-      ]
-    }));
+    const data = variants.map(variant => {
+      // Si el producto padre tiene imágenes las usamos; si no, heredamos las de la variante
+      const parentImages = (variant.product.images && variant.product.images.length > 0)
+        ? variant.product.images
+        : (variant.images || []);
+
+      return {
+        id: variant.product.id,
+        name: variant.product.name,
+        description: variant.product.description,
+        imageIds: parentImages.map(img => img.id),
+        images: parentImages.map(img => ({ id: img.id, url: img.url, description: img.description })),
+        variants: [
+          {
+            id: variant.id,
+            sku: variant.sku,
+            barcode: variant.barcode,
+            purchasePrice: Number(variant.purchasePrice),
+            salePrice: Number(variant.salePrice),
+            wholesalePrice: variant.wholesalePrice !== null ? Number(variant.wholesalePrice) : null,
+            stocks: variant.stocks,
+            attributeValues: variant.attributeValues,
+            tags: variant.tags,
+            imageIds: variant.images ? variant.images.map(img => img.id) : [],
+            images: variant.images ? variant.images.map(img => ({ id: img.id, url: img.url, description: img.description })) : [],
+          }
+        ]
+      };
+    });
 
     return {
       data,

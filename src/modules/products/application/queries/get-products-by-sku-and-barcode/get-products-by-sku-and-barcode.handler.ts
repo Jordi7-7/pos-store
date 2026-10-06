@@ -16,6 +16,7 @@ export class GetProductsBySkuAndBarcodeHandler implements IQueryHandler<GetProdu
 
     const [variants, total] = await repo.createQueryBuilder('variant')
       .innerJoinAndSelect('variant.product', 'product')
+      .leftJoinAndSelect('product.images', 'productImages')
       .leftJoinAndSelect('variant.images', 'variantImages')
       .leftJoinAndSelect('variant.stocks', 'stocks')
       .leftJoinAndSelect('variant.attributeValues', 'attributeValues')
@@ -28,11 +29,17 @@ export class GetProductsBySkuAndBarcodeHandler implements IQueryHandler<GetProdu
       .take(take)
       .getManyAndCount();
 
-    const data = variants.map(variant => ({
-      id: variant.product.id,
-      name: variant.product.name,
-      description: variant.product.description,
-      imageIds: variant.images ? variant.images.map(img => img.id) : [],
+    const data = variants.map(variant => {
+      const parentImages = (variant.product.images && variant.product.images.length > 0)
+        ? variant.product.images
+        : (variant.images || []);
+
+      return {
+        id: variant.product.id,
+        name: variant.product.name,
+        description: variant.product.description,
+        imageIds: parentImages.map(img => img.id),
+        images: parentImages.map(img => ({ id: img.id, url: img.url, description: img.description })),
       variants: [
         {
           id: variant.id,
@@ -45,9 +52,11 @@ export class GetProductsBySkuAndBarcodeHandler implements IQueryHandler<GetProdu
           attributeValues: variant.attributeValues,
           tags: variant.tags,
           imageIds: variant.images ? variant.images.map(img => img.id) : [],
+          images: variant.images ? variant.images.map(img => ({ id: img.id, url: img.url, description: img.description })) : [],
         }
       ]
-    }));
+    };
+  });
 
     return {
       data,

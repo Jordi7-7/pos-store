@@ -15,6 +15,7 @@ export class GetProductsByNameHandler implements IQueryHandler<GetProductsByName
     const skip = (page - 1) * limit;
 
     const [products, total] = await repo.createQueryBuilder('product')
+      .leftJoinAndSelect('product.images', 'productImages')
       .leftJoinAndSelect('product.variants', 'variants')
       .leftJoinAndSelect('variants.images', 'variantImages')
       .leftJoinAndSelect('variants.stocks', 'stocks')
@@ -30,13 +31,18 @@ export class GetProductsByNameHandler implements IQueryHandler<GetProductsByName
 
     const data = products.map(product => {
       const firstVariant = product.variants?.[0];
-      const imageIds = firstVariant && firstVariant.images ? firstVariant.images.map(img => img.id) : [];
+      const parentImages = (product.images && product.images.length > 0)
+        ? product.images
+        : (firstVariant?.images || []);
+      const imageIds = parentImages.map(img => img.id);
+      const images = parentImages.map(img => ({ id: img.id, url: img.url, description: img.description }));
 
       return {
         id: product.id,
         name: product.name,
         description: product.description,
         imageIds: imageIds,
+        images: images,
         variants: product.variants.map(variant => ({
           id: variant.id,
           sku: variant.sku,
@@ -48,6 +54,7 @@ export class GetProductsByNameHandler implements IQueryHandler<GetProductsByName
           attributeValues: variant.attributeValues,
           tags: variant.tags,
           imageIds: variant.images ? variant.images.map(img => img.id) : [],
+          images: variant.images ? variant.images.map(img => ({ id: img.id, url: img.url, description: img.description })) : [],
         }))
       };
     });
