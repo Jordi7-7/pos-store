@@ -107,9 +107,13 @@ export class GetDashboardMetricsHandler implements IQueryHandler<GetDashboardMet
         `
         SELECT 
           COALESCE(SUM(s.total), 0) AS "totalSales",
-          COALESCE(SUM(si.quantity), 0) AS "itemsCount"
+          COALESCE(SUM(items.qty), 0) AS "itemsCount"
         FROM sales s
-        LEFT JOIN sale_items si ON si.sale_id = s.id
+        LEFT JOIN (
+          SELECT sale_id, SUM(quantity) AS qty
+          FROM sale_items
+          GROUP BY sale_id
+        ) items ON items.sale_id = s.id
         WHERE s.tenant_id = $1 
           ${branchFilterSql}
           AND s.status != 'REFUNDED'
