@@ -8,6 +8,13 @@ export interface DashboardMetricsDto {
   today: {
     totalSales: number;
     itemsCount: number;
+    netSales: number;
+    netItemsCount: number;
+    refunds: {
+      totalRefunded: number;
+      itemsCount: number;
+      count: number;
+    };
   };
   paymentMethods: {
     total: number;
@@ -76,6 +83,7 @@ export class GetDashboardMetricsHandler implements IQueryHandler<GetDashboardMet
     const sixMonthsAgo = now.minus({ months: 6 }).startOf('day').toJSDate();
 
     const branchFilterSql = branchId ? 'AND s.branch_id = $2' : '';
+    const refundBranchFilterSql = branchId ? 'AND r.branch_id = $2' : '';
     const queryParamsToday: any[] = branchId ? [tenantId, branchId, startOfToday, endOfToday] : [tenantId, startOfToday, endOfToday];
     const todayStartIdx = branchId ? '$3' : '$2';
     const todayEndIdx = branchId ? '$4' : '$3';
@@ -95,6 +103,7 @@ export class GetDashboardMetricsHandler implements IQueryHandler<GetDashboardMet
     // 2. Ejecutar consultas optimizadas en paralelo
     const [
       todaySalesRaw,
+      todayRefundsRaw,
       paymentMethodsRaw,
       topProductsRaw,
       lowStockRaw,
@@ -102,7 +111,7 @@ export class GetDashboardMetricsHandler implements IQueryHandler<GetDashboardMet
       weekDailyRaw,
       prevWeekRaw,
     ] = await Promise.all([
-      // A. Ventas de Hoy & Unidades Vendidas
+      // A. Ventas Brutas de Hoy & Unidades Vendidas
       this.entityManager.query(
         `
         SELECT 
@@ -122,7 +131,27 @@ export class GetDashboardMetricsHandler implements IQueryHandler<GetDashboardMet
         queryParamsToday,
       ),
 
-      // B. Métodos de Pago de Hoy
+      // B. Devoluciones de Hoy & Unidades Devueltas
+      this.entityManager.query(
+        `
+        SELECT 
+          COALESCE(SUM(r.total_refunded), 0) AS "totalRefunded",
+          COALESCE(SUM(items.qty), 0) AS "refundedItemsCount",
+          COUNT(DISTINCT r.id) AS "refundsCount"
+        FROM refunds r
+        LEFT JOIN (
+          SELECT refund_id, SUM(quantity) AS qty
+          FROM refund_items
+          GROUP BY refund_id
+        ) items ON items.refund_id = r.id
+        WHERE r.tenant_id = $1 
+          ${refundBranchFilterSql}
+          AND r.created_at BETWEEN ${todayStartIdx} AND ${todayEndIdx}
+        `,
+        queryParamsToday,
+      ),
+
+      // C. Métodos de Pago de Hoy
       this.entityManager.query(
         `
         SELECT 
@@ -261,6 +290,13 @@ export class GetDashboardMetricsHandler implements IQueryHandler<GetDashboardMet
     const todayTotal = Number(todaySalesRaw[0]?.totalSales || 0);
     const todayItemsCount = Number(todaySalesRaw[0]?.itemsCount || 0);
 
+    const todayRefundedAmount = Number(todayRefundsRaw[0]?.totalRefunded || 0);
+    const todayRefundedItemsCount = Number(todayRefundsRaw[0]?.refundedItemsCount || 0);
+    const todayRefundsCount = Number(todayRefundsRaw[0]?.refundsCount || 0);
+
+    const todayNetSales = Math.max(0, todayTotal - todayRefundedAmount);
+    const todayNetItemsCount = Math.max(0, todayItemsCount - todayRefundedItemsCount);
+
     // 4. Procesar Métodos de Pago
     let cashAmount = 0;
     let cardAmount = 0;
@@ -332,6 +368,13 @@ export class GetDashboardMetricsHandler implements IQueryHandler<GetDashboardMet
       today: {
         totalSales: Number(todayTotal.toFixed(2)),
         itemsCount: todayItemsCount,
+        netSales: Number(todayNetSales.toFixed(2)),
+        netItemsCount: todayNetItemsCount,
+        refunds: {
+          totalRefunded: Number(todayRefundedAmount.toFixed(2)),
+          itemsCount: todayRefundedItemsCount,
+          count: todayRefundsCount,
+        },
       },
       paymentMethods: {
         total: Number(payTotal.toFixed(2)),
