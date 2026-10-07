@@ -13,7 +13,7 @@ import { ValidateImportPurchasesQuery } from '../../application/queries/validate
 import { GetPurchasesQuery } from '../../application/queries/get-purchases/get-purchases.query';
 import { GetPurchasesByProductQuery } from '../../application/queries/get-purchases-by-product/get-purchases-by-product.query';
 import { GetPurchasesByVariantQuery } from '../../application/queries/get-purchases-by-variant/get-purchases-by-variant.query';
-import { RequirePermissions } from '../../../auth/decorators/permissions.decorator';
+import { RequirePermissions, RequireAnyPermissions } from '../../../auth/decorators/permissions.decorator';
 import { APP_PERMISSIONS } from '../../../../common/enums/permissions.enum';
 
 @Controller('purchases')
@@ -65,11 +65,13 @@ export class PurchasesController {
   }
 
   @Get()
+  @RequirePermissions(APP_PERMISSIONS.VIEW_PURCHASES)
   async getPurchases(@CurrentUser('tenantId') tenantId: string) {
     return this.queryBus.execute(new GetPurchasesQuery(tenantId));
   }
 
   @Get('by-variant/:variantId')
+  @RequireAnyPermissions(APP_PERMISSIONS.VIEW_PRODUCTS, APP_PERMISSIONS.VIEW_PURCHASES)
   async getPurchasesByVariant(
     @CurrentUser('tenantId') tenantId: string,
     @Param('variantId') variantId: string,
@@ -85,6 +87,7 @@ export class PurchasesController {
   }
 
   @Get('by-product/:productId')
+  @RequireAnyPermissions(APP_PERMISSIONS.VIEW_PRODUCTS, APP_PERMISSIONS.VIEW_PURCHASES)
   async getPurchasesByProduct(
     @CurrentUser('tenantId') tenantId: string,
     @Param('productId') productId: string,

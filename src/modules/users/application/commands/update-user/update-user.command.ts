@@ -5,5 +5,6 @@ export class UpdateUserCommand {
     public readonly tenantId: string,
     public readonly userId: string,
     public readonly dto: UpdateUserDto,
+    public readonly currentUserId?: string,
   ) {}
 }

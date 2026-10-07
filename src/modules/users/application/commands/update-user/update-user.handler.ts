@@ -16,7 +16,7 @@ export class UpdateUserHandler implements ICommandHandler<UpdateUserCommand> {
   ) {}
 
   async execute(command: UpdateUserCommand): Promise<User> {
-    const { tenantId, userId, dto } = command;
+    const { tenantId, userId, dto, currentUserId } = command;
     this.logger.log(`Updating user: ${userId} for Tenant: ${tenantId}`);
 
     const userRepo = this.entityManager.getRepository(User);
@@ -26,6 +26,11 @@ export class UpdateUserHandler implements ICommandHandler<UpdateUserCommand> {
 
     if (!user) {
       throw new NotFoundException(`Usuario no encontrado.`);
+    }
+
+    // Seguridad: Prevenir que el usuario en sesión se auto-desactive
+    if (currentUserId && currentUserId === userId && dto.isActive === false) {
+      throw new BadRequestException('No puedes desactivar tu propia cuenta mientras estás en sesión.');
     }
 
     if (dto.name !== undefined) {

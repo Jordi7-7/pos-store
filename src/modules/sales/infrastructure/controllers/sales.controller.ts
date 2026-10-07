@@ -23,7 +23,7 @@ import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
 import { CashSession } from '../../domain/entities/cash-session.entity';
 import { Expense } from '../../domain/entities/expense.entity';
 import { Refund } from '../../domain/entities/refund.entity';
-import { RequirePermissions } from '../../../auth/decorators/permissions.decorator';
+import { RequirePermissions, RequireAnyPermissions } from '../../../auth/decorators/permissions.decorator';
 import { APP_PERMISSIONS } from '../../../../common/enums/permissions.enum';
 
 @Controller('sales')
@@ -48,6 +48,7 @@ export class SalesController {
   }
 
   @Post()
+  @RequirePermissions(APP_PERMISSIONS.VIEW_POS)
   async process(
     @CurrentUser('tenantId') tenantId: string,
     @CurrentUser('sub') userId: string,
@@ -70,11 +71,13 @@ export class SalesController {
   }
 
   @Get()
+  @RequirePermissions(APP_PERMISSIONS.VIEW_SALES)
   async findSales(@CurrentUser('tenantId') tenantId: string) {
     return this.queryBus.execute(new GetSalesQuery(tenantId));
   }
 
   @Get('paginated')
+  @RequirePermissions(APP_PERMISSIONS.VIEW_SALES)
   async findSalesPaginated(
     @CurrentUser('tenantId') tenantId: string,
     @Query('startDate') startDate?: string,
@@ -92,6 +95,7 @@ export class SalesController {
   }
 
   @Get('by-variant/:variantId')
+  @RequireAnyPermissions(APP_PERMISSIONS.VIEW_PRODUCTS, APP_PERMISSIONS.VIEW_SALES)
   async findSalesByVariant(
     @CurrentUser('tenantId') tenantId: string,
     @Param('variantId') variantId: string,
@@ -107,6 +111,7 @@ export class SalesController {
   }
 
   @Get('by-product/:productId')
+  @RequireAnyPermissions(APP_PERMISSIONS.VIEW_PRODUCTS, APP_PERMISSIONS.VIEW_SALES)
   async findSalesByProduct(
     @CurrentUser('tenantId') tenantId: string,
     @Param('productId') productId: string,

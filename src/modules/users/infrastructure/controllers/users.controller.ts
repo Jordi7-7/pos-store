@@ -49,11 +49,12 @@ export class UsersController {
   @Roles(UserRole.OWNER, UserRole.ADMIN)
   async update(
     @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser('sub') currentUserId: string,
     @Param('id') userId: string,
     @Body() dto: UpdateUserDto,
   ) {
     return this.commandBus.execute(
-      new UpdateUserCommand(tenantId, userId, dto),
+      new UpdateUserCommand(tenantId, userId, dto, currentUserId),
     );
   }
 
@@ -78,7 +79,6 @@ export class UsersController {
       .createQueryBuilder('user')
       .leftJoinAndSelect('user.roleEntity', 'roleEntity')
       .leftJoinAndSelect('user.branches', 'branches')
-      .leftJoinAndSelect('user.cashRegisters', 'cashRegisters')
       .addSelect('CASE WHEN user.pin IS NOT NULL AND user.pin != \'\' THEN true ELSE false END', 'hasPin')
       .where('user.tenantId = :tenantId', { tenantId })
       .orderBy('user.createdAt', 'ASC')
@@ -89,7 +89,6 @@ export class UsersController {
       roleName: user.roleEntity?.name || user.role,
       hasPin: rawUsers.raw[idx]?.hasPin === true || rawUsers.raw[idx]?.hasPin === 'true',
       branchIds: (user.branches || []).map((b: any) => b.id),
-      cashRegisterIds: (user.cashRegisters || []).map((cr: any) => cr.id),
     }));
   }
 }

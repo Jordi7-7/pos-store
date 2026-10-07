@@ -6,6 +6,7 @@ import {
   Delete,
   Body,
   Param,
+  Header,
   UseGuards,
   ConflictException,
   NotFoundException,
@@ -27,6 +28,7 @@ export class RolesController {
   constructor(private readonly entityManager: EntityManager) {}
 
   @Get('permissions-catalog')
+  @Header('Cache-Control', 'public, max-age=1800')
   getPermissionsCatalog() {
     return {
       modules: PERMISSION_MODULES,

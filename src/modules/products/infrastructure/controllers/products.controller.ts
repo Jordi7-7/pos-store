@@ -37,7 +37,7 @@ import { GetInventoryMovementsByVariantQuery } from '../../application/queries/g
 import { GetTagsQuery } from '../../application/queries/get-tags/get-tags.query';
 import { CreateTagCommand } from '../../application/commands/create-tag/create-tag.command';
 import { UpdateVariantTagsCommand } from '../../application/commands/update-variant-tags/update-variant-tags.command';
-import { RequirePermissions } from '../../../auth/decorators/permissions.decorator';
+import { RequirePermissions, RequireAnyPermissions } from '../../../auth/decorators/permissions.decorator';
 import { APP_PERMISSIONS } from '../../../../common/enums/permissions.enum';
 
 @Controller('products')
@@ -144,6 +144,7 @@ export class ProductsController {
   }
 
   @Get()
+  @RequirePermissions(APP_PERMISSIONS.VIEW_PRODUCTS)
   async find(
     @CurrentUser('tenantId') tenantId: string,
     @Query('page') page?: number,
@@ -245,6 +246,7 @@ export class ProductsController {
   }
 
   @Get('pos/variant/sku/:sku')
+  @RequirePermissions(APP_PERMISSIONS.VIEW_POS)
   async findPosVariantBySku(
     @CurrentUser('tenantId') tenantId: string,
     @Param('sku') sku: string,
@@ -254,6 +256,7 @@ export class ProductsController {
   }
 
   @Get('pos/variants')
+  @RequirePermissions(APP_PERMISSIONS.VIEW_POS)
   async findPosVariants(
     @CurrentUser('tenantId') tenantId: string,
     @Query('branchId') branchId: string,
@@ -262,6 +265,7 @@ export class ProductsController {
   }
 
   @Get(':id')
+  @RequirePermissions(APP_PERMISSIONS.VIEW_PRODUCTS)
   async findOne(
     @CurrentUser('tenantId') tenantId: string,
     @Param('id') id: string,
