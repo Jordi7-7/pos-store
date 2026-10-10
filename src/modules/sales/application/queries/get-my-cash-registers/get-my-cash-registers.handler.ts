@@ -38,7 +38,7 @@ export class GetMyCashRegistersHandler implements IQueryHandler<GetMyCashRegiste
       qb.andWhere('cr.branchId = :branchId', { branchId });
     }
 
-    const isOwner = String(userRole).toUpperCase() === 'OWNER';
+    const isOwner = userRole === UserRole.OWNER;
 
     // Si no es OWNER, filtrar estrictamente por las cajas asignadas al usuario
     if (!isOwner) {

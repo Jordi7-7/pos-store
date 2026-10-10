@@ -1,15 +1,17 @@
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { GetBatchesQuery } from './get-batches.query';
-import { Batch } from '../../../domain/entities/batch.entity';
+import { Batch, BatchOriginType } from '../../../domain/entities/batch.entity';
 import { parseReportDates } from '../../../../reports/application/queries/parse-dates.helper';
+import { UserRole } from '../../../../users/enums/user-role.enum';
 
 @QueryHandler(GetBatchesQuery)
 export class GetBatchesHandler implements IQueryHandler<GetBatchesQuery> {
   constructor(private readonly entityManager: EntityManager) {}
 
   async execute(query: GetBatchesQuery) {
-    const { tenantId, branchId, startDateStr, endDateStr, search, page, limit } = query;
+    const { tenantId, branchId, startDateStr, endDateStr, search, page, limit, userId, userRole } = query;
     const batchRepo = this.entityManager.getRepository(Batch);
 
     const qb = batchRepo
@@ -22,7 +24,26 @@ export class GetBatchesHandler implements IQueryHandler<GetBatchesQuery> {
       .leftJoinAndSelect('variant.product', 'product')
       .where('batch.tenantId = :tenantId', { tenantId });
 
-    if (branchId) {
+    const isOwner = userRole === UserRole.OWNER;
+    if (isOwner) {
+      if (branchId) {
+        qb.andWhere('batch.branchId = :branchId', { branchId });
+      }
+    } else {
+      if (!branchId) {
+        throw new BadRequestException('Debes seleccionar una sucursal para consultar los lotes de inventario.');
+      }
+
+      const user = await this.entityManager.query(
+        `SELECT branch_id FROM user_branches WHERE user_id = $1`,
+        [userId],
+      );
+      const userBranchIds = (user || []).map((r: any) => r.branch_id);
+
+      if (!userBranchIds.includes(branchId)) {
+        throw new ForbiddenException('No tienes permisos para consultar lotes en la sucursal seleccionada.');
+      }
+
       qb.andWhere('batch.branchId = :branchId', { branchId });
     }
 
@@ -51,19 +72,28 @@ export class GetBatchesHandler implements IQueryHandler<GetBatchesQuery> {
       .getManyAndCount();
 
     const data = batches.map((batch) => {
-      let originLabel = 'Stock inicial / Ajuste';
+      let originLabel = 'Stock inicial';
       let originReference = batch.code || 'Lote Directo';
 
-      if (batch.originType === 'PURCHASE') {
-        const supplierName = batch.purchaseOrder?.supplier?.name || 'Proveedor';
-        originLabel = `Compra (${supplierName})`;
-        originReference = batch.purchaseOrder?.invoiceNumber
-          ? `Factura: ${batch.purchaseOrder.invoiceNumber}`
-          : batch.code || (batch.purchaseOrderId ? `OC #${batch.purchaseOrderId.slice(0, 8)}` : 'Compra');
-      } else if (batch.originType === 'REFUND') {
-        originLabel = 'Devolución de cliente';
-      } else if (batch.originType === 'ADJUSTMENT') {
-        originLabel = 'Ajuste de inventario';
+      switch (batch.originType) {
+        case BatchOriginType.PURCHASE: {
+          const supplierName = batch.purchaseOrder?.supplier?.name || 'Proveedor';
+          originLabel = `Compra (${supplierName})`;
+          originReference = batch.purchaseOrder?.invoiceNumber
+            ? `Factura: ${batch.purchaseOrder.invoiceNumber}`
+            : batch.code || (batch.purchaseOrderId ? `OC #${batch.purchaseOrderId.slice(0, 8)}` : 'Compra');
+          break;
+        }
+        case BatchOriginType.REFUND:
+          originLabel = 'Devolución de cliente';
+          break;
+        case BatchOriginType.ADJUSTMENT:
+          originLabel = 'Ajuste de inventario';
+          break;
+        case BatchOriginType.INITIAL_STOCK:
+        default:
+          originLabel = 'Stock inicial';
+          break;
       }
 
       let totalInitialQuantity = 0;

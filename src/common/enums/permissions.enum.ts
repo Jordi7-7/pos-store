@@ -43,6 +43,9 @@ export const APP_PERMISSIONS = {
   USERS_MANAGE: 'action:users.manage',
   ROLES_MANAGE: 'action:roles.manage',
 
+  // Sucursales y Configuración
+  BRANCHES_MANAGE: 'action:branches.manage',
+
   // Reportes
   REPORTS_EXPORT: 'action:reports.export',
 } as const;
@@ -272,6 +275,13 @@ export const PERMISSION_DEFINITIONS: PermissionDefinition[] = [
     code: APP_PERMISSIONS.VIEW_SETTINGS,
     label: 'Configuración de Negocio',
     description: 'Permite modificar datos fiscales, sucursales y parámetros generales.',
+    module: 'system',
+    isDangerous: true,
+  },
+  {
+    code: APP_PERMISSIONS.BRANCHES_MANAGE,
+    label: 'Administrar Sucursales',
+    description: 'Permite crear, editar y activar o desactivar sucursales.',
     module: 'system',
     isDangerous: true,
   },

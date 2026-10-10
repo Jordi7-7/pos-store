@@ -5,5 +5,7 @@ export class ImportPurchasesCommand {
     public readonly tenantId: string,
     public readonly branchId: string,
     public readonly items: ImportPurchaseItemDto[],
+    public readonly invoiceNumber?: string,
   ) {}
 }
+

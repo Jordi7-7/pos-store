@@ -14,6 +14,8 @@ export class BatchesController {
   @RequirePermissions(APP_PERMISSIONS.VIEW_PRODUCTS)
   async getBatchesByVariant(
     @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser('sub') userId: string,
+    @CurrentUser('role') userRole: string,
     @Param('variantId') variantId: string,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
@@ -26,6 +28,8 @@ export class BatchesController {
         page ? Number(page) : 1,
         limit ? Number(limit) : 10,
         branchId,
+        userId,
+        userRole,
       ),
     );
   }
@@ -34,6 +38,8 @@ export class BatchesController {
   @RequirePermissions(APP_PERMISSIONS.VIEW_PRODUCTS)
   async getBatches(
     @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser('sub') userId: string,
+    @CurrentUser('role') userRole: string,
     @Query('branchId') branchId?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
@@ -50,6 +56,8 @@ export class BatchesController {
         search,
         page ? Number(page) : 1,
         limit ? Number(limit) : 10,
+        userId,
+        userRole,
       ),
     );
   }

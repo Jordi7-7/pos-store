@@ -20,7 +20,8 @@ export class ImportPurchasesHandler implements ICommandHandler<ImportPurchasesCo
   constructor(private readonly entityManager: EntityManager) {}
 
   async execute(command: ImportPurchasesCommand): Promise<PurchaseOrder> {
-    const { tenantId, branchId, items } = command;
+    const { tenantId, branchId, items, invoiceNumber } = command;
+    const cleanInvoiceNumber = invoiceNumber?.trim() || null;
     this.logger.log(`Executing bulk purchase import: ${items.length} items for Branch: ${branchId}`);
 
     if (items.length === 0) {
@@ -98,7 +99,7 @@ export class ImportPurchasesHandler implements ICommandHandler<ImportPurchasesCo
       purchaseOrder.tenantId = tenantId;
       purchaseOrder.supplierId = supplier.id;
       purchaseOrder.branchId = branchId;
-      purchaseOrder.invoiceNumber = 'IMP-MASIVO';
+      purchaseOrder.invoiceNumber = cleanInvoiceNumber || 'IMP-MASIVO';
       purchaseOrder.totalAmount = totalAmount;
       purchaseOrder.status = 'COMPLETED';
       const savedPurchase = await purchaseRepo.save(purchaseOrder);
@@ -108,7 +109,7 @@ export class ImportPurchasesHandler implements ICommandHandler<ImportPurchasesCo
       batchHeader.tenantId = tenantId;
       batchHeader.branchId = branchId;
       batchHeader.purchaseOrderId = savedPurchase.id;
-      batchHeader.code = 'COMPRA-MASIVA';
+      batchHeader.code = cleanInvoiceNumber ? `IMP-${cleanInvoiceNumber}` : 'COMPRA-MASIVA';
       batchHeader.originType = BatchOriginType.PURCHASE;
       const savedBatchHeader = await batchHeaderRepo.save(batchHeader);
 

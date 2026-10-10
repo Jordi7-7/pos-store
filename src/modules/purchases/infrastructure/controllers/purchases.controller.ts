@@ -66,23 +66,34 @@ export class PurchasesController {
 
   @Get()
   @RequirePermissions(APP_PERMISSIONS.VIEW_PURCHASES)
-  async getPurchases(@CurrentUser('tenantId') tenantId: string) {
-    return this.queryBus.execute(new GetPurchasesQuery(tenantId));
+  async getPurchases(
+    @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser('sub') userId: string,
+    @CurrentUser('role') userRole: string,
+    @Query('branchId') branchId?: string,
+  ) {
+    return this.queryBus.execute(new GetPurchasesQuery(tenantId, branchId || undefined, userId, userRole));
   }
 
   @Get('by-variant/:variantId')
   @RequireAnyPermissions(APP_PERMISSIONS.VIEW_PRODUCTS, APP_PERMISSIONS.VIEW_PURCHASES)
   async getPurchasesByVariant(
     @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser('sub') userId: string,
+    @CurrentUser('role') userRole: string,
     @Param('variantId') variantId: string,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
+    @Query('branchId') branchId?: string,
   ) {
     return this.queryBus.execute(new GetPurchasesByVariantQuery(
       tenantId,
       variantId,
       page ? Number(page) : 1,
       limit ? Number(limit) : 10,
+      branchId || undefined,
+      userId,
+      userRole,
     ));
   }
 
@@ -129,7 +140,7 @@ export class PurchasesController {
     @Body() dto: ImportPurchasesDto,
   ) {
     return this.commandBus.execute(
-      new ImportPurchasesCommand(tenantId, dto.branchId, dto.items),
+      new ImportPurchasesCommand(tenantId, dto.branchId, dto.items, dto.invoiceNumber),
     );
   }
 }

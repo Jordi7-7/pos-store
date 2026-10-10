@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsNumber, IsArray, ValidateNested, IsUUID } from 'class-validator';
+import { IsString, IsNotEmpty, IsNumber, IsArray, ValidateNested, IsUUID, IsOptional } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class ValidatePurchaseItemDto {
@@ -31,8 +31,13 @@ export class ImportPurchasesDto {
   @IsNotEmpty()
   branchId: string;
 
+  @IsString()
+  @IsOptional()
+  invoiceNumber?: string;
+
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => ImportPurchaseItemDto)
   items: ImportPurchaseItemDto[];
 }
+

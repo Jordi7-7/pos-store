@@ -80,10 +80,13 @@ export class SalesController {
   @RequirePermissions(APP_PERMISSIONS.VIEW_SALES)
   async findSalesPaginated(
     @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser('sub') userId: string,
+    @CurrentUser('role') userRole: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
+    @Query('branchId') branchId?: string,
   ) {
     return this.queryBus.execute(new GetSalesPaginatedQuery(
       tenantId,
@@ -91,6 +94,9 @@ export class SalesController {
       endDate,
       page ? Number(page) : 1,
       limit ? Number(limit) : 10,
+      branchId || undefined,
+      userId,
+      userRole,
     ));
   }
 
@@ -98,15 +104,21 @@ export class SalesController {
   @RequireAnyPermissions(APP_PERMISSIONS.VIEW_PRODUCTS, APP_PERMISSIONS.VIEW_SALES)
   async findSalesByVariant(
     @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser('sub') userId: string,
+    @CurrentUser('role') userRole: string,
     @Param('variantId') variantId: string,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
+    @Query('branchId') branchId?: string,
   ) {
     return this.queryBus.execute(new GetSalesByVariantQuery(
       tenantId,
       variantId,
       page ? Number(page) : 1,
       limit ? Number(limit) : 10,
+      branchId || undefined,
+      userId,
+      userRole,
     ));
   }
 
@@ -233,9 +245,11 @@ export class SalesController {
   @Get('cash-sessions')
   async getCashSessions(
     @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser('sub') userId: string,
+    @CurrentUser('role') userRole: string,
     @Query('branchId') branchId?: string,
   ) {
-    return this.queryBus.execute(new GetCashSessionsQuery(tenantId, branchId));
+    return this.queryBus.execute(new GetCashSessionsQuery(tenantId, branchId, userId, userRole));
   }
 
   @Get('cash-sessions/:id/details')

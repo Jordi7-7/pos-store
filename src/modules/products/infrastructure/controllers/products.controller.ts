@@ -191,15 +191,21 @@ export class ProductsController {
   @Get('inventory-movements-by-variant')
   async getMovementsByVariant(
     @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser('sub') userId: string,
+    @CurrentUser('role') userRole: string,
     @Query('variantId') variantId: string,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
+    @Query('branchId') branchId?: string,
   ) {
     return this.queryBus.execute(new GetInventoryMovementsByVariantQuery(
       tenantId,
       variantId,
       page ? Number(page) : 1,
       limit ? Number(limit) : 10,
+      branchId || undefined,
+      userId,
+      userRole,
     ));
   }
 
