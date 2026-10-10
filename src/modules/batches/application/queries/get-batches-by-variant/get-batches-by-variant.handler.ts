@@ -1,16 +1,26 @@
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { GetBatchesByVariantQuery } from './get-batches-by-variant.query';
 import { ProductBatch } from '../../../../products/domain/entities/product-batch.entity';
-import { UserRole } from '../../../../users/enums/user-role.enum';
+import { RedisService } from '../../../../../common/redis/redis.service';
+import { assertUserCanAccessBranch } from '../../../../../common/security/branch-access.helper';
 
 @QueryHandler(GetBatchesByVariantQuery)
 export class GetBatchesByVariantHandler implements IQueryHandler<GetBatchesByVariantQuery> {
-  constructor(private readonly entityManager: EntityManager) {}
+  constructor(
+    private readonly entityManager: EntityManager,
+    private readonly redisService: RedisService,
+  ) {}
 
   async execute(query: GetBatchesByVariantQuery) {
     const { tenantId, variantId, page, limit, branchId, userId, userRole } = query;
+
+    await assertUserCanAccessBranch(this.entityManager, this.redisService, {
+      userId,
+      userRole,
+      branchId,
+      actionDescription: 'consultar los lotes de la variante',
+    });
 
     const qb = this.entityManager.getRepository(ProductBatch)
       .createQueryBuilder('pb')
@@ -24,26 +34,7 @@ export class GetBatchesByVariantHandler implements IQueryHandler<GetBatchesByVar
       .where('pb.tenantId = :tenantId', { tenantId })
       .andWhere('pb.variantId = :variantId', { variantId });
 
-    const isOwner = userRole === UserRole.OWNER;
-    if (isOwner) {
-      if (branchId) {
-        qb.andWhere('pb.branchId = :branchId', { branchId });
-      }
-    } else {
-      if (!branchId) {
-        throw new BadRequestException('Debes seleccionar una sucursal para consultar los lotes de la variante.');
-      }
-
-      const user = await this.entityManager.query(
-        `SELECT branch_id FROM user_branches WHERE user_id = $1`,
-        [userId],
-      );
-      const userBranchIds = (user || []).map((r: any) => r.branch_id);
-
-      if (!userBranchIds.includes(branchId)) {
-        throw new ForbiddenException('No tienes permisos para consultar lotes en la sucursal seleccionada.');
-      }
-
+    if (branchId) {
       qb.andWhere('pb.branchId = :branchId', { branchId });
     }
 

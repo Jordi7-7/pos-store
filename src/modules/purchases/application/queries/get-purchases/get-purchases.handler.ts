@@ -1,43 +1,32 @@
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { EntityManager, In } from 'typeorm';
 import { GetPurchasesQuery } from './get-purchases.query';
 import { PurchaseOrder } from '../../../domain/entities/purchase-order.entity';
 import { Batch } from '../../../../batches/domain/entities/batch.entity';
-import { User } from '../../../../users/domain/entities/user.entity';
-import { UserRole } from '../../../../users/enums/user-role.enum';
+import { RedisService } from '../../../../../common/redis/redis.service';
+import { assertUserCanAccessBranch } from '../../../../../common/security/branch-access.helper';
 
 @QueryHandler(GetPurchasesQuery)
 export class GetPurchasesHandler implements IQueryHandler<GetPurchasesQuery> {
-  constructor(private readonly entityManager: EntityManager) {}
+  constructor(
+    private readonly entityManager: EntityManager,
+    private readonly redisService: RedisService,
+  ) {}
 
   async execute(query: GetPurchasesQuery): Promise<any[]> {
     const { tenantId, branchId, userId, userRole } = query;
     const purchaseRepo = this.entityManager.getRepository(PurchaseOrder);
     const batchHeaderRepo = this.entityManager.getRepository(Batch);
 
+    await assertUserCanAccessBranch(this.entityManager, this.redisService, {
+      userId,
+      userRole,
+      branchId,
+      actionDescription: 'consultar las compras',
+    });
+
     const whereClause: any = { tenantId };
-
-    const isOwner = userRole === UserRole.OWNER;
-    if (isOwner) {
-      if (branchId) {
-        whereClause.branchId = branchId;
-      }
-    } else {
-      if (!branchId) {
-        throw new BadRequestException('Debes seleccionar una sucursal para consultar las compras.');
-      }
-
-      const user = await this.entityManager.findOne(User, {
-        where: { id: userId, tenantId },
-        relations: { branches: true },
-      });
-      const userBranchIds = (user?.branches || []).map((b) => b.id);
-
-      if (!userBranchIds.includes(branchId)) {
-        throw new ForbiddenException('No tienes permisos para consultar compras en la sucursal seleccionada.');
-      }
-
+    if (branchId) {
       whereClause.branchId = branchId;
     }
 

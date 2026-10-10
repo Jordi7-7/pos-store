@@ -1,18 +1,28 @@
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { GetBatchesQuery } from './get-batches.query';
 import { Batch, BatchOriginType } from '../../../domain/entities/batch.entity';
 import { parseReportDates } from '../../../../reports/application/queries/parse-dates.helper';
-import { UserRole } from '../../../../users/enums/user-role.enum';
+import { RedisService } from '../../../../../common/redis/redis.service';
+import { assertUserCanAccessBranch } from '../../../../../common/security/branch-access.helper';
 
 @QueryHandler(GetBatchesQuery)
 export class GetBatchesHandler implements IQueryHandler<GetBatchesQuery> {
-  constructor(private readonly entityManager: EntityManager) {}
+  constructor(
+    private readonly entityManager: EntityManager,
+    private readonly redisService: RedisService,
+  ) {}
 
   async execute(query: GetBatchesQuery) {
     const { tenantId, branchId, startDateStr, endDateStr, search, page, limit, userId, userRole } = query;
     const batchRepo = this.entityManager.getRepository(Batch);
+
+    await assertUserCanAccessBranch(this.entityManager, this.redisService, {
+      userId,
+      userRole,
+      branchId,
+      actionDescription: 'consultar los lotes de inventario',
+    });
 
     const qb = batchRepo
       .createQueryBuilder('batch')
@@ -24,26 +34,7 @@ export class GetBatchesHandler implements IQueryHandler<GetBatchesQuery> {
       .leftJoinAndSelect('variant.product', 'product')
       .where('batch.tenantId = :tenantId', { tenantId });
 
-    const isOwner = userRole === UserRole.OWNER;
-    if (isOwner) {
-      if (branchId) {
-        qb.andWhere('batch.branchId = :branchId', { branchId });
-      }
-    } else {
-      if (!branchId) {
-        throw new BadRequestException('Debes seleccionar una sucursal para consultar los lotes de inventario.');
-      }
-
-      const user = await this.entityManager.query(
-        `SELECT branch_id FROM user_branches WHERE user_id = $1`,
-        [userId],
-      );
-      const userBranchIds = (user || []).map((r: any) => r.branch_id);
-
-      if (!userBranchIds.includes(branchId)) {
-        throw new ForbiddenException('No tienes permisos para consultar lotes en la sucursal seleccionada.');
-      }
-
+    if (branchId) {
       qb.andWhere('batch.branchId = :branchId', { branchId });
     }
 

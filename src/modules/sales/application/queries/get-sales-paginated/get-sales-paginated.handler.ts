@@ -1,15 +1,17 @@
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { Between, EntityManager } from 'typeorm';
 import { GetSalesPaginatedQuery } from './get-sales-paginated.query';
 import { Sale } from '../../../domain/entities/sale.entity';
 import { parseReportDates } from '../../../../reports/application/queries/parse-dates.helper';
-import { User } from '../../../../users/domain/entities/user.entity';
-import { UserRole } from '../../../../users/enums/user-role.enum';
+import { RedisService } from '../../../../../common/redis/redis.service';
+import { assertUserCanAccessBranch } from '../../../../../common/security/branch-access.helper';
 
 @QueryHandler(GetSalesPaginatedQuery)
 export class GetSalesPaginatedHandler implements IQueryHandler<GetSalesPaginatedQuery> {
-  constructor(private readonly entityManager: EntityManager) {}
+  constructor(
+    private readonly entityManager: EntityManager,
+    private readonly redisService: RedisService,
+  ) {}
 
   async execute(query: GetSalesPaginatedQuery) {
     const { start, end } = await parseReportDates(
@@ -25,28 +27,15 @@ export class GetSalesPaginatedHandler implements IQueryHandler<GetSalesPaginated
       .where('sale.tenantId = :tenantId', { tenantId: query.tenantId })
       .andWhere('sale.createdAt BETWEEN :start AND :end', { start, end });
 
-    // Role-based branch enforcement
-    const isOwner = query.userRole === UserRole.OWNER;
+    // Role-based branch enforcement with Redis Cache-Aside
+    await assertUserCanAccessBranch(this.entityManager, this.redisService, {
+      userId: query.userId,
+      userRole: query.userRole,
+      branchId: query.branchId,
+      actionDescription: 'consultar las ventas',
+    });
 
-    if (isOwner) {
-      if (query.branchId) {
-        salesQuery.andWhere('sale.branchId = :branchId', { branchId: query.branchId });
-      }
-    } else {
-      if (!query.branchId) {
-        throw new BadRequestException('Debes seleccionar una sucursal para consultar las ventas.');
-      }
-
-      const user = await this.entityManager.findOne(User, {
-        where: { id: query.userId, tenantId: query.tenantId },
-        relations: { branches: true },
-      });
-      const userBranchIds = (user?.branches || []).map((b) => b.id);
-
-      if (!userBranchIds.includes(query.branchId)) {
-        throw new ForbiddenException('No tienes permisos para consultar ventas en la sucursal seleccionada.');
-      }
-
+    if (query.branchId) {
       salesQuery.andWhere('sale.branchId = :branchId', { branchId: query.branchId });
     }
 

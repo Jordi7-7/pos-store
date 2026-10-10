@@ -5,6 +5,8 @@ import { UpdateUserCommand } from './update-user.command';
 import { User } from '../../../domain/entities/user.entity';
 import { Branch } from '../../../../branches/domain/entities/branch.entity';
 import { HashService } from '../../../../auth/services/hash.service';
+import { RedisService } from '../../../../../common/redis/redis.service';
+import { invalidateUserBranchesCache } from '../../../../../common/security/branch-access.helper';
 
 @CommandHandler(UpdateUserCommand)
 export class UpdateUserHandler implements ICommandHandler<UpdateUserCommand> {
@@ -13,6 +15,7 @@ export class UpdateUserHandler implements ICommandHandler<UpdateUserCommand> {
   constructor(
     private readonly entityManager: EntityManager,
     private readonly hashService: HashService,
+    private readonly redisService: RedisService,
   ) {}
 
   async execute(command: UpdateUserCommand): Promise<User> {
@@ -140,6 +143,9 @@ export class UpdateUserHandler implements ICommandHandler<UpdateUserCommand> {
           );
         }
       }
+
+      // Invalidate Redis Cache-Aside for user branches immediately
+      await invalidateUserBranchesCache(this.redisService, savedUser.id);
     }
 
     // Sync assigned cash registers if explicitly passed

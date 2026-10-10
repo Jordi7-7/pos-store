@@ -7,12 +7,17 @@ import { CashRegister } from '../../../domain/entities/cash-register.entity';
 import { Branch } from '../../../../branches/domain/entities/branch.entity';
 import { User } from '../../../../users/domain/entities/user.entity';
 import { UserRole } from '../../../../users/enums/user-role.enum';
+import { RedisService } from '../../../../../common/redis/redis.service';
+import { assertUserCanAccessBranch } from '../../../../../common/security/branch-access.helper';
 
 @CommandHandler(OpenCashSessionCommand)
 export class OpenCashSessionHandler implements ICommandHandler<OpenCashSessionCommand> {
   private readonly logger = new Logger(OpenCashSessionHandler.name);
 
-  constructor(private readonly entityManager: EntityManager) {}
+  constructor(
+    private readonly entityManager: EntityManager,
+    private readonly redisService: RedisService,
+  ) {}
 
   async execute(command: OpenCashSessionCommand): Promise<CashSession> {
     const { tenantId, userId, branchId, openingBalance, cashRegisterId } = command;
@@ -32,11 +37,11 @@ export class OpenCashSessionHandler implements ICommandHandler<OpenCashSessionCo
         throw new NotFoundException(`Branch with ID ${branchId} not found`);
       }
 
-      // 1.1 Verify user permissions and assignment to this branch
+      // 1.1 Verify user exists
       const userRepo = transactionalManager.getRepository(User);
       const user = await userRepo.findOne({
         where: { id: userId, tenantId },
-        relations: { branches: true, cashRegisters: true },
+        relations: { cashRegisters: true },
       });
       if (!user) {
         throw new NotFoundException('Usuario no encontrado');
@@ -44,18 +49,13 @@ export class OpenCashSessionHandler implements ICommandHandler<OpenCashSessionCo
 
       const isOwner = user.role === UserRole.OWNER;
 
-      // Check branch authorization
-      const assignedBranchIds = (user.branches || []).map((b) => b.id);
-      if (!isOwner) {
-        if (assignedBranchIds.length === 0) {
-          this.logger.warn(`User ${userId} has no assigned branches`);
-          throw new ForbiddenException('No tienes ninguna sucursal asignada. Contacta a un administrador.');
-        }
-        if (!assignedBranchIds.includes(branchId)) {
-          this.logger.warn(`User ${userId} attempted to open cash in unauthorized branch ${branchId}`);
-          throw new ForbiddenException('No tienes autorización para abrir caja en esta sucursal.');
-        }
-      }
+      // Check branch authorization using Redis Cache-Aside
+      await assertUserCanAccessBranch(transactionalManager, this.redisService, {
+        userId,
+        userRole: user.role,
+        branchId,
+        actionDescription: 'abrir caja',
+      });
 
       // 2. Resolve CashRegister
       const register = await registerRepo.findOne({

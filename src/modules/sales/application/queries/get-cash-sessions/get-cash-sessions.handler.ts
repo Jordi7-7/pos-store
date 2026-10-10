@@ -1,8 +1,8 @@
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { GetCashSessionsQuery } from './get-cash-sessions.query';
-import { UserRole } from '../../../../users/enums/user-role.enum';
+import { RedisService } from '../../../../../common/redis/redis.service';
+import { assertUserCanAccessBranch } from '../../../../../common/security/branch-access.helper';
 
 export interface CashSessionListItemDto {
   id: string;
@@ -27,28 +27,20 @@ export interface CashSessionListItemDto {
 
 @QueryHandler(GetCashSessionsQuery)
 export class GetCashSessionsHandler implements IQueryHandler<GetCashSessionsQuery> {
-  constructor(private readonly entityManager: EntityManager) {}
+  constructor(
+    private readonly entityManager: EntityManager,
+    private readonly redisService: RedisService,
+  ) {}
 
   async execute(query: GetCashSessionsQuery): Promise<CashSessionListItemDto[]> {
     const { tenantId, branchId, userId, userRole } = query;
 
-    const isOwner = userRole === UserRole.OWNER;
-
-    if (!isOwner && !branchId) {
-      throw new BadRequestException('Debes seleccionar una sucursal para consultar las sesiones de caja.');
-    }
-
-    if (branchId && !isOwner) {
-      const user = await this.entityManager.query(
-        `SELECT branch_id FROM user_branches WHERE user_id = $1`,
-        [userId],
-      );
-      const userBranchIds = (user || []).map((r: any) => r.branch_id);
-
-      if (!userBranchIds.includes(branchId)) {
-        throw new ForbiddenException('No tienes permisos para consultar sesiones de caja en la sucursal seleccionada.');
-      }
-    }
+    await assertUserCanAccessBranch(this.entityManager, this.redisService, {
+      userId,
+      userRole,
+      branchId,
+      actionDescription: 'consultar las sesiones de caja',
+    });
 
     const params: any[] = [tenantId];
     let branchFilterSql = '';
