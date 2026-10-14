@@ -4,5 +4,7 @@ export class GetProductsBySkuAndBarcodeQuery {
     public readonly code: string,
     public readonly page?: number,
     public readonly limit?: number,
+    public readonly productType?: string,
   ) {}
 }
+

@@ -10,8 +10,10 @@ import { Batch, BatchOriginType } from '../../../../batches/domain/entities/batc
 import { InventoryMovement } from '../../../domain/entities/inventory-movement.entity';
 import { Branch } from '../../../../branches/domain/entities/branch.entity';
 import { InventoryMovementReason } from '../../../../../common/enums/inventory-movement-reason.enum';
+import { ProductType } from '../../../domain/enums/product-type.enum';
 
 @CommandHandler(ImportProductsCommand)
+
 export class ImportProductsHandler implements ICommandHandler<ImportProductsCommand> {
   private readonly logger = new Logger(ImportProductsHandler.name);
 
@@ -95,6 +97,8 @@ export class ImportProductsHandler implements ICommandHandler<ImportProductsComm
           prod.tenantId = tenantId;
           prod.name = item.name.trim();
           prod.description = '';
+          prod.type = ProductType.SIMPLE;
+          prod.baseSku = null;
           return prod;
         });
         const savedProducts = await productRepo.save(productsToCreate);
@@ -118,6 +122,7 @@ export class ImportProductsHandler implements ICommandHandler<ImportProductsComm
 
         // 3. Bulk create Stocks, Batches and Movements if stock is provided and branchId is present
         if (branchId && savedBatchHeader) {
+          const currentBatchHeader = savedBatchHeader;
           const stocksToCreate: ProductStock[] = [];
           const batchesToCreate: ProductBatch[] = [];
           const movementsToCreate: InventoryMovement[] = [];
@@ -137,7 +142,7 @@ export class ImportProductsHandler implements ICommandHandler<ImportProductsComm
               const batch = new ProductBatch();
               batch.tenantId = tenantId;
               batch.branchId = branchId;
-              batch.batchId = savedBatchHeader.id;
+              batch.batchId = currentBatchHeader.id;
               batch.variantId = variantId;
               batch.initialQuantity = qty;
               batch.remainingQuantity = qty;

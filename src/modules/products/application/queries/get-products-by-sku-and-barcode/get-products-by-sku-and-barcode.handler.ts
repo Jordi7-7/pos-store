@@ -1,62 +1,90 @@
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
 import { EntityManager } from 'typeorm';
 import { GetProductsBySkuAndBarcodeQuery } from './get-products-by-sku-and-barcode.query';
-import { ProductVariant } from '../../../domain/entities/product-variant.entity';
+import { Product } from '../../../domain/entities/product.entity';
+import { ProductType } from '../../../domain/enums/product-type.enum';
+import { PaginatedProductsResponseDto, ProductListItemResponseDto } from '../../dtos/product-response.dto';
 
 @QueryHandler(GetProductsBySkuAndBarcodeQuery)
 export class GetProductsBySkuAndBarcodeHandler implements IQueryHandler<GetProductsBySkuAndBarcodeQuery> {
   constructor(private readonly entityManager: EntityManager) {}
 
-  async execute(query: GetProductsBySkuAndBarcodeQuery): Promise<any> {
-    const { tenantId, code, page = 1, limit = 10 } = query;
-    const repo = this.entityManager.getRepository(ProductVariant);
+  async execute(query: GetProductsBySkuAndBarcodeQuery): Promise<PaginatedProductsResponseDto> {
+    const { tenantId, code, page = 1, limit = 10, productType } = query;
+    const repo = this.entityManager.getRepository(Product);
     const searchCode = `%${code.trim()}%`;
     const take = limit;
     const skip = (page - 1) * limit;
 
-    const [variants, total] = await repo.createQueryBuilder('variant')
-      .innerJoinAndSelect('variant.product', 'product')
+    const qb = repo.createQueryBuilder('product')
+      .leftJoinAndSelect('product.category', 'category')
       .leftJoinAndSelect('product.images', 'productImages')
-      .leftJoinAndSelect('variant.images', 'variantImages')
-      .leftJoinAndSelect('variant.stocks', 'stocks')
-      .leftJoinAndSelect('variant.attributeValues', 'attributeValues')
+      .leftJoinAndSelect('product.variants', 'variants')
+      .leftJoinAndSelect('variants.images', 'variantImages')
+      .leftJoinAndSelect('variants.stocks', 'stocks')
+      .leftJoinAndSelect('stocks.branch', 'branch')
+      .leftJoinAndSelect('variants.attributeValues', 'attributeValues')
       .leftJoinAndSelect('attributeValues.attribute', 'attribute')
-      .leftJoinAndSelect('variant.tags', 'tags')
-      .where('variant.tenantId = :tenantId', { tenantId })
-      .andWhere('(variant.sku LIKE :searchCode OR variant.barcode LIKE :searchCode)', { searchCode })
-      .orderBy('variant.sku', 'ASC')
+      .where('product.tenantId = :tenantId', { tenantId })
+      .andWhere('(product.baseSku ILIKE :searchCode OR variants.sku ILIKE :searchCode OR variants.barcode ILIKE :searchCode)', { searchCode });
+
+    if (productType && (productType === ProductType.SIMPLE || productType === ProductType.VARIABLE)) {
+      qb.andWhere('product.type = :productType', { productType });
+    }
+
+    const [products, total] = await qb
+      .orderBy('product.createdAt', 'DESC')
       .skip(skip)
       .take(take)
       .getManyAndCount();
 
-    const data = variants.map(variant => {
-      const parentImages = (variant.product.images && variant.product.images.length > 0)
-        ? variant.product.images
-        : (variant.images || []);
+    const data: ProductListItemResponseDto[] = products.map(product => {
+      const isVariable = product.type === ProductType.VARIABLE;
+      const firstVariant = product.variants?.[0];
+      const parentImages = (product.images && product.images.length > 0)
+        ? product.images
+        : (firstVariant?.images || []);
 
       return {
-        id: variant.product.id,
-        name: variant.product.name,
-        description: variant.product.description,
-        imageIds: parentImages.map(img => img.id),
-        images: parentImages.map(img => ({ id: img.id, url: img.url, description: img.description })),
-      variants: [
-        {
-          id: variant.id,
-          sku: variant.sku,
-          barcode: variant.barcode,
-          purchasePrice: Number(variant.purchasePrice),
-          salePrice: Number(variant.salePrice),
-          wholesalePrice: variant.wholesalePrice !== null ? Number(variant.wholesalePrice) : null,
-          stocks: variant.stocks,
-          attributeValues: variant.attributeValues,
-          tags: variant.tags,
-          imageIds: variant.images ? variant.images.map(img => img.id) : [],
-          images: variant.images ? variant.images.map(img => ({ id: img.id, url: img.url, description: img.description })) : [],
-        }
-      ]
-    };
-  });
+        id: product.id,
+        name: product.name,
+        description: product.description,
+        type: product.type || ProductType.SIMPLE,
+        baseSku: product.baseSku,
+        categoryId: product.categoryId,
+        categoryName: product.category ? product.category.name : null,
+        images: parentImages.map(img => ({ id: img.id, url: img.url })),
+        variants: (product.variants || []).map(variant => {
+          const varImages = (variant.images && variant.images.length > 0)
+            ? variant.images.map(img => ({ id: img.id, url: img.url }))
+            : parentImages.map(img => ({ id: img.id, url: img.url }));
+
+          const variantDto: any = {
+            id: variant.id,
+            sku: variant.sku,
+            barcode: variant.barcode,
+            purchasePrice: Number(variant.purchasePrice),
+            salePrice: Number(variant.salePrice),
+            wholesalePrice: variant.wholesalePrice !== null ? Number(variant.wholesalePrice) : null,
+            images: varImages,
+            stocks: (variant.stocks || []).map(s => ({
+              branchId: s.branchId,
+              branchName: s.branch ? s.branch.name : '',
+              quantity: Number(s.quantity || 0),
+            })),
+          };
+
+          if (isVariable && variant.attributeValues && variant.attributeValues.length > 0) {
+            variantDto.attributes = variant.attributeValues.map(av => ({
+              name: av.attribute ? av.attribute.name : '',
+              value: av.value,
+            }));
+          }
+
+          return variantDto;
+        }),
+      };
+    });
 
     return {
       data,
@@ -65,7 +93,7 @@ export class GetProductsBySkuAndBarcodeHandler implements IQueryHandler<GetProdu
         page,
         limit,
         totalPages: Math.ceil(total / limit),
-      }
+      },
     };
   }
 }

@@ -13,6 +13,7 @@ import { Batch, BatchOriginType } from '../../../../batches/domain/entities/batc
 import { InventoryMovement } from '../../../domain/entities/inventory-movement.entity';
 import { Branch } from '../../../../branches/domain/entities/branch.entity';
 import { InventoryMovementReason } from '../../../../../common/enums/inventory-movement-reason.enum';
+import { ProductType } from '../../../domain/enums/product-type.enum';
 
 
 @CommandHandler(CreateVariableProductCommand)
@@ -22,8 +23,13 @@ export class CreateVariableProductHandler implements ICommandHandler<CreateVaria
   constructor(private readonly entityManager: EntityManager) {}
 
   async execute(command: CreateVariableProductCommand): Promise<Product> {
-    const { tenantId, name, description, variants, imageIds, categoryId } = command;
+    const { tenantId, name, description, variants, imageIds, categoryId, baseSku } = command;
+
     this.logger.log(`Creating variable product: ${name} with ${variants.length} variant(s) for Tenant: ${tenantId}`);
+
+    if (!baseSku || !baseSku.trim()) {
+      throw new BadRequestException('El SKU base es obligatorio para un producto variable.');
+    }
 
     if (!variants || variants.length === 0) {
       throw new BadRequestException('Un producto variable debe tener al menos una variante.');
@@ -83,6 +89,8 @@ export class CreateVariableProductHandler implements ICommandHandler<CreateVaria
       product.tenantId = tenantId;
       product.name = name;
       product.description = description;
+      product.type = ProductType.VARIABLE;
+      product.baseSku = baseSku ? baseSku.trim().toUpperCase() : null;
       product.variants = [];
 
       // Link Category if provided
@@ -160,6 +168,7 @@ export class CreateVariableProductHandler implements ICommandHandler<CreateVaria
             const stock = new ProductStock();
             stock.branchId = stockDto.branchId;
             stock.quantity = Number(stockDto.quantity) || 0;
+            stock.variant = variant;
             variant.stocks.push(stock);
           }
         }
@@ -215,6 +224,11 @@ export class CreateVariableProductHandler implements ICommandHandler<CreateVaria
 
       for (const variant of savedVariants) {
         delete (variant as any).product;
+        if (variant.stocks) {
+          for (const stock of variant.stocks) {
+            delete (stock as any).variant;
+          }
+        }
       }
       savedProduct.variants = savedVariants;
       this.logger.log(`Variable product created successfully: ${savedProduct.name} (ID: ${savedProduct.id})`);

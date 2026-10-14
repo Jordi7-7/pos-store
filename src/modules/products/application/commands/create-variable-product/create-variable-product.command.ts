@@ -6,5 +6,7 @@ export class CreateVariableProductCommand {
     public readonly variants: any[],
     public readonly imageIds?: string[],
     public readonly categoryId?: string,
+    public readonly baseSku?: string,
   ) {}
 }
+

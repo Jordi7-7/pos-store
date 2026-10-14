@@ -6,5 +6,7 @@ export class UpdateProductCommand {
     public readonly description?: string,
     public readonly imageIds?: string[],
     public readonly categoryId?: string | null,
+    public readonly baseSku?: string | null,
   ) {}
 }
+

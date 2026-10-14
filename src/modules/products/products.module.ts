@@ -25,6 +25,7 @@ import { UpdateSimpleProductHandler } from './application/commands/update-simple
 import { UpdateVariantHandler } from './application/commands/update-variant/update-variant.handler';
 import { DeleteProductHandler } from './application/commands/delete-product/delete-product.handler';
 import { CreateVariantHandler } from './application/commands/create-variant/create-variant.handler';
+import { DeleteVariantHandler } from './application/commands/delete-variant/delete-variant.handler';
 import { AdjustStockHandler } from './application/commands/adjust-stock/adjust-stock.handler';
 import { ImportProductsHandler } from './application/commands/import-products/import-products.handler';
 import { ValidateImportProductsHandler } from './application/queries/validate-import-products/validate-import-products.handler';
@@ -35,6 +36,7 @@ import { GetTagsHandler } from './application/queries/get-tags/get-tags.handler'
 import { CreateTagHandler } from './application/commands/create-tag/create-tag.handler';
 import { UpdateVariantTagsHandler } from './application/commands/update-variant-tags/update-variant-tags.handler';
 import { GetPosVariantBySkuHandler } from './application/queries/get-pos-variant-by-sku/get-pos-variant-by-sku.handler';
+import { GetPosVariantsByBaseSkuHandler } from './application/queries/get-pos-variants-by-base-sku/get-pos-variants-by-base-sku.handler';
 import { GetPosVariantsHandler } from './application/queries/get-pos-variants/get-pos-variants.handler';
 import { GetProductsBySkuAndBarcodeHandler } from './application/queries/get-products-by-sku-and-barcode/get-products-by-sku-and-barcode.handler';
 import { GetProductsByNameHandler } from './application/queries/get-products-by-name/get-products-by-name.handler';
@@ -72,6 +74,7 @@ import { ProductsController } from './infrastructure/controllers/products.contro
     UpdateVariantHandler,
     DeleteProductHandler,
     CreateVariantHandler,
+    DeleteVariantHandler,
     AdjustStockHandler,
     ImportProductsHandler,
     ValidateImportProductsHandler,
@@ -82,6 +85,7 @@ import { ProductsController } from './infrastructure/controllers/products.contro
     CreateTagHandler,
     UpdateVariantTagsHandler,
     GetPosVariantBySkuHandler,
+    GetPosVariantsByBaseSkuHandler,
     GetPosVariantsHandler,
     GetProductsBySkuAndBarcodeHandler,
     GetProductsByNameHandler,

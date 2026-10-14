@@ -18,4 +18,9 @@ export class UpdateProductDto {
   @IsUUID(4, { each: true })
   @IsOptional()
   imageIds?: string[];
+
+  @IsString()
+  @IsOptional()
+  baseSku?: string | null;
 }
+

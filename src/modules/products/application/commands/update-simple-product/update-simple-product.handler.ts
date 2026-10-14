@@ -6,6 +6,7 @@ import { Product } from '../../../domain/entities/product.entity';
 import { ProductImage } from '../../../domain/entities/product-image.entity';
 import { Category } from '../../../domain/entities/category.entity';
 import { ProductVariant } from '../../../domain/entities/product-variant.entity';
+import { ProductType } from '../../../domain/enums/product-type.enum';
 
 @CommandHandler(UpdateSimpleProductCommand)
 export class UpdateSimpleProductHandler implements ICommandHandler<UpdateSimpleProductCommand> {
@@ -79,7 +80,14 @@ export class UpdateSimpleProductHandler implements ICommandHandler<UpdateSimpleP
       }
     }
 
-    // 4. Update Variant (for simple products, the single default variant)
+    // 4. Update Variant
+    // If the product has multiple variants or is marked as VARIABLE, reject simple update
+    if (product.type === ProductType.VARIABLE || (product.variants && product.variants.length > 1)) {
+      throw new BadRequestException(
+        'Este producto es de tipo compuesto o tiene múltiples variantes. Debe actualizarse mediante la edición de producto compuesto o por variante individual.'
+      );
+    }
+
     let variant = product.variants?.[0];
     if (!variant) {
       variant = new ProductVariant();
@@ -119,7 +127,9 @@ export class UpdateSimpleProductHandler implements ICommandHandler<UpdateSimpleP
 
     try {
       const savedVariant = await variantRepo.save(variant);
-      product.variants = [savedVariant];
+      // Preserve existing variants list or keep only this one if simple
+      const existingOtherVariants = (product.variants || []).filter(v => v.id !== savedVariant.id);
+      product.variants = [savedVariant, ...existingOtherVariants];
       const savedProduct = await productRepo.save(product);
 
       this.logger.log(`Simple product updated successfully: ID ${savedProduct.id}`);

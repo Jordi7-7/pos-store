@@ -12,9 +12,11 @@ import { Batch, BatchOriginType } from '../../../../batches/domain/entities/batc
 import { InventoryMovement } from '../../../domain/entities/inventory-movement.entity';
 import { Branch } from '../../../../branches/domain/entities/branch.entity';
 import { InventoryMovementReason } from '../../../../../common/enums/inventory-movement-reason.enum';
+import { ProductType } from '../../../domain/enums/product-type.enum';
 
 
 @CommandHandler(CreateSimpleProductCommand)
+
 export class CreateSimpleProductHandler implements ICommandHandler<CreateSimpleProductCommand> {
   private readonly logger = new Logger(CreateSimpleProductHandler.name);
 
@@ -70,6 +72,8 @@ export class CreateSimpleProductHandler implements ICommandHandler<CreateSimpleP
       product.tenantId = tenantId;
       product.name = name;
       product.description = description;
+      product.type = ProductType.SIMPLE;
+      product.baseSku = null;
 
       // Link Category if provided
       if (categoryId) {

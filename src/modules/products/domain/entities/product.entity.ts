@@ -1,11 +1,13 @@
-import { Entity, Column, ManyToOne, JoinColumn, OneToMany, ManyToMany, JoinTable } from 'typeorm';
+import { Entity, Column, ManyToOne, JoinColumn, OneToMany, ManyToMany, JoinTable, Index } from 'typeorm';
 import { BaseEntity } from '../../../../common/database/base.entity';
 import { Tenant } from '../../../tenants/domain/entities/tenant.entity';
 import { ProductVariant } from './product-variant.entity';
 import { ProductImage } from './product-image.entity';
 import { Category } from './category.entity';
+import { ProductType } from '../enums/product-type.enum';
 
 @Entity('products')
+@Index('idx_products_tenant_base_sku', ['tenantId', 'baseSku'], { where: 'deleted_at IS NULL' })
 export class Product extends BaseEntity {
   @Column({ name: 'tenant_id', type: 'uuid' })
   tenantId: string;
@@ -26,6 +28,16 @@ export class Product extends BaseEntity {
 
   @Column({ type: 'text' })
   description: string;
+
+  @Column({
+    type: 'enum',
+    enum: ProductType,
+    default: ProductType.SIMPLE,
+  })
+  type: ProductType;
+
+  @Column({ name: 'base_sku', type: 'varchar', nullable: true })
+  baseSku: string | null;
 
   @OneToMany(() => ProductVariant, (variant) => variant.product, { cascade: true })
   variants: ProductVariant[];

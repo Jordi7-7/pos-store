@@ -108,6 +108,7 @@ export class CreateVariantHandler implements ICommandHandler<CreateVariantComman
           const stock = new ProductStock();
           stock.branchId = stockDto.branchId;
           stock.quantity = Number(stockDto.quantity) || 0;
+          stock.variant = variant;
           variant.stocks.push(stock);
         }
       }
@@ -150,6 +151,13 @@ export class CreateVariantHandler implements ICommandHandler<CreateVariantComman
             movement.reason = InventoryMovementReason.INITIAL_STOCK;
             await movementRepo.save(movement);
           }
+        }
+      }
+
+      delete (savedVariant as any).product;
+      if (savedVariant.stocks) {
+        for (const stock of savedVariant.stocks) {
+          delete (stock as any).variant;
         }
       }
 

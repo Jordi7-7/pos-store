@@ -20,8 +20,8 @@ export class ProductVariantDto {
   sku: string;
 
   @IsString()
-  @IsNotEmpty()
-  barcode: string;
+  @IsOptional()
+  barcode?: string;
 
   @IsNumber()
   purchasePrice: number;
@@ -58,6 +58,10 @@ export class CreateVariableProductDto {
   @IsString()
   description: string;
 
+  @IsString()
+  @IsNotEmpty({ message: 'El SKU base es obligatorio para un producto variable.' })
+  baseSku: string;
+
   @IsUUID()
   @IsOptional()
   categoryId?: string;
@@ -73,6 +77,7 @@ export class CreateVariableProductDto {
   @Type(() => ProductVariantDto)
   variants: ProductVariantDto[];
 }
+
 
 
 export class CreateSimpleProductDto {

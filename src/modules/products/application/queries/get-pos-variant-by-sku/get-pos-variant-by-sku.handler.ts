@@ -39,7 +39,12 @@ export class GetPosVariantBySkuHandler implements IQueryHandler<GetPosVariantByS
         salePrice: variant.salePrice,
         wholesalePrice: variant.wholesalePrice !== null ? Number(variant.wholesalePrice) : null,
         productName: variant.product.name,
+        productType: variant.product.type,
         stock: stockQuantity,
+        attributes: (variant.attributeValues || []).map((av) => ({
+          name: av.attribute?.name || 'Atributo',
+          value: av.value,
+        })),
         attributeValues: variant.attributeValues || [],
         imageUrl: firstImage ? firstImage.url : null,
       };

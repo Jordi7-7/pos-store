@@ -3,6 +3,7 @@ import { Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { EntityManager, In } from 'typeorm';
 import { UpdateProductCommand } from './update-product.command';
 import { Product } from '../../../domain/entities/product.entity';
+import { ProductVariant } from '../../../domain/entities/product-variant.entity';
 import { ProductImage } from '../../../domain/entities/product-image.entity';
 import { Category } from '../../../domain/entities/category.entity';
 
@@ -13,7 +14,7 @@ export class UpdateProductHandler implements ICommandHandler<UpdateProductComman
   constructor(private readonly entityManager: EntityManager) {}
 
   async execute(command: UpdateProductCommand): Promise<Product> {
-    const { tenantId, id, name, description, imageIds, categoryId } = command;
+    const { tenantId, id, name, description, imageIds, categoryId, baseSku } = command;
     this.logger.log(`Updating product (parent) ID: ${id} for Tenant: ${tenantId}`);
 
     const productRepo = this.entityManager.getRepository(Product);
@@ -22,7 +23,7 @@ export class UpdateProductHandler implements ICommandHandler<UpdateProductComman
 
     const product = await productRepo.findOne({
       where: { id, tenantId },
-      relations: { images: true },
+      relations: { images: true, variants: true },
     });
 
     if (!product) {
@@ -33,7 +34,35 @@ export class UpdateProductHandler implements ICommandHandler<UpdateProductComman
     if (name !== undefined) product.name = name;
     if (description !== undefined) product.description = description;
 
+    const oldBaseSku = product.baseSku ? product.baseSku.trim().toUpperCase() : null;
+    let newBaseSku: string | null = null;
+    if (baseSku !== undefined && baseSku !== null && baseSku.trim() !== '') {
+      newBaseSku = baseSku.trim().toUpperCase();
+      product.baseSku = newBaseSku;
+    }
+
+    // Si cambió el baseSku y el producto tiene variantes, sincronizar los SKUs de las variantes
+    if (newBaseSku && oldBaseSku && newBaseSku !== oldBaseSku && product.variants && product.variants.length > 0) {
+      const variantRepo = this.entityManager.getRepository(ProductVariant);
+      const oldPrefix = `${oldBaseSku}-`;
+      const newPrefix = `${newBaseSku}-`;
+
+      for (const variant of product.variants) {
+        if (variant.sku.startsWith(oldPrefix)) {
+          variant.sku = `${newPrefix}${variant.sku.slice(oldPrefix.length)}`;
+        } else if (variant.sku === oldBaseSku) {
+          variant.sku = newBaseSku;
+        } else {
+          // Si el SKU no comenzaba con el prefijo anterior, actualizamos o prefijamos con el nuevo
+          variant.sku = `${newPrefix}${variant.sku}`;
+        }
+      }
+      await variantRepo.save(product.variants);
+      this.logger.log(`Updated SKUs for ${product.variants.length} variants of product ${product.id}`);
+    }
+
     // Update Category if provided
+
     if (categoryId !== undefined) {
       if (categoryId === null || categoryId === '') {
         product.categoryId = null;

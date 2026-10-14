@@ -17,6 +17,7 @@ import { GetProductsByNameQuery } from '../../application/queries/get-products-b
 import { GetProductByIdQuery } from '../../application/queries/get-product-by-id/get-product-by-id.query';
 import { GetVariantBySkuQuery } from '../../application/queries/get-variant-by-sku/get-variant-by-sku.query';
 import { GetPosVariantBySkuQuery } from '../../application/queries/get-pos-variant-by-sku/get-pos-variant-by-sku.query';
+import { GetPosVariantsByBaseSkuQuery } from '../../application/queries/get-pos-variants-by-base-sku/get-pos-variants-by-base-sku.query';
 import { GetPosVariantsQuery } from '../../application/queries/get-pos-variants/get-pos-variants.query';
 import { UpdateProductDto } from '../../application/commands/update-product/update-product.dto';
 import { UpdateProductCommand } from '../../application/commands/update-product/update-product.command';
@@ -25,6 +26,7 @@ import { UpdateSimpleProductCommand } from '../../application/commands/update-si
 import { UpdateVariantDto } from '../../application/commands/update-variant/update-variant.dto';
 import { UpdateVariantCommand } from '../../application/commands/update-variant/update-variant.command';
 import { DeleteProductCommand } from '../../application/commands/delete-product/delete-product.command';
+import { DeleteVariantCommand } from '../../application/commands/delete-variant/delete-variant.command';
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
 import { AdjustStockDto } from '../../application/commands/adjust-stock/adjust-stock.dto';
 import { AdjustStockCommand } from '../../application/commands/adjust-stock/adjust-stock.command';
@@ -84,9 +86,11 @@ export class ProductsController {
         dto.variants,
         dto.imageIds,
         dto.categoryId,
+        dto.baseSku,
       ),
     );
   }
+
 
 
 
@@ -150,13 +154,14 @@ export class ProductsController {
     @Query('page') page?: number,
     @Query('limit') limit?: number,
     @Query('search') search?: string,
+    @Query('type') type?: string,
   ) {
     const p = page ? Number(page) : undefined;
     const l = limit ? Number(limit) : undefined;
 
     if (search && search.trim() !== '') {
       const codeResult = await this.queryBus.execute(
-        new GetProductsBySkuAndBarcodeQuery(tenantId, search, p, l),
+        new GetProductsBySkuAndBarcodeQuery(tenantId, search, p, l, type),
       );
 
       if (codeResult && codeResult.meta && codeResult.meta.total > 0) {
@@ -164,12 +169,12 @@ export class ProductsController {
       }
 
       return this.queryBus.execute(
-        new GetProductsByNameQuery(tenantId, search, p, l),
+        new GetProductsByNameQuery(tenantId, search, p, l, type),
       );
     }
 
     return this.queryBus.execute(
-      new GetProductsQuery(tenantId, p, l),
+      new GetProductsQuery(tenantId, p, l, undefined, type),
     );
   }
 
@@ -258,7 +263,18 @@ export class ProductsController {
     @Param('sku') sku: string,
     @Query('branchId') branchId: string,
   ) {
-    return this.queryBus.execute(new GetPosVariantBySkuQuery(tenantId, sku, branchId));
+    const directVariants = await this.queryBus.execute(new GetPosVariantBySkuQuery(tenantId, sku, branchId));
+    if (directVariants && directVariants.length > 0) {
+      return directVariants;
+    }
+
+    // Fallback: If not found by variant SKU/Barcode, search by baseSku in VARIABLE products
+    const variableProduct = await this.queryBus.execute(new GetPosVariantsByBaseSkuQuery(tenantId, sku, branchId));
+    if (variableProduct) {
+      return variableProduct;
+    }
+
+    return [];
   }
 
   @Get('pos/variants')
@@ -311,9 +327,10 @@ export class ProductsController {
     @Body() dto: UpdateProductDto,
   ) {
     return this.commandBus.execute(
-      new UpdateProductCommand(tenantId, id, dto.name, dto.description, dto.imageIds, dto.categoryId),
+      new UpdateProductCommand(tenantId, id, dto.name, dto.description, dto.imageIds, dto.categoryId, dto.baseSku),
     );
   }
+
 
   @Put('variants/:variantId')
   @RequirePermissions(APP_PERMISSIONS.PRODUCTS_EDIT)
@@ -344,6 +361,16 @@ export class ProductsController {
   ) {
     await this.commandBus.execute(new DeleteProductCommand(tenantId, id));
     return { success: true, message: 'Producto eliminado correctamente' };
+  }
+
+  @Delete('variants/:variantId')
+  @RequirePermissions(APP_PERMISSIONS.PRODUCTS_DELETE)
+  async removeVariant(
+    @CurrentUser('tenantId') tenantId: string,
+    @Param('variantId') variantId: string,
+  ) {
+    await this.commandBus.execute(new DeleteVariantCommand(tenantId, variantId));
+    return { success: true, message: 'Variante eliminada correctamente' };
   }
 
   @Put('variants/:variantId/tags')
