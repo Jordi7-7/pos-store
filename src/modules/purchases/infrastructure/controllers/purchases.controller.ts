@@ -93,8 +93,25 @@ export class PurchasesController {
     @CurrentUser('sub') userId: string,
     @CurrentUser('role') userRole: string,
     @Query('branchId') branchId?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('supplierId') supplierId?: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
   ) {
-    return this.queryBus.execute(new GetPurchasesQuery(tenantId, branchId || undefined, userId, userRole));
+    return this.queryBus.execute(
+      new GetPurchasesQuery(
+        tenantId,
+        branchId || undefined,
+        userId,
+        userRole,
+        startDate,
+        endDate,
+        supplierId || undefined,
+        page ? Number(page) : 1,
+        limit ? Number(limit) : 10,
+      ),
+    );
   }
 
   @Get('by-variant/:variantId')

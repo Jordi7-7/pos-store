@@ -5,6 +5,7 @@ import { PurchaseOrder } from '../../../domain/entities/purchase-order.entity';
 import { Batch } from '../../../../batches/domain/entities/batch.entity';
 import { RedisService } from '../../../../../common/redis/redis.service';
 import { assertUserCanAccessBranch } from '../../../../../common/security/branch-access.helper';
+import { parseReportDates } from '../../../../reports/application/queries/parse-dates.helper';
 
 @QueryHandler(GetPurchasesQuery)
 export class GetPurchasesHandler implements IQueryHandler<GetPurchasesQuery> {
@@ -13,9 +14,8 @@ export class GetPurchasesHandler implements IQueryHandler<GetPurchasesQuery> {
     private readonly redisService: RedisService,
   ) {}
 
-  async execute(query: GetPurchasesQuery): Promise<any[]> {
-    const { tenantId, branchId, userId, userRole } = query;
-    const purchaseRepo = this.entityManager.getRepository(PurchaseOrder);
+  async execute(query: GetPurchasesQuery): Promise<any> {
+    const { tenantId, branchId, userId, userRole, startDateStr, endDateStr, supplierId, page, limit } = query;
     const batchHeaderRepo = this.entityManager.getRepository(Batch);
 
     await assertUserCanAccessBranch(this.entityManager, this.redisService, {
@@ -25,24 +25,40 @@ export class GetPurchasesHandler implements IQueryHandler<GetPurchasesQuery> {
       actionDescription: 'consultar las compras',
     });
 
-    const whereClause: any = { tenantId };
+    const qb = this.entityManager.getRepository(PurchaseOrder)
+      .createQueryBuilder('po')
+      .leftJoinAndSelect('po.supplier', 'supplier')
+      .leftJoinAndSelect('po.branch', 'branch')
+      .leftJoinAndSelect('po.items', 'items')
+      .leftJoinAndSelect('items.variant', 'variant')
+      .leftJoinAndSelect('variant.product', 'product')
+      .where('po.tenantId = :tenantId', { tenantId });
+
     if (branchId) {
-      whereClause.branchId = branchId;
+      qb.andWhere('po.branchId = :branchId', { branchId });
     }
 
-    const orders = await purchaseRepo.find({
-      where: whereClause,
-      relations: {
-        supplier: true,
-        branch: true,
-        items: {
-          variant: { product: true },
-        },
-      },
-      order: { createdAt: 'DESC' },
-    });
+    if (supplierId) {
+      qb.andWhere('po.supplierId = :supplierId', { supplierId });
+    }
 
-    const result = await Promise.all(
+    if (startDateStr || endDateStr) {
+      const { start, end } = await parseReportDates(
+        this.entityManager,
+        tenantId,
+        startDateStr,
+        endDateStr,
+      );
+      qb.andWhere('po.createdAt BETWEEN :start AND :end', { start, end });
+    }
+
+    qb.orderBy('po.createdAt', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    const [orders, total] = await qb.getManyAndCount();
+
+    const data = await Promise.all(
       orders.map(async (order) => {
         if (order.status !== 'COMPLETED') {
           return { ...order, isCancellable: false };
@@ -63,6 +79,14 @@ export class GetPurchasesHandler implements IQueryHandler<GetPurchasesQuery> {
       }),
     );
 
-    return result;
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   }
 }
