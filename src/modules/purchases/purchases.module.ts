@@ -9,6 +9,8 @@ import { ProductBatch } from '../products/domain/entities/product-batch.entity';
 import { InventoryMovement } from '../products/domain/entities/inventory-movement.entity';
 import { ProductVariant } from '../products/domain/entities/product-variant.entity';
 import { CreateSupplierHandler } from './application/commands/create-supplier/create-supplier.handler';
+import { UpdateSupplierHandler } from './application/commands/update-supplier/update-supplier.handler';
+import { DeleteSupplierHandler } from './application/commands/delete-supplier/delete-supplier.handler';
 import { RegisterPurchaseHandler } from './application/commands/register-purchase/register-purchase.handler';
 import { CancelPurchaseOrderHandler } from './application/commands/cancel-purchase-order/cancel-purchase-order.handler';
 import { ImportPurchasesHandler } from './application/commands/import-purchases/import-purchases.handler';
@@ -35,6 +37,8 @@ import { PurchasesController } from './infrastructure/controllers/purchases.cont
   controllers: [PurchasesController],
   providers: [
     CreateSupplierHandler,
+    UpdateSupplierHandler,
+    DeleteSupplierHandler,
     RegisterPurchaseHandler,
     CancelPurchaseOrderHandler,
     ImportPurchasesHandler,

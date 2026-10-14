@@ -31,6 +31,10 @@ export class ImportPurchasesDto {
   @IsNotEmpty()
   branchId: string;
 
+  @IsUUID()
+  @IsOptional()
+  supplierId?: string;
+
   @IsString()
   @IsOptional()
   invoiceNumber?: string;

@@ -51,13 +51,21 @@ export class ImportPurchasesHandler implements ICommandHandler<ImportPurchasesCo
         throw new NotFoundException(`La sucursal destino con ID ${branchId} no existe.`);
       }
 
-      // Find generic supplier
-      let supplier = await supplierRepo.findOne({ where: { identityNumber: 'GENERICO', tenantId } });
-      if (!supplier) {
-        supplier = await supplierRepo.findOne({ where: { tenantId } });
-      }
-      if (!supplier) {
-        throw new NotFoundException('No se encontró un proveedor configurado para este tenant.');
+      // Resolve supplier (by supplierId or default to GENERICO)
+      let supplier: Supplier | null = null;
+      if (command.supplierId) {
+        supplier = await supplierRepo.findOne({ where: { id: command.supplierId, tenantId } });
+        if (!supplier) {
+          throw new NotFoundException(`El proveedor seleccionado con ID ${command.supplierId} no existe.`);
+        }
+      } else {
+        supplier = await supplierRepo.findOne({ where: { identityNumber: 'GENERICO', tenantId } });
+        if (!supplier) {
+          supplier = await supplierRepo.findOne({ where: { tenantId } });
+        }
+        if (!supplier) {
+          throw new NotFoundException('No se encontró un proveedor configurado para este tenant.');
+        }
       }
 
       // Resolve all variants in batch to check existence

@@ -1,7 +1,10 @@
-import { Controller, Post, Body, Get, Patch, Param, Query } from '@nestjs/common';
+import { Controller, Post, Put, Delete, Body, Get, Patch, Param, Query } from '@nestjs/common';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
 import { CreateSupplierDto } from '../../application/commands/create-supplier/create-supplier.dto';
 import { CreateSupplierCommand } from '../../application/commands/create-supplier/create-supplier.command';
+import { UpdateSupplierDto } from '../../application/commands/update-supplier/update-supplier.dto';
+import { UpdateSupplierCommand } from '../../application/commands/update-supplier/update-supplier.command';
+import { DeleteSupplierCommand } from '../../application/commands/delete-supplier/delete-supplier.command';
 import { RegisterPurchaseDto } from '../../application/commands/register-purchase/register-purchase.dto';
 import { RegisterPurchaseCommand } from '../../application/commands/register-purchase/register-purchase.command';
 import { CancelPurchaseOrderCommand } from '../../application/commands/cancel-purchase-order/cancel-purchase-order.command';
@@ -45,6 +48,25 @@ export class PurchasesController {
   @RequirePermissions(APP_PERMISSIONS.VIEW_PURCHASES)
   async findSuppliers(@CurrentUser('tenantId') tenantId: string) {
     return this.queryBus.execute(new GetSuppliersQuery(tenantId));
+  }
+
+  @Put('suppliers/:id')
+  @RequirePermissions(APP_PERMISSIONS.PURCHASES_CREATE)
+  async updateSupplier(
+    @CurrentUser('tenantId') tenantId: string,
+    @Param('id') id: string,
+    @Body() dto: UpdateSupplierDto,
+  ) {
+    return this.commandBus.execute(new UpdateSupplierCommand(tenantId, id, dto));
+  }
+
+  @Delete('suppliers/:id')
+  @RequirePermissions(APP_PERMISSIONS.PURCHASES_CREATE)
+  async deleteSupplier(
+    @CurrentUser('tenantId') tenantId: string,
+    @Param('id') id: string,
+  ) {
+    return this.commandBus.execute(new DeleteSupplierCommand(tenantId, id));
   }
 
   @Post()
@@ -140,7 +162,7 @@ export class PurchasesController {
     @Body() dto: ImportPurchasesDto,
   ) {
     return this.commandBus.execute(
-      new ImportPurchasesCommand(tenantId, dto.branchId, dto.items, dto.invoiceNumber),
+      new ImportPurchasesCommand(tenantId, dto.branchId, dto.items, dto.invoiceNumber, dto.supplierId),
     );
   }
 }
