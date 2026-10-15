@@ -5,11 +5,24 @@ import { Sale } from '../../../../sales/domain/entities/sale.entity';
 import { parseReportDates } from '../parse-dates.helper';
 import { SaleStatus } from '../../../../../common/enums/sale-status.enum';
 
+import { RedisService } from '../../../../../common/redis/redis.service';
+import { assertUserCanAccessBranch } from '../../../../../common/security/branch-access.helper';
+
 @QueryHandler(GetSalesCostReportQuery)
 export class GetSalesCostReportHandler implements IQueryHandler<GetSalesCostReportQuery> {
-  constructor(private readonly entityManager: EntityManager) {}
+  constructor(
+    private readonly entityManager: EntityManager,
+    private readonly redisService: RedisService,
+  ) {}
 
   async execute(query: GetSalesCostReportQuery) {
+    await assertUserCanAccessBranch(this.entityManager, this.redisService, {
+      userId: query.userId,
+      userRole: query.userRole,
+      branchId: query.branchId,
+      actionDescription: 'consultar el reporte de costo de ventas',
+    });
+
     const { start, end } = await parseReportDates(
       this.entityManager,
       query.tenantId,
@@ -19,12 +32,18 @@ export class GetSalesCostReportHandler implements IQueryHandler<GetSalesCostRepo
 
     const saleRepository = this.entityManager.getRepository(Sale);
 
+    const whereClause: any = {
+      tenantId: query.tenantId,
+      createdAt: Between(start, end),
+      status: In([SaleStatus.COMPLETED, SaleStatus.PARTIALLY_REFUNDED]),
+    };
+
+    if (query.branchId) {
+      whereClause.branchId = query.branchId;
+    }
+
     const sales = await saleRepository.find({
-      where: {
-        tenantId: query.tenantId,
-        createdAt: Between(start, end),
-        status: In([SaleStatus.COMPLETED, SaleStatus.PARTIALLY_REFUNDED]),
-      },
+      where: whereClause,
       relations: {
         customer: true,
         items: {

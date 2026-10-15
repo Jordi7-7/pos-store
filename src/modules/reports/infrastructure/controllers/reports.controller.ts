@@ -16,10 +16,19 @@ export class ReportsController {
   @RequirePermissions(APP_PERMISSIONS.VIEW_REPORTS)
   async getSalesCost(
     @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser('sub') userId: string,
+    @CurrentUser('role') userRole: string,
     @Query() query: GetReportDto,
   ) {
     return this.queryBus.execute(
-      new GetSalesCostReportQuery(tenantId, query.startDate, query.endDate),
+      new GetSalesCostReportQuery(
+        tenantId,
+        query.startDate,
+        query.endDate,
+        query.branchId || undefined,
+        userId,
+        userRole,
+      ),
     );
   }
 
@@ -27,14 +36,20 @@ export class ReportsController {
   @RequirePermissions(APP_PERMISSIONS.VIEW_REPORTS)
   async getValuedInventory(
     @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser('sub') userId: string,
+    @CurrentUser('role') userRole: string,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
+    @Query('branchId') branchId?: string,
   ) {
     return this.queryBus.execute(
       new GetValuedInventoryQuery(
         tenantId,
         page ? Number(page) : undefined,
         limit ? Number(limit) : undefined,
+        branchId || undefined,
+        userId,
+        userRole,
       ),
     );
   }
@@ -43,10 +58,19 @@ export class ReportsController {
   @RequirePermissions(APP_PERMISSIONS.VIEW_REPORTS)
   async getProductSales(
     @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser('sub') userId: string,
+    @CurrentUser('role') userRole: string,
     @Query() query: GetReportDto,
   ) {
     return this.queryBus.execute(
-      new GetProductSalesReportQuery(tenantId, query.startDate, query.endDate),
+      new GetProductSalesReportQuery(
+        tenantId,
+        query.startDate,
+        query.endDate,
+        query.branchId || undefined,
+        userId,
+        userRole,
+      ),
     );
   }
 }

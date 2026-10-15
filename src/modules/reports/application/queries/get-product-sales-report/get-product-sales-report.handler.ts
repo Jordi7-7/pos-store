@@ -4,6 +4,9 @@ import { GetProductSalesReportQuery } from './get-product-sales-report.query';
 import { parseReportDates } from '../parse-dates.helper';
 import { SaleStatus } from '../../../../../common/enums/sale-status.enum';
 
+import { RedisService } from '../../../../../common/redis/redis.service';
+import { assertUserCanAccessBranch } from '../../../../../common/security/branch-access.helper';
+
 export interface ProductSaleRow {
   variantId: string;
   sku: string;
@@ -18,15 +21,42 @@ export interface ProductSaleRow {
 
 @QueryHandler(GetProductSalesReportQuery)
 export class GetProductSalesReportHandler implements IQueryHandler<GetProductSalesReportQuery> {
-  constructor(private readonly entityManager: EntityManager) {}
+  constructor(
+    private readonly entityManager: EntityManager,
+    private readonly redisService: RedisService,
+  ) {}
 
   async execute(query: GetProductSalesReportQuery): Promise<ProductSaleRow[]> {
+    await assertUserCanAccessBranch(this.entityManager, this.redisService, {
+      userId: query.userId,
+      userRole: query.userRole,
+      branchId: query.branchId,
+      actionDescription: 'consultar el reporte de ventas por producto',
+    });
+
     const { start, end } = await parseReportDates(
       this.entityManager,
       query.tenantId,
       query.startDateStr,
       query.endDateStr,
     );
+
+    const queryParams: any[] = [
+      query.tenantId,
+      start,
+      end,
+      SaleStatus.COMPLETED,
+      SaleStatus.PARTIALLY_REFUNDED,
+    ];
+
+    let branchSalesFilter = '';
+    let branchStockFilter = '';
+    if (query.branchId) {
+      queryParams.push(query.branchId);
+      const branchParamIndex = `$${queryParams.length}`;
+      branchSalesFilter = `AND s.branch_id = ${branchParamIndex}`;
+      branchStockFilter = `WHERE branch_id = ${branchParamIndex}`;
+    }
 
     // Consulta SQL:
     // Agrupa por variante, precio efectivo vendido y fecha/hora exacta de la venta (o ticket)
@@ -58,6 +88,7 @@ export class GetProductSalesReportHandler implements IQueryHandler<GetProductSal
         WHERE s.tenant_id = $1
           AND s.created_at BETWEEN $2 AND $3
           AND s.status IN ($4, $5)
+          ${branchSalesFilter}
       ),
       sales_aggregated AS (
         SELECT 
@@ -76,6 +107,7 @@ export class GetProductSalesReportHandler implements IQueryHandler<GetProductSal
           variant_id, 
           COALESCE(SUM(quantity), 0) AS total_stock
         FROM product_stocks
+        ${branchStockFilter}
         GROUP BY variant_id
       ),
       variant_attributes AS (
@@ -107,7 +139,7 @@ export class GetProductSalesReportHandler implements IQueryHandler<GetProductSal
       LEFT JOIN variant_attributes va ON va.variant_id = sa.variant_id
       ORDER BY pv.sku ASC, sa.sale_date DESC, sa.unit_sold_price DESC;
       `,
-      [query.tenantId, start, end, SaleStatus.COMPLETED, SaleStatus.PARTIALLY_REFUNDED],
+      queryParams,
     );
 
     return rawData.map((row: any) => ({

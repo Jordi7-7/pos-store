@@ -4,15 +4,28 @@ import { GetValuedInventoryQuery } from './get-valued-inventory.query';
 import { ProductVariant } from '../../../../products/domain/entities/product-variant.entity';
 import { PurchaseOrderItem } from '../../../../purchases/domain/entities/purchase-order-item.entity';
 
+import { RedisService } from '../../../../../common/redis/redis.service';
+import { assertUserCanAccessBranch } from '../../../../../common/security/branch-access.helper';
+
 @QueryHandler(GetValuedInventoryQuery)
 export class GetValuedInventoryHandler implements IQueryHandler<GetValuedInventoryQuery> {
-  constructor(private readonly entityManager: EntityManager) {}
+  constructor(
+    private readonly entityManager: EntityManager,
+    private readonly redisService: RedisService,
+  ) {}
 
   async execute(query: GetValuedInventoryQuery) {
-    const { tenantId, page, limit } = query;
+    const { tenantId, page, limit, branchId, userId, userRole } = query;
+
+    await assertUserCanAccessBranch(this.entityManager, this.redisService, {
+      userId,
+      userRole,
+      branchId,
+      actionDescription: 'consultar el reporte de existencias valuadas',
+    });
 
     // 1. Fetch latest purchase order item price for each variant of this tenant
-    const latestPurchases = await this.entityManager
+    const poQuery = this.entityManager
       .createQueryBuilder(PurchaseOrderItem, 'poi')
       .innerJoin('poi.purchaseOrder', 'po')
       .select('poi.variantId', 'variantId')
@@ -20,24 +33,42 @@ export class GetValuedInventoryHandler implements IQueryHandler<GetValuedInvento
       .distinctOn(['poi.variantId'])
       .where('po.tenantId = :tenantId', { tenantId })
       .orderBy('poi.variantId')
-      .addOrderBy('po.createdAt', 'DESC')
-      .getRawMany();
+      .addOrderBy('po.createdAt', 'DESC');
+
+    if (branchId) {
+      poQuery.andWhere('po.branchId = :branchId', { branchId });
+    }
+
+    const latestPurchases = await poQuery.getRawMany();
 
     const priceMap = new Map<string, number>();
     for (const row of latestPurchases) {
       priceMap.set(row.variantId, Number(row.purchasePrice || 0));
     }
 
+    // Subquery condition for stock !== 0
+    const stockCondition = branchId
+      ? `COALESCE((SELECT SUM(quantity) FROM product_stocks WHERE variant_id = variant.id AND branch_id = :branchId), 0) <> 0`
+      : `COALESCE((SELECT SUM(quantity) FROM product_stocks WHERE variant_id = variant.id), 0) <> 0`;
+
+    const stockParams: Record<string, any> = { tenantId };
+    if (branchId) {
+      stockParams.branchId = branchId;
+    }
+
     // 2. Build QueryBuilder on ProductVariant to filter stock !== 0 and apply pagination
     const variantRepository = this.entityManager.getRepository(ProductVariant);
     const queryBuilder = variantRepository.createQueryBuilder('variant')
       .innerJoinAndSelect('variant.product', 'product')
-      .leftJoinAndSelect('variant.stocks', 'stocks')
+      .leftJoinAndSelect(
+        'variant.stocks',
+        'stocks',
+        branchId ? 'stocks.branchId = :branchId' : undefined,
+        branchId ? { branchId } : undefined,
+      )
       .leftJoinAndSelect('variant.attributeValues', 'attributeValues')
       .where('variant.tenantId = :tenantId', { tenantId })
-      .andWhere(
-        `COALESCE((SELECT SUM(quantity) FROM product_stocks WHERE variant_id = variant.id), 0) <> 0`
-      )
+      .andWhere(stockCondition, stockParams)
       .orderBy('variant.sku', 'ASC');
 
     if (page && limit) {
@@ -48,11 +79,14 @@ export class GetValuedInventoryHandler implements IQueryHandler<GetValuedInvento
 
     // 3. Compute global totalQuantity and totalValue across all non-zero stock variants
     const allVariants = await variantRepository.createQueryBuilder('variant')
-      .leftJoinAndSelect('variant.stocks', 'stocks')
-      .where('variant.tenantId = :tenantId', { tenantId })
-      .andWhere(
-        `COALESCE((SELECT SUM(quantity) FROM product_stocks WHERE variant_id = variant.id), 0) <> 0`
+      .leftJoinAndSelect(
+        'variant.stocks',
+        'stocks',
+        branchId ? 'stocks.branchId = :branchId' : undefined,
+        branchId ? { branchId } : undefined,
       )
+      .where('variant.tenantId = :tenantId', { tenantId })
+      .andWhere(stockCondition, stockParams)
       .getMany();
 
     let globalTotalQuantity = 0;

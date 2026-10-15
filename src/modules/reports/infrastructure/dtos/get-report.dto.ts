@@ -8,4 +8,8 @@ export class GetReportDto {
   @IsOptional()
   @IsISO8601()
   endDate?: string;
+
+  @IsOptional()
+  @IsString()
+  branchId?: string;
 }
