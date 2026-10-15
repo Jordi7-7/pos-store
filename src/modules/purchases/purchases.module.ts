@@ -17,7 +17,6 @@ import { ImportPurchasesHandler } from './application/commands/import-purchases/
 import { ValidateImportPurchasesHandler } from './application/queries/validate-import-purchases/validate-import-purchases.handler';
 import { GetPurchasesHandler } from './application/queries/get-purchases/get-purchases.handler';
 import { GetSuppliersHandler } from './application/queries/get-suppliers/get-suppliers.handler';
-import { GetPurchasesByProductHandler } from './application/queries/get-purchases-by-product/get-purchases-by-product.handler';
 import { GetPurchasesByVariantHandler } from './application/queries/get-purchases-by-variant/get-purchases-by-variant.handler';
 import { PurchasesController } from './infrastructure/controllers/purchases.controller';
 
@@ -45,7 +44,6 @@ import { PurchasesController } from './infrastructure/controllers/purchases.cont
     ValidateImportPurchasesHandler,
     GetPurchasesHandler,
     GetSuppliersHandler,
-    GetPurchasesByProductHandler,
     GetPurchasesByVariantHandler,
   ],
   exports: [TypeOrmModule],

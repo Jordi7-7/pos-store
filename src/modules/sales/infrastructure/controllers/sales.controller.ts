@@ -15,7 +15,6 @@ import { GetSalesQuery } from '../../application/queries/get-sales/get-sales.que
 import { GetCashSessionsQuery } from '../../application/queries/get-cash-sessions/get-cash-sessions.query';
 import { GetCashSessionDetailsQuery } from '../../application/queries/get-cash-session-details/get-cash-session-details.query';
 import { GetSaleByInvoiceQuery } from '../../application/queries/get-sale-by-invoice/get-sale-by-invoice.query';
-import { GetSalesByProductQuery } from '../../application/queries/get-sales-by-product/get-sales-by-product.query';
 import { GetSalesByVariantQuery } from '../../application/queries/get-sales-by-variant/get-sales-by-variant.query';
 import { GetSalesPaginatedQuery } from '../../application/queries/get-sales-paginated/get-sales-paginated.query';
 import { GetActiveCashSessionQuery } from '../../application/queries/get-active-cash-session/get-active-cash-session.query';
@@ -119,22 +118,6 @@ export class SalesController {
       branchId || undefined,
       userId,
       userRole,
-    ));
-  }
-
-  @Get('by-product/:productId')
-  @RequireAnyPermissions(APP_PERMISSIONS.VIEW_PRODUCTS, APP_PERMISSIONS.VIEW_SALES)
-  async findSalesByProduct(
-    @CurrentUser('tenantId') tenantId: string,
-    @Param('productId') productId: string,
-    @Query('page') page?: number,
-    @Query('limit') limit?: number,
-  ) {
-    return this.queryBus.execute(new GetSalesByProductQuery(
-      tenantId,
-      productId,
-      page ? Number(page) : 1,
-      limit ? Number(limit) : 10,
     ));
   }
 

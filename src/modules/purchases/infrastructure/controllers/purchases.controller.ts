@@ -14,7 +14,6 @@ import { ValidateImportPurchasesDto, ImportPurchasesDto } from '../../applicatio
 import { ImportPurchasesCommand } from '../../application/commands/import-purchases/import-purchases.command';
 import { ValidateImportPurchasesQuery } from '../../application/queries/validate-import-purchases/validate-import-purchases.query';
 import { GetPurchasesQuery } from '../../application/queries/get-purchases/get-purchases.query';
-import { GetPurchasesByProductQuery } from '../../application/queries/get-purchases-by-product/get-purchases-by-product.query';
 import { GetPurchasesByVariantQuery } from '../../application/queries/get-purchases-by-variant/get-purchases-by-variant.query';
 import { RequirePermissions, RequireAnyPermissions } from '../../../auth/decorators/permissions.decorator';
 import { APP_PERMISSIONS } from '../../../../common/enums/permissions.enum';
@@ -133,22 +132,6 @@ export class PurchasesController {
       branchId || undefined,
       userId,
       userRole,
-    ));
-  }
-
-  @Get('by-product/:productId')
-  @RequireAnyPermissions(APP_PERMISSIONS.VIEW_PRODUCTS, APP_PERMISSIONS.VIEW_PURCHASES)
-  async getPurchasesByProduct(
-    @CurrentUser('tenantId') tenantId: string,
-    @Param('productId') productId: string,
-    @Query('page') page?: number,
-    @Query('limit') limit?: number,
-  ) {
-    return this.queryBus.execute(new GetPurchasesByProductQuery(
-      tenantId,
-      productId,
-      page ? Number(page) : 1,
-      limit ? Number(limit) : 10,
     ));
   }
 

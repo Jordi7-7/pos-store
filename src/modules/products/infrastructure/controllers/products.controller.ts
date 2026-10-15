@@ -34,7 +34,6 @@ import { ValidateImportProductsDto, ImportProductsDto } from '../../application/
 import { ImportProductsCommand } from '../../application/commands/import-products/import-products.command';
 import { ValidateImportProductsQuery } from '../../application/queries/validate-import-products/validate-import-products.query';
 import { GetAttributesQuery } from '../../application/queries/get-attributes/get-attributes.query';
-import { GetInventoryMovementsQuery } from '../../application/queries/get-inventory-movements/get-inventory-movements.query';
 import { GetInventoryMovementsByVariantQuery } from '../../application/queries/get-inventory-movements-by-variant/get-inventory-movements-by-variant.query';
 import { GetTagsQuery } from '../../application/queries/get-tags/get-tags.query';
 import { CreateTagCommand } from '../../application/commands/create-tag/create-tag.command';
@@ -176,21 +175,6 @@ export class ProductsController {
     return this.queryBus.execute(
       new GetProductsQuery(tenantId, p, l, undefined, type),
     );
-  }
-
-  @Get('inventory-movements')
-  async getMovements(
-    @CurrentUser('tenantId') tenantId: string,
-    @Query('branchId') branchId: string,
-    @Query('page') page?: number,
-    @Query('limit') limit?: number,
-  ) {
-    return this.queryBus.execute(new GetInventoryMovementsQuery(
-      tenantId,
-      branchId,
-      page ? Number(page) : 1,
-      limit ? Number(limit) : 10,
-    ));
   }
 
   @Get('inventory-movements-by-variant')
