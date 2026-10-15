@@ -11,7 +11,6 @@ import { RegisterExpenseDto } from '../../application/commands/register-expense/
 import { RegisterExpenseCommand } from '../../application/commands/register-expense/register-expense.command';
 import { ProcessRefundDto } from '../../application/commands/process-refund/process-refund.dto';
 import { ProcessRefundCommand } from '../../application/commands/process-refund/process-refund.command';
-import { GetSalesQuery } from '../../application/queries/get-sales/get-sales.query';
 import { GetCashSessionsQuery } from '../../application/queries/get-cash-sessions/get-cash-sessions.query';
 import { GetCashSessionDetailsQuery } from '../../application/queries/get-cash-session-details/get-cash-session-details.query';
 import { GetSaleByInvoiceQuery } from '../../application/queries/get-sale-by-invoice/get-sale-by-invoice.query';
@@ -67,12 +66,6 @@ export class SalesController {
         dto.discountAmount,
       ),
     );
-  }
-
-  @Get()
-  @RequirePermissions(APP_PERMISSIONS.VIEW_SALES)
-  async findSales(@CurrentUser('tenantId') tenantId: string) {
-    return this.queryBus.execute(new GetSalesQuery(tenantId));
   }
 
   @Get('paginated')

@@ -14,7 +14,6 @@ import { OpenCashSessionHandler } from './application/commands/open-cash-session
 import { CloseCashSessionHandler } from './application/commands/close-cash-session/close-cash-session.handler';
 import { RegisterExpenseHandler } from './application/commands/register-expense/register-expense.handler';
 import { ProcessRefundHandler } from './application/commands/process-refund/process-refund.handler';
-import { GetSalesHandler } from './application/queries/get-sales/get-sales.handler';
 import { GetCashSessionsHandler } from './application/queries/get-cash-sessions/get-cash-sessions.handler';
 import { GetCashSessionDetailsHandler } from './application/queries/get-cash-session-details/get-cash-session-details.handler';
 import { GetSaleByInvoiceHandler } from './application/queries/get-sale-by-invoice/get-sale-by-invoice.handler';
@@ -50,7 +49,6 @@ import { CashRegistersController } from './infrastructure/controllers/cash-regis
     CloseCashSessionHandler,
     RegisterExpenseHandler,
     ProcessRefundHandler,
-    GetSalesHandler,
     GetCashSessionsHandler,
     GetCashSessionDetailsHandler,
     GetSaleByInvoiceHandler,
