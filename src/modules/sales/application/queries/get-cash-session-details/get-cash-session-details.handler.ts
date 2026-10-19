@@ -267,6 +267,7 @@ export class GetCashSessionDetailsHandler implements IQueryHandler<GetCashSessio
         durationFormatted,
         openedBy: session.user?.name || 'No especificado',
         branchName: session.branch?.name || '',
+        branchAddress: session.branch?.address || '',
         cashRegister: session.cashRegister ? {
           id: session.cashRegister.id,
           name: session.cashRegister.name,
