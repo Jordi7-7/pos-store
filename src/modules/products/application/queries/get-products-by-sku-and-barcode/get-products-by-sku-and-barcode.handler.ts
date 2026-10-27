@@ -10,7 +10,7 @@ export class GetProductsBySkuAndBarcodeHandler implements IQueryHandler<GetProdu
   constructor(private readonly entityManager: EntityManager) {}
 
   async execute(query: GetProductsBySkuAndBarcodeQuery): Promise<PaginatedProductsResponseDto> {
-    const { tenantId, code, page = 1, limit = 10, productType } = query;
+    const { tenantId, code, page = 1, limit = 10, productType, branchId } = query;
     const repo = this.entityManager.getRepository(Product);
     const searchCode = `%${code.trim()}%`;
     const take = limit;
@@ -20,9 +20,15 @@ export class GetProductsBySkuAndBarcodeHandler implements IQueryHandler<GetProdu
       .leftJoinAndSelect('product.category', 'category')
       .leftJoinAndSelect('product.images', 'productImages')
       .leftJoinAndSelect('product.variants', 'variants')
-      .leftJoinAndSelect('variants.images', 'variantImages')
-      .leftJoinAndSelect('variants.stocks', 'stocks')
-      .leftJoinAndSelect('stocks.branch', 'branch')
+      .leftJoinAndSelect('variants.images', 'variantImages');
+
+    if (branchId) {
+      qb.leftJoinAndSelect('variants.stocks', 'stocks', 'stocks.branchId = :branchId', { branchId });
+    } else {
+      qb.leftJoinAndSelect('variants.stocks', 'stocks');
+    }
+
+    qb.leftJoinAndSelect('stocks.branch', 'branch')
       .leftJoinAndSelect('variants.attributeValues', 'attributeValues')
       .leftJoinAndSelect('attributeValues.attribute', 'attribute')
       .where('product.tenantId = :tenantId', { tenantId })

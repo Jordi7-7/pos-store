@@ -154,13 +154,15 @@ export class ProductsController {
     @Query('limit') limit?: number,
     @Query('search') search?: string,
     @Query('type') type?: string,
+    @Query('branchId') branchId?: string,
   ) {
     const p = page ? Number(page) : undefined;
     const l = limit ? Number(limit) : undefined;
+    const b = branchId || undefined;
 
     if (search && search.trim() !== '') {
       const codeResult = await this.queryBus.execute(
-        new GetProductsBySkuAndBarcodeQuery(tenantId, search, p, l, type),
+        new GetProductsBySkuAndBarcodeQuery(tenantId, search, p, l, type, b),
       );
 
       if (codeResult && codeResult.meta && codeResult.meta.total > 0) {
@@ -168,12 +170,12 @@ export class ProductsController {
       }
 
       return this.queryBus.execute(
-        new GetProductsByNameQuery(tenantId, search, p, l, type),
+        new GetProductsByNameQuery(tenantId, search, p, l, type, b),
       );
     }
 
     return this.queryBus.execute(
-      new GetProductsQuery(tenantId, p, l, undefined, type),
+      new GetProductsQuery(tenantId, p, l, undefined, type, b),
     );
   }
 

@@ -36,10 +36,10 @@ export class UpdateCustomerHandler implements ICommandHandler<UpdateCustomerComm
       customer.name = dto.name;
     }
     if (dto.email !== undefined) {
-      customer.email = dto.email;
+      customer.email = dto.email?.trim() ? dto.email.trim() : null;
     }
     if (dto.phone !== undefined) {
-      customer.phone = dto.phone;
+      customer.phone = dto.phone?.trim() ? dto.phone.trim() : null;
     }
 
     return this.customerRepository.save(customer);

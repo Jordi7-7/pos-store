@@ -5,6 +5,7 @@ export class GetProductsByNameQuery {
     public readonly page?: number,
     public readonly limit?: number,
     public readonly productType?: string,
+    public readonly branchId?: string,
   ) {}
 }
 

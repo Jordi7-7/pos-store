@@ -26,8 +26,8 @@ export class CreateCustomerHandler implements ICommandHandler<CreateCustomerComm
     customer.tenantId = tenantId;
     customer.identityNumber = dto.identityNumber;
     customer.name = dto.name;
-    customer.email = dto.email || '';
-    customer.phone = dto.phone || '';
+    customer.email = dto.email?.trim() ? dto.email.trim() : null;
+    customer.phone = dto.phone?.trim() ? dto.phone.trim() : null;
 
     return this.customerRepository.save(customer);
   }
