@@ -5,6 +5,7 @@ import { RegisterExpenseCommand } from './register-expense.command';
 import { Expense } from '../../../domain/entities/expense.entity';
 import { Branch } from '../../../../branches/domain/entities/branch.entity';
 import { CashSession } from '../../../domain/entities/cash-session.entity';
+import { CashSessionStatus } from '../../../domain/enums/cash-session-status.enum';
 
 @CommandHandler(RegisterExpenseCommand)
 export class RegisterExpenseHandler implements ICommandHandler<RegisterExpenseCommand> {
@@ -34,7 +35,7 @@ export class RegisterExpenseHandler implements ICommandHandler<RegisterExpenseCo
       const activeSession = await cashSessionRepo.findOne({
         where: {
           branchId,
-          status: 'OPEN',
+          status: CashSessionStatus.OPEN,
         },
       });
       if (!activeSession) {

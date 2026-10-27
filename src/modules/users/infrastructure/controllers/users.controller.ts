@@ -31,15 +31,13 @@ export class UsersController {
       new CreateUserCommand(
         tenantId,
         dto.name,
-        dto.email,
-        dto.password,
-        dto.role,
         dto.username,
+        dto.password,
+        dto.email,
         dto.pin,
         dto.roleId,
         dto.customPermissions,
         dto.branchIds,
-        dto.cashRegisterIds,
       ),
     );
   }
@@ -84,11 +82,33 @@ export class UsersController {
       .orderBy('user.createdAt', 'ASC')
       .getRawAndEntities();
 
-    return rawUsers.entities.map((user, idx) => ({
-      ...user,
-      roleName: user.roleEntity?.name || user.role,
-      hasPin: rawUsers.raw[idx]?.hasPin === true || rawUsers.raw[idx]?.hasPin === 'true',
-      branchIds: (user.branches || []).map((b: any) => b.id),
-    }));
+    return rawUsers.entities.map((user, idx) => {
+      const role = user.isOwner
+        ? { id: 'owner', name: 'Propietario' }
+        : user.roleEntity
+        ? { id: user.roleEntity.id, name: user.roleEntity.name }
+        : null;
+
+      const branches = (user.branches || []).map((b: any) => ({
+        id: b.id,
+        name: b.name,
+        address: b.address || null,
+      }));
+
+      return {
+        id: user.id,
+        name: user.name,
+        username: user.username || null,
+        email: user.email,
+        isOwner: user.isOwner,
+        isActive: user.isActive,
+        role,
+        hasPin: rawUsers.raw[idx]?.hasPin === true || rawUsers.raw[idx]?.hasPin === 'true',
+        branches,
+        customPermissions: user.customPermissions || null,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+      };
+    });
   }
 }

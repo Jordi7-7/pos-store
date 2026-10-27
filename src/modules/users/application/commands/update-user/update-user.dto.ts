@@ -1,5 +1,4 @@
-import { IsString, IsEmail, MinLength, IsEnum, IsOptional, IsBoolean } from 'class-validator';
-import { UserRole } from '../../../enums/user-role.enum';
+import { IsString, IsEmail, MinLength, IsOptional, IsBoolean, Matches } from 'class-validator';
 
 export class UpdateUserDto {
   @IsString()
@@ -8,9 +7,10 @@ export class UpdateUserDto {
 
   @IsString()
   @IsOptional()
+  @Matches(/^[a-zA-Z0-9._-]+$/, { message: 'El nombre de usuario solo puede contener letras, números, puntos, guiones y guiones bajos.' })
   username?: string;
 
-  @IsEmail()
+  @IsEmail({}, { message: 'El formato del correo electrónico no es válido.' })
   @IsOptional()
   email?: string;
 
@@ -18,10 +18,6 @@ export class UpdateUserDto {
   @MinLength(6)
   @IsOptional()
   password?: string;
-
-  @IsEnum(UserRole)
-  @IsOptional()
-  role?: UserRole;
 
   @IsString()
   @IsOptional()
@@ -40,7 +36,4 @@ export class UpdateUserDto {
 
   @IsOptional()
   branchIds?: string[];
-
-  @IsOptional()
-  cashRegisterIds?: string[];
 }

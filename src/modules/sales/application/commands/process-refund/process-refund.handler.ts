@@ -8,6 +8,7 @@ import { InventoryMovementType } from '../../../../../common/enums/inventory-mov
 import { RefundItem } from '../../../domain/entities/refund-item.entity';
 import { Sale } from '../../../domain/entities/sale.entity';
 import { CashSession } from '../../../domain/entities/cash-session.entity';
+import { CashSessionStatus } from '../../../domain/enums/cash-session-status.enum';
 import { Branch } from '../../../../branches/domain/entities/branch.entity';
 import { ProductStock } from '../../../../products/domain/entities/product-stock.entity';
 import { InventoryMovement } from '../../../../products/domain/entities/inventory-movement.entity';
@@ -50,7 +51,7 @@ export class ProcessRefundHandler implements ICommandHandler<ProcessRefundComman
       const cashSession = await cashSessionRepo.findOne({
         where: {
           id: cashSessionId,
-          status: 'OPEN',
+          status: CashSessionStatus.OPEN,
           branch: { id: branchId, tenantId },
         },
         relations: { branch: true },

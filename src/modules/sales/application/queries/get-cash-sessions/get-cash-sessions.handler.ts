@@ -16,12 +16,17 @@ export interface CashSessionListItemDto {
   branch: {
     id: string;
     name: string;
-  } | null;
+    address?: string;
+  };
   cashRegister: {
     id: string;
     name: string;
     code: number;
-  } | null;
+  };
+  user: {
+    id: string;
+    name: string;
+  };
   totalSales: number;
 }
 
@@ -63,13 +68,17 @@ export class GetCashSessionsHandler implements IQueryHandler<GetCashSessionsQuer
         cs.difference AS "difference",
         b.id AS "branchId",
         b.name AS "branchName",
+        b.address AS "branchAddress",
         cr.id AS "cashRegisterId",
         cr.name AS "cashRegisterName",
         cr.code AS "cashRegisterCode",
+        u.id AS "userId",
+        u.name AS "userName",
         GREATEST(COALESCE(sales_summary.gross_sales, 0) - COALESCE(refunds_summary.session_refunds, 0), 0) AS "totalSales"
       FROM cash_sessions cs
       INNER JOIN branches b ON b.id = cs.branch_id
       LEFT JOIN cash_registers cr ON cr.id = cs.cash_register_id
+      LEFT JOIN users u ON u.id = cs.user_id
       LEFT JOIN (
         SELECT 
           s.cash_session_id,
@@ -106,19 +115,20 @@ export class GetCashSessionsHandler implements IQueryHandler<GetCashSessionsQuer
       closingBalance: row.closingBalance !== null ? Number(row.closingBalance) : null,
       expectedBalance: row.expectedBalance !== null ? Number(row.expectedBalance) : null,
       difference: row.difference !== null ? Number(row.difference) : null,
-      branch: row.branchId
-        ? {
-            id: row.branchId,
-            name: row.branchName,
-          }
-        : null,
-      cashRegister: row.cashRegisterId
-        ? {
-            id: row.cashRegisterId,
-            name: row.cashRegisterName,
-            code: row.cashRegisterCode,
-          }
-        : null,
+      branch: {
+        id: row.branchId,
+        name: row.branchName,
+        address: row.branchAddress || '',
+      },
+      cashRegister: {
+        id: row.cashRegisterId,
+        name: row.cashRegisterName,
+        code: Number(row.cashRegisterCode),
+      },
+      user: {
+        id: row.userId,
+        name: row.userName,
+      },
       totalSales: Number(row.totalSales || 0),
     }));
   }

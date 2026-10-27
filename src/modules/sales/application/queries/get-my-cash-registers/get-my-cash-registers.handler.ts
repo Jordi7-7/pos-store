@@ -4,6 +4,7 @@ import { EntityManager } from 'typeorm';
 import { GetMyCashRegistersQuery } from './get-my-cash-registers.query';
 import { CashRegister } from '../../../domain/entities/cash-register.entity';
 import { CashSession } from '../../../domain/entities/cash-session.entity';
+import { CashSessionStatus } from '../../../domain/enums/cash-session-status.enum';
 import { User } from '../../../../users/domain/entities/user.entity';
 import { UserRole } from '../../../../users/enums/user-role.enum';
 
@@ -14,6 +15,8 @@ export interface MyCashRegisterDto {
   branchId: string;
   branchName: string;
   isOpen: boolean;
+  activeSessionId?: string | null;
+  openedAt?: Date | null;
 }
 
 @QueryHandler(GetMyCashRegistersQuery)
@@ -64,21 +67,32 @@ export class GetMyCashRegistersHandler implements IQueryHandler<GetMyCashRegiste
     const sessionRepo = this.entityManager.getRepository(CashSession);
     const openSessions = await sessionRepo.find({
       where: {
-        status: 'OPEN',
+        status: CashSessionStatus.OPEN,
         branch: { tenantId },
       },
-      select: { id: true, cashRegisterId: true },
+      select: {
+        id: true,
+        cashRegisterId: true,
+        openedAt: true,
+      },
     });
 
-    const openRegisterIds = new Set(openSessions.map((s) => s.cashRegisterId).filter(Boolean));
+    const sessionByRegisterId = new Map(
+      openSessions.map((s) => [s.cashRegisterId, s]),
+    );
 
-    return registers.map((reg) => ({
-      id: reg.id,
-      code: reg.code,
-      name: reg.name,
-      branchId: reg.branchId,
-      branchName: reg.branch?.name || '',
-      isOpen: openRegisterIds.has(reg.id),
-    }));
+    return registers.map((reg) => {
+      const activeSession = sessionByRegisterId.get(reg.id);
+      return {
+        id: reg.id,
+        code: reg.code,
+        name: reg.name,
+        branchId: reg.branchId,
+        branchName: reg.branch?.name || '',
+        isOpen: !!activeSession,
+        activeSessionId: activeSession?.id || null,
+        openedAt: activeSession?.openedAt || null,
+      };
+    });
   }
 }

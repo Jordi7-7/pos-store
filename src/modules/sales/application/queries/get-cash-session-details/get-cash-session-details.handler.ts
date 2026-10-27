@@ -240,14 +240,6 @@ export class GetCashSessionDetailsHandler implements IQueryHandler<GetCashSessio
 
     const netSales = Math.max(grossSales - totalRefunds, 0);
 
-    // Calcular duración de la sesión
-    const openedTime = new Date(session.openedAt).getTime();
-    const closedTime = session.closedAt ? new Date(session.closedAt).getTime() : Date.now();
-    const durationMs = Math.max(closedTime - openedTime, 0);
-    const hours = Math.floor(durationMs / (1000 * 60 * 60));
-    const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
-    const durationFormatted = `${hours}h ${minutes}m`;
-
     const openingBalance = Number(session.openingBalance || 0);
     const closingBalance = session.closingBalance !== null ? Number(session.closingBalance) : null;
     const expectedBalance = session.expectedBalance !== null 
@@ -264,15 +256,20 @@ export class GetCashSessionDetailsHandler implements IQueryHandler<GetCashSessio
         status: session.status,
         openedAt: session.openedAt,
         closedAt: session.closedAt,
-        durationFormatted,
-        openedBy: session.user?.name || 'No especificado',
-        branchName: session.branch?.name || '',
-        branchAddress: session.branch?.address || '',
-        cashRegister: session.cashRegister ? {
+        branch: {
+          id: session.branch.id,
+          name: session.branch.name,
+          address: session.branch.address || '',
+        },
+        cashRegister: {
           id: session.cashRegister.id,
           name: session.cashRegister.name,
           code: session.cashRegister.code,
-        } : null,
+        },
+        user: {
+          id: session.user.id,
+          name: session.user.name,
+        },
         openingBalance,
         closingBalance,
         expectedBalance,

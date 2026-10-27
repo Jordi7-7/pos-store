@@ -3,7 +3,6 @@ import { Logger, BadRequestException } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { CreateUserCommand } from './create-user.command';
 import { User } from '../../../domain/entities/user.entity';
-import { Branch } from '../../../../branches/domain/entities/branch.entity';
 import { HashService } from '../../../../auth/services/hash.service';
 
 @CommandHandler(CreateUserCommand)
@@ -16,35 +15,36 @@ export class CreateUserHandler implements ICommandHandler<CreateUserCommand> {
   ) {}
 
   async execute(command: CreateUserCommand): Promise<User> {
-    const { tenantId, name, email, password, role, username, pin, roleId, customPermissions, branchIds, cashRegisterIds } = command;
-    const cleanEmail = email.toLowerCase().trim();
-    const cleanUsername = username ? username.toLowerCase().trim() : undefined;
+    const { tenantId, name, username, password, email, pin, roleId, customPermissions, branchIds } = command;
+    const cleanUsername = username.toLowerCase().trim();
+    const cleanEmail = email && email.trim() ? email.toLowerCase().trim() : null;
 
-    this.logger.log(`Creating user: ${cleanEmail} for Tenant: ${tenantId}`);
+    this.logger.log(`Creating user: ${cleanUsername} for Tenant: ${tenantId}`);
 
     const userRepo = this.entityManager.getRepository(User);
 
-    const emailExists = await userRepo.findOne({
-      where: { tenantId, email: cleanEmail },
+    // 1. Username is mandatory and must be unique per tenant
+    const usernameExists = await userRepo.findOne({
+      where: { tenantId, username: cleanUsername },
     });
-    if (emailExists) {
-      this.logger.warn(`User creation failed: email ${cleanEmail} is already in use for tenant ${tenantId}`);
-      throw new BadRequestException(`El correo "${cleanEmail}" ya está registrado en esta tienda.`);
+    if (usernameExists) {
+      this.logger.warn(`User creation failed: username ${cleanUsername} is already in use for tenant ${tenantId}`);
+      throw new BadRequestException(`El nombre de usuario "${cleanUsername}" ya está registrado en esta tienda.`);
     }
 
-    if (cleanUsername) {
-      const usernameExists = await userRepo.findOne({
-        where: { tenantId, username: cleanUsername },
+    // 2. Email is optional; if provided, must be unique per tenant
+    if (cleanEmail) {
+      const emailExists = await userRepo.findOne({
+        where: { tenantId, email: cleanEmail },
       });
-      if (usernameExists) {
-        this.logger.warn(`User creation failed: username ${cleanUsername} is already in use for tenant ${tenantId}`);
-        throw new BadRequestException(`El nombre de usuario "${cleanUsername}" ya está registrado en esta tienda.`);
+      if (emailExists) {
+        this.logger.warn(`User creation failed: email ${cleanEmail} is already in use for tenant ${tenantId}`);
+        throw new BadRequestException(`El correo "${cleanEmail}" ya está registrado en esta tienda.`);
       }
     }
 
-    // Resolve Role entity: roleId is strictly required
+    // Resolve Role entity: roleId is strictly used
     let resolvedRoleId: string | null = null;
-    let resolvedRoleName: string = 'CASHIER';
 
     if (roleId) {
       const roleEntity = await this.entityManager.query(
@@ -55,24 +55,15 @@ export class CreateUserHandler implements ICommandHandler<CreateUserCommand> {
         throw new BadRequestException('El rol especificado no existe para esta tienda.');
       }
       resolvedRoleId = roleEntity[0].id;
-      const nameUpper = roleEntity[0].name.toUpperCase();
-      if (nameUpper.includes('ADMIN')) resolvedRoleName = 'ADMIN';
-      else if (nameUpper.includes('GERENTE') || nameUpper.includes('SUPERVISOR')) resolvedRoleName = 'MANAGER';
-      else if (nameUpper.includes('PROPIETARIO') || nameUpper.includes('OWNER')) resolvedRoleName = 'OWNER';
-      else resolvedRoleName = 'CASHIER';
-    } else if (role) {
-      // Backward compatibility fallback if role string was passed
-      const roleEntity = await this.entityManager.query(
-        `SELECT id, name FROM "roles" WHERE "tenant_id" = $1 AND ("name" ILIKE $2 OR "name" ILIKE $3) LIMIT 1`,
-        [tenantId, role, role === 'CASHIER' ? 'Cajero' : role === 'ADMIN' ? 'Administrador' : role === 'MANAGER' ? 'Gerente%' : 'Propietario'],
-      );
-      if (roleEntity.length === 0) {
-        throw new BadRequestException('No se encontró un rol predeterminado para asignar al usuario.');
-      }
-      resolvedRoleId = roleEntity[0].id;
-      resolvedRoleName = role;
     } else {
-      throw new BadRequestException('Debes seleccionar un rol para el usuario.');
+      // Default to first system role (e.g. Cajero) if none provided
+      const defaultRole = await this.entityManager.query(
+        `SELECT id, name FROM "roles" WHERE "tenant_id" = $1 AND "name" ILIKE '%Cajero%' LIMIT 1`,
+        [tenantId],
+      );
+      if (defaultRole.length > 0) {
+        resolvedRoleId = defaultRole[0].id;
+      }
     }
 
     const hashedPassword = await this.hashService.hash(password);
@@ -80,10 +71,10 @@ export class CreateUserHandler implements ICommandHandler<CreateUserCommand> {
     const user = new User();
     user.tenantId = tenantId;
     user.name = name.trim();
+    user.username = cleanUsername;
     user.email = cleanEmail;
-    user.username = cleanUsername || undefined;
     user.password = hashedPassword;
-    user.role = resolvedRoleName;
+    user.isOwner = false;
     user.roleId = resolvedRoleId;
     user.customPermissions = customPermissions || null;
     user.isActive = true;
@@ -94,33 +85,20 @@ export class CreateUserHandler implements ICommandHandler<CreateUserCommand> {
       user.pin = undefined;
     }
 
-    const savedUser = await userRepo.save(user);
+    // Save assigned branches (if none provided, user is inactive)
+    const finalBranchIds = branchIds || [];
 
-    // Save assigned branches (if empty/not specified, assign all active tenant branches)
-    let finalBranchIds = branchIds || [];
     if (finalBranchIds.length === 0) {
-      const allBranches = await this.entityManager.find(Branch, {
-        where: { tenantId, isActive: true },
-        select: { id: true },
-      });
-      finalBranchIds = allBranches.map((b) => b.id);
+      user.isActive = false;
     }
+
+    const savedUser = await userRepo.save(user);
 
     if (finalBranchIds.length > 0) {
       for (const bId of finalBranchIds) {
         await this.entityManager.query(
           `INSERT INTO "user_branches" ("user_id", "branch_id") VALUES ($1, $2) ON CONFLICT DO NOTHING`,
           [savedUser.id, bId],
-        );
-      }
-    }
-
-    // Save assigned cash registers if provided
-    if (cashRegisterIds && cashRegisterIds.length > 0) {
-      for (const crId of cashRegisterIds) {
-        await this.entityManager.query(
-          `INSERT INTO "user_cash_registers" ("user_id", "cash_register_id") VALUES ($1, $2) ON CONFLICT DO NOTHING`,
-          [savedUser.id, crId],
         );
       }
     }

@@ -3,9 +3,7 @@ import { EntityManager } from 'typeorm';
 import { GetCashRegistersQuery } from './get-cash-registers.query';
 import { CashRegister } from '../../../domain/entities/cash-register.entity';
 import { CashSession } from '../../../domain/entities/cash-session.entity';
-import { User } from '../../../../users/domain/entities/user.entity';
-import { UserRole } from '../../../../users/enums/user-role.enum';
-import { APP_PERMISSIONS } from '../../../../../common/enums/permissions.enum';
+import { CashSessionStatus } from '../../../domain/enums/cash-session-status.enum';
 
 export interface CashRegisterResponseDto {
   id: string;
@@ -51,7 +49,7 @@ export class GetCashRegistersHandler implements IQueryHandler<GetCashRegistersQu
     const sessionRepo = this.entityManager.getRepository(CashSession);
     const openSessions = await sessionRepo.find({
       where: {
-        status: 'OPEN',
+        status: CashSessionStatus.OPEN,
         branch: { tenantId },
       },
       relations: { user: true },

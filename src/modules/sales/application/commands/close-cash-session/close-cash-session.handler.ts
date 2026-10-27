@@ -3,6 +3,7 @@ import { Logger, NotFoundException } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { CloseCashSessionCommand } from './close-cash-session.command';
 import { CashSession } from '../../../domain/entities/cash-session.entity';
+import { CashSessionStatus } from '../../../domain/enums/cash-session-status.enum';
 import { SalePayment, PaymentMethod } from '../../../domain/entities/sale-payment.entity';
 import { Expense } from '../../../domain/entities/expense.entity';
 import { Refund } from '../../../domain/entities/refund.entity';
@@ -24,7 +25,7 @@ export class CloseCashSessionHandler implements ICommandHandler<CloseCashSession
       const session = await cashSessionRepo.findOne({
         where: {
           id,
-          status: 'OPEN',
+          status: CashSessionStatus.OPEN,
           branch: { tenantId },
         },
         relations: { branch: true },
@@ -72,7 +73,7 @@ export class CloseCashSessionHandler implements ICommandHandler<CloseCashSession
       session.closingBalance = closingBalance;
       session.expectedBalance = expectedBalance;
       session.difference = difference;
-      session.status = 'CLOSED';
+      session.status = CashSessionStatus.CLOSED;
       session.closedAt = new Date();
 
       const savedSession = await cashSessionRepo.save(session);

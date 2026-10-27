@@ -10,6 +10,7 @@ import { ProductVariant } from '../../../../products/domain/entities/product-var
 import { InventoryMovement } from '../../../../products/domain/entities/inventory-movement.entity';
 import { ProductBatch } from '../../../../products/domain/entities/product-batch.entity';
 import { CashSession } from '../../../domain/entities/cash-session.entity';
+import { CashSessionStatus } from '../../../domain/enums/cash-session-status.enum';
 import { CashRegister } from '../../../domain/entities/cash-register.entity';
 import { Customer } from '../../../../customers/domain/entities/customer.entity';
 import { InventoryMovementReason } from '../../../../../common/enums/inventory-movement-reason.enum';
@@ -54,7 +55,7 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
       const cashSession = await cashSessionRepo.findOne({
         where: {
           id: cashSessionId,
-          status: 'OPEN',
+          status: CashSessionStatus.OPEN,
           branch: { id: branchId, tenantId },
         },
         relations: { branch: true },
