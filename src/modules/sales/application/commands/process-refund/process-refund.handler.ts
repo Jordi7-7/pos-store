@@ -156,7 +156,7 @@ export class ProcessRefundHandler implements ICommandHandler<ProcessRefundComman
         batch.variantId = itemDto.variantId;
         batch.initialQuantity = itemDto.quantity;
         batch.remainingQuantity = remainingForFutureSales;
-        batch.unitCost = Number(saleItem.cost);
+        batch.unitCost = Number(saleItem.cost) || 0;
         await batchRepo.save(batch);
 
         // Build Kardex entry
