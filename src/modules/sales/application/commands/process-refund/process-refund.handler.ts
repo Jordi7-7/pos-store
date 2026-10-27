@@ -130,7 +130,11 @@ export class ProcessRefundHandler implements ICommandHandler<ProcessRefundComman
           stock.quantity = 0;
         }
 
-        stock.quantity = Number(stock.quantity) + itemDto.quantity;
+        const previousStock = Number(stock.quantity);
+        const negativeDebt = previousStock < 0 ? Math.abs(previousStock) : 0;
+        const remainingForFutureSales = Math.max(0, itemDto.quantity - negativeDebt);
+
+        stock.quantity = previousStock + itemDto.quantity;
         await stockRepo.save(stock);
 
         // Create Batch header for the returned merchandise
@@ -151,7 +155,7 @@ export class ProcessRefundHandler implements ICommandHandler<ProcessRefundComman
         batch.batchId = savedBatchHeader.id;
         batch.variantId = itemDto.variantId;
         batch.initialQuantity = itemDto.quantity;
-        batch.remainingQuantity = itemDto.quantity;
+        batch.remainingQuantity = remainingForFutureSales;
         batch.unitCost = Number(saleItem.cost);
         await batchRepo.save(batch);
 
