@@ -6,7 +6,6 @@ import { CashRegister } from '../../../domain/entities/cash-register.entity';
 import { CashSession } from '../../../domain/entities/cash-session.entity';
 import { CashSessionStatus } from '../../../domain/enums/cash-session-status.enum';
 import { User } from '../../../../users/domain/entities/user.entity';
-import { UserRole } from '../../../../users/enums/user-role.enum';
 
 export interface MyCashRegisterDto {
   id: string;
@@ -26,8 +25,8 @@ export class GetMyCashRegistersHandler implements IQueryHandler<GetMyCashRegiste
   constructor(private readonly entityManager: EntityManager) {}
 
   async execute(query: GetMyCashRegistersQuery): Promise<MyCashRegisterDto[]> {
-    const { tenantId, userId, userRole, branchId } = query;
-    this.logger.log(`Fetching cash registers for User: ${userId} (Role: ${userRole}), Branch: ${branchId || 'ALL'}, Tenant: ${tenantId}`);
+    const { tenantId, userId, isOwner, branchId } = query;
+    this.logger.log(`Fetching cash registers for User: ${userId} (isOwner: ${isOwner}), Branch: ${branchId || 'ALL'}, Tenant: ${tenantId}`);
 
     const registerRepo = this.entityManager.getRepository(CashRegister);
     const qb = registerRepo
@@ -40,8 +39,6 @@ export class GetMyCashRegistersHandler implements IQueryHandler<GetMyCashRegiste
     if (branchId && branchId !== 'null' && branchId !== 'undefined') {
       qb.andWhere('cr.branchId = :branchId', { branchId });
     }
-
-    const isOwner = userRole === UserRole.OWNER;
 
     // Si no es OWNER, filtrar estrictamente por las cajas asignadas al usuario
     if (!isOwner) {

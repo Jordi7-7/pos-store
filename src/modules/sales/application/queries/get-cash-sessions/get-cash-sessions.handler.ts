@@ -38,11 +38,11 @@ export class GetCashSessionsHandler implements IQueryHandler<GetCashSessionsQuer
   ) {}
 
   async execute(query: GetCashSessionsQuery): Promise<CashSessionListItemDto[]> {
-    const { tenantId, branchId, userId, userRole } = query;
+    const { tenantId, branchId, userId, isOwner } = query;
 
     await assertUserCanAccessBranch(this.entityManager, this.redisService, {
       userId,
-      userRole,
+      isOwner,
       branchId,
       actionDescription: 'consultar las sesiones de caja',
     });

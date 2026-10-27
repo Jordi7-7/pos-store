@@ -1,7 +1,6 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { RedisService } from '../redis/redis.service';
-import { UserRole } from '../../modules/users/enums/user-role.enum';
 
 const USER_BRANCHES_CACHE_TTL = 3600; // 1 hour
 
@@ -62,7 +61,7 @@ export async function getUserAssignedBranchIds(
 
 export interface AssertUserBranchOptions {
   userId?: string;
-  userRole?: string;
+  isOwner?: boolean;
   branchId?: string;
   actionDescription: string;
 }
@@ -77,9 +76,9 @@ export async function assertUserCanAccessBranch(
   redisService: RedisService,
   options: AssertUserBranchOptions,
 ): Promise<void> {
-  const { userId, userRole, branchId, actionDescription } = options;
+  const { userId, isOwner, branchId, actionDescription } = options;
 
-  if (userRole === UserRole.OWNER) {
+  if (isOwner) {
     return;
   }
 

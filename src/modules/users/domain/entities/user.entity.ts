@@ -16,17 +16,17 @@ export class User extends BaseEntity {
   @Column()
   name: string;
 
-  @Column({ type: 'varchar', nullable: true })
-  username?: string;
+  @Column({ type: 'varchar', nullable: false })
+  username: string;
 
-  @Column()
-  email: string;
+  @Column({ type: 'varchar', nullable: true })
+  email?: string | null;
 
   @Column({ select: false })
   password?: string;
 
-  @Column()
-  role: string;
+  @Column({ name: 'is_owner', type: 'boolean', default: false })
+  isOwner: boolean;
 
   @Column({ name: 'role_id', type: 'uuid', nullable: true })
   roleId?: string | null;

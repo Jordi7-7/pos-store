@@ -183,7 +183,7 @@ export class ProductsController {
   async getMovementsByVariant(
     @CurrentUser('tenantId') tenantId: string,
     @CurrentUser('sub') userId: string,
-    @CurrentUser('role') userRole: string,
+    @CurrentUser('isOwner') isOwner: boolean,
     @Query('variantId') variantId: string,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
@@ -196,7 +196,7 @@ export class ProductsController {
       limit ? Number(limit) : 10,
       branchId || undefined,
       userId,
-      userRole,
+      isOwner,
     ));
   }
 

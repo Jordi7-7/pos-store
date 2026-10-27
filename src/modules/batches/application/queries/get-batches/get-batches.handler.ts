@@ -14,12 +14,12 @@ export class GetBatchesHandler implements IQueryHandler<GetBatchesQuery> {
   ) {}
 
   async execute(query: GetBatchesQuery) {
-    const { tenantId, branchId, startDateStr, endDateStr, search, page, limit, userId, userRole } = query;
+    const { tenantId, branchId, startDateStr, endDateStr, search, page, limit, userId, isOwner } = query;
     const batchRepo = this.entityManager.getRepository(Batch);
 
     await assertUserCanAccessBranch(this.entityManager, this.redisService, {
       userId,
-      userRole,
+      isOwner,
       branchId,
       actionDescription: 'consultar los lotes de inventario',
     });

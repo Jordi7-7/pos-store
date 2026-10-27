@@ -36,12 +36,12 @@ export class SalesController {
   async getActiveSession(
     @CurrentUser('tenantId') tenantId: string,
     @CurrentUser('sub') userId: string,
-    @CurrentUser('role') userRole: string,
+    @CurrentUser('isOwner') isOwner: boolean,
     @Query('branchId') branchId?: string,
     @Query('cashRegisterId') cashRegisterId?: string,
   ) {
     return this.queryBus.execute(
-      new GetActiveCashSessionQuery(tenantId, userId, userRole, branchId, cashRegisterId),
+      new GetActiveCashSessionQuery(tenantId, userId, isOwner, branchId, cashRegisterId),
     );
   }
 
@@ -73,7 +73,7 @@ export class SalesController {
   async findSalesPaginated(
     @CurrentUser('tenantId') tenantId: string,
     @CurrentUser('sub') userId: string,
-    @CurrentUser('role') userRole: string,
+    @CurrentUser('isOwner') isOwner: boolean,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
     @Query('page') page?: number,
@@ -88,7 +88,7 @@ export class SalesController {
       limit ? Number(limit) : 10,
       branchId || undefined,
       userId,
-      userRole,
+      isOwner,
     ));
   }
 
@@ -97,7 +97,7 @@ export class SalesController {
   async findSalesByVariant(
     @CurrentUser('tenantId') tenantId: string,
     @CurrentUser('sub') userId: string,
-    @CurrentUser('role') userRole: string,
+    @CurrentUser('isOwner') isOwner: boolean,
     @Param('variantId') variantId: string,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
@@ -110,7 +110,7 @@ export class SalesController {
       limit ? Number(limit) : 10,
       branchId || undefined,
       userId,
-      userRole,
+      isOwner,
     ));
   }
 
@@ -222,10 +222,10 @@ export class SalesController {
   async getCashSessions(
     @CurrentUser('tenantId') tenantId: string,
     @CurrentUser('sub') userId: string,
-    @CurrentUser('role') userRole: string,
+    @CurrentUser('isOwner') isOwner: boolean,
     @Query('branchId') branchId?: string,
   ) {
-    return this.queryBus.execute(new GetCashSessionsQuery(tenantId, branchId, userId, userRole));
+    return this.queryBus.execute(new GetCashSessionsQuery(tenantId, branchId, userId, isOwner));
   }
 
   @Get('cash-sessions/:id/details')

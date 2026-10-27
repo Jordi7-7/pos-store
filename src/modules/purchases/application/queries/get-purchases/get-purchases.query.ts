@@ -3,7 +3,7 @@ export class GetPurchasesQuery {
     public readonly tenantId: string,
     public readonly branchId?: string,
     public readonly userId?: string,
-    public readonly userRole?: string,
+    public readonly isOwner?: boolean,
     public readonly startDateStr?: string,
     public readonly endDateStr?: string,
     public readonly supplierId?: string,

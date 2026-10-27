@@ -2,6 +2,7 @@ export interface JwtUserPayload {
   sub: string;
   tenantId: string;
   email: string;
+  isOwner: boolean;
   role: string;
   roleId: string | null;
   roleName: string;

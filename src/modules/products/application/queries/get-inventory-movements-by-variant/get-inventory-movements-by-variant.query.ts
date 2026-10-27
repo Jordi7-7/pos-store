@@ -6,6 +6,6 @@ export class GetInventoryMovementsByVariantQuery {
     public readonly limit = 10,
     public readonly branchId?: string,
     public readonly userId?: string,
-    public readonly userRole?: string,
+    public readonly isOwner?: boolean,
   ) {}
 }

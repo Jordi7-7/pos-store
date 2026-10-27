@@ -5,7 +5,6 @@ import { Logger } from '@nestjs/common';
 import { GetActiveCashSessionQuery } from './get-active-cash-session.query';
 import { CashSession } from '../../../domain/entities/cash-session.entity';
 import { User } from '../../../../users/domain/entities/user.entity';
-import { UserRole } from '../../../../users/enums/user-role.enum';
 
 export interface ActiveCashSessionResponseDto {
   id: string;
@@ -29,8 +28,7 @@ export class GetActiveCashSessionHandler implements IQueryHandler<GetActiveCashS
   ) {}
 
   async execute(query: GetActiveCashSessionQuery): Promise<ActiveCashSessionResponseDto | null> {
-    const { tenantId, userId, userRole, branchId, cashRegisterId } = query;
-    const isOwner = userRole === UserRole.OWNER;
+    const { tenantId, userId, isOwner, branchId, cashRegisterId } = query;
 
     // Criterios base: sesión abierta dentro del tenant
     const where: any = {

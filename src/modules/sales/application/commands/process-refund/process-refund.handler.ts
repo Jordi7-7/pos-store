@@ -61,13 +61,13 @@ export class ProcessRefundHandler implements ICommandHandler<ProcessRefundComman
         throw new BadRequestException('Active cash session not found for this branch');
       }
 
-      // 4. Validate Sale exists, belongs to branch and tenant, and load its items
+      // 4. Validate Sale exists under tenant and load its items (allows cross-branch returns)
       const sale = await saleRepo.findOne({
-        where: { id: saleId, branchId, tenantId },
+        where: { id: saleId, tenantId },
         relations: { items: true },
       });
       if (!sale) {
-        this.logger.warn(`Refund failed: Sale ID ${saleId} not found in Branch ${branchId} for Tenant ${tenantId}`);
+        this.logger.warn(`Refund failed: Sale ID ${saleId} not found for Tenant ${tenantId}`);
         throw new NotFoundException(`Sale with ID ${saleId} not found`);
       }
 

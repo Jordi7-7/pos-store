@@ -90,7 +90,7 @@ export class PurchasesController {
   async getPurchases(
     @CurrentUser('tenantId') tenantId: string,
     @CurrentUser('sub') userId: string,
-    @CurrentUser('role') userRole: string,
+    @CurrentUser('isOwner') isOwner: boolean,
     @Query('branchId') branchId?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
@@ -103,7 +103,7 @@ export class PurchasesController {
         tenantId,
         branchId || undefined,
         userId,
-        userRole,
+        isOwner,
         startDate,
         endDate,
         supplierId || undefined,
@@ -118,7 +118,7 @@ export class PurchasesController {
   async getPurchasesByVariant(
     @CurrentUser('tenantId') tenantId: string,
     @CurrentUser('sub') userId: string,
-    @CurrentUser('role') userRole: string,
+    @CurrentUser('isOwner') isOwner: boolean,
     @Param('variantId') variantId: string,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
@@ -131,7 +131,7 @@ export class PurchasesController {
       limit ? Number(limit) : 10,
       branchId || undefined,
       userId,
-      userRole,
+      isOwner,
     ));
   }
 

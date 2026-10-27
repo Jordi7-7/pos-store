@@ -13,11 +13,11 @@ export class GetSalesByVariantHandler implements IQueryHandler<GetSalesByVariant
   ) {}
 
   async execute(query: GetSalesByVariantQuery) {
-    const { tenantId, variantId, page, limit, branchId, userId, userRole } = query;
+    const { tenantId, variantId, page, limit, branchId, userId, isOwner } = query;
 
     await assertUserCanAccessBranch(this.entityManager, this.redisService, {
       userId,
-      userRole,
+      isOwner,
       branchId,
       actionDescription: 'consultar las ventas de la variante',
     });

@@ -30,7 +30,7 @@ export class GetSalesPaginatedHandler implements IQueryHandler<GetSalesPaginated
     // Role-based branch enforcement with Redis Cache-Aside
     await assertUserCanAccessBranch(this.entityManager, this.redisService, {
       userId: query.userId,
-      userRole: query.userRole,
+      isOwner: query.isOwner,
       branchId: query.branchId,
       actionDescription: 'consultar las ventas',
     });

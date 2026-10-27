@@ -5,6 +5,6 @@ export class GetProductSalesReportQuery {
     public readonly endDateStr?: string,
     public readonly branchId?: string,
     public readonly userId?: string,
-    public readonly userRole?: string,
+    public readonly isOwner?: boolean,
   ) {}
 }

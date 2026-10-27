@@ -1,5 +1,4 @@
-import { IsString, IsNotEmpty, IsEmail, MinLength, IsEnum, IsOptional } from 'class-validator';
-import { UserRole } from '../../../enums/user-role.enum';
+import { IsString, IsNotEmpty, IsEmail, MinLength, IsOptional, Matches } from 'class-validator';
 
 export class CreateUserDto {
   @IsString()
@@ -7,19 +6,17 @@ export class CreateUserDto {
   name: string;
 
   @IsString()
-  @IsOptional()
-  username?: string;
+  @IsNotEmpty({ message: 'El nombre de usuario es obligatorio.' })
+  @Matches(/^[a-zA-Z0-9._-]+$/, { message: 'El nombre de usuario solo puede contener letras, números, puntos, guiones y guiones bajos.' })
+  username: string;
 
-  @IsEmail()
-  email: string;
+  @IsEmail({}, { message: 'El formato del correo electrónico no es válido.' })
+  @IsOptional()
+  email?: string;
 
   @IsString()
   @MinLength(6)
   password: string;
-
-  @IsEnum(UserRole)
-  @IsOptional()
-  role?: UserRole;
 
   @IsString()
   @IsOptional()
@@ -34,7 +31,4 @@ export class CreateUserDto {
 
   @IsOptional()
   branchIds?: string[];
-
-  @IsOptional()
-  cashRegisterIds?: string[];
 }

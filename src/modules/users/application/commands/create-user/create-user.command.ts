@@ -1,17 +1,14 @@
-import { UserRole } from '../../../enums/user-role.enum';
 
 export class CreateUserCommand {
   constructor(
     public readonly tenantId: string,
     public readonly name: string,
-    public readonly email: string,
+    public readonly username: string,
     public readonly password: string,
-    public readonly role?: UserRole,
-    public readonly username?: string,
+    public readonly email?: string,
     public readonly pin?: string,
     public readonly roleId?: string,
     public readonly customPermissions?: string[],
     public readonly branchIds?: string[],
-    public readonly cashRegisterIds?: string[],
   ) {}
 }

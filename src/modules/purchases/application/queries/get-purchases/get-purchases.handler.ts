@@ -15,12 +15,12 @@ export class GetPurchasesHandler implements IQueryHandler<GetPurchasesQuery> {
   ) {}
 
   async execute(query: GetPurchasesQuery): Promise<any> {
-    const { tenantId, branchId, userId, userRole, startDateStr, endDateStr, supplierId, page, limit } = query;
+    const { tenantId, branchId, userId, isOwner, startDateStr, endDateStr, supplierId, page, limit } = query;
     const batchHeaderRepo = this.entityManager.getRepository(Batch);
 
     await assertUserCanAccessBranch(this.entityManager, this.redisService, {
       userId,
-      userRole,
+      isOwner,
       branchId,
       actionDescription: 'consultar las compras',
     });

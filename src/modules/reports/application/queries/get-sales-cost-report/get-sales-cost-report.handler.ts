@@ -18,7 +18,7 @@ export class GetSalesCostReportHandler implements IQueryHandler<GetSalesCostRepo
   async execute(query: GetSalesCostReportQuery) {
     await assertUserCanAccessBranch(this.entityManager, this.redisService, {
       userId: query.userId,
-      userRole: query.userRole,
+      isOwner: query.isOwner,
       branchId: query.branchId,
       actionDescription: 'consultar el reporte de costo de ventas',
     });

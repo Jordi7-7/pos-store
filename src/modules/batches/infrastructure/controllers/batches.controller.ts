@@ -15,7 +15,7 @@ export class BatchesController {
   async getBatchesByVariant(
     @CurrentUser('tenantId') tenantId: string,
     @CurrentUser('sub') userId: string,
-    @CurrentUser('role') userRole: string,
+    @CurrentUser('isOwner') isOwner: boolean,
     @Param('variantId') variantId: string,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
@@ -29,7 +29,7 @@ export class BatchesController {
         limit ? Number(limit) : 10,
         branchId,
         userId,
-        userRole,
+        isOwner,
       ),
     );
   }
@@ -39,7 +39,7 @@ export class BatchesController {
   async getBatches(
     @CurrentUser('tenantId') tenantId: string,
     @CurrentUser('sub') userId: string,
-    @CurrentUser('role') userRole: string,
+    @CurrentUser('isOwner') isOwner: boolean,
     @Query('branchId') branchId?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
@@ -57,7 +57,7 @@ export class BatchesController {
         page ? Number(page) : 1,
         limit ? Number(limit) : 10,
         userId,
-        userRole,
+        isOwner,
       ),
     );
   }

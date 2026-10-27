@@ -189,6 +189,7 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
 
         const saleItem = new SaleItem();
         saleItem.variantId = itemDto.variantId;
+        saleItem.variant = variant;
         saleItem.quantity = itemDto.quantity;
         saleItem.price = itemDto.price;
         saleItem.cost = averageUnitCost;

@@ -5,6 +5,6 @@ export class GetValuedInventoryQuery {
     public readonly limit?: number,
     public readonly branchId?: string,
     public readonly userId?: string,
-    public readonly userRole?: string,
+    public readonly isOwner?: boolean,
   ) {}
 }

@@ -14,12 +14,12 @@ export class GetInventoryMovementsByVariantHandler
   ) {}
 
   async execute(query: GetInventoryMovementsByVariantQuery) {
-    const { tenantId, variantId, page, limit, branchId, userId, userRole } = query;
+    const { tenantId, variantId, page, limit, branchId, userId, isOwner } = query;
     const repo = this.entityManager.getRepository(InventoryMovement);
 
     await assertUserCanAccessBranch(this.entityManager, this.redisService, {
       userId,
-      userRole,
+      isOwner,
       branchId,
       actionDescription: 'consultar los movimientos de la variante',
     });

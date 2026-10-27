@@ -13,11 +13,11 @@ export class GetPurchasesByVariantHandler implements IQueryHandler<GetPurchasesB
   ) {}
 
   async execute(query: GetPurchasesByVariantQuery) {
-    const { tenantId, variantId, page, limit, branchId, userId, userRole } = query;
+    const { tenantId, variantId, page, limit, branchId, userId, isOwner } = query;
 
     await assertUserCanAccessBranch(this.entityManager, this.redisService, {
       userId,
-      userRole,
+      isOwner,
       branchId,
       actionDescription: 'consultar las compras de la variante',
     });

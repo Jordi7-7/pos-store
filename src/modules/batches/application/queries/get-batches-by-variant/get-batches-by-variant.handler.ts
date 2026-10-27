@@ -13,11 +13,11 @@ export class GetBatchesByVariantHandler implements IQueryHandler<GetBatchesByVar
   ) {}
 
   async execute(query: GetBatchesByVariantQuery) {
-    const { tenantId, variantId, page, limit, branchId, userId, userRole } = query;
+    const { tenantId, variantId, page, limit, branchId, userId, isOwner } = query;
 
     await assertUserCanAccessBranch(this.entityManager, this.redisService, {
       userId,
-      userRole,
+      isOwner,
       branchId,
       actionDescription: 'consultar los lotes de la variante',
     });

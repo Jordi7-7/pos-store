@@ -29,7 +29,7 @@ export class GetProductSalesReportHandler implements IQueryHandler<GetProductSal
   async execute(query: GetProductSalesReportQuery): Promise<ProductSaleRow[]> {
     await assertUserCanAccessBranch(this.entityManager, this.redisService, {
       userId: query.userId,
-      userRole: query.userRole,
+      isOwner: query.isOwner,
       branchId: query.branchId,
       actionDescription: 'consultar el reporte de ventas por producto',
     });

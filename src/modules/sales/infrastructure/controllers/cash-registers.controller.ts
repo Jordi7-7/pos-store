@@ -56,11 +56,11 @@ export class CashRegistersController {
   async getMyRegisters(
     @CurrentUser('tenantId') tenantId: string,
     @CurrentUser('sub') userId: string,
-    @CurrentUser('role') userRole: string,
+    @CurrentUser('isOwner') isOwner: boolean,
     @Query('branchId') branchId?: string,
   ) {
     return this.queryBus.execute(
-      new GetMyCashRegistersQuery(tenantId, userId, userRole, branchId),
+      new GetMyCashRegistersQuery(tenantId, userId, isOwner, branchId),
     );
   }
 

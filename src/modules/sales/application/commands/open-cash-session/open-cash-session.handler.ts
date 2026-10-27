@@ -3,10 +3,10 @@ import { Logger, BadRequestException, NotFoundException, ForbiddenException } fr
 import { EntityManager } from 'typeorm';
 import { OpenCashSessionCommand } from './open-cash-session.command';
 import { CashSession } from '../../../domain/entities/cash-session.entity';
+import { CashSessionStatus } from '../../../domain/enums/cash-session-status.enum';
 import { CashRegister } from '../../../domain/entities/cash-register.entity';
 import { Branch } from '../../../../branches/domain/entities/branch.entity';
 import { User } from '../../../../users/domain/entities/user.entity';
-import { UserRole } from '../../../../users/enums/user-role.enum';
 import { RedisService } from '../../../../../common/redis/redis.service';
 import { assertUserCanAccessBranch } from '../../../../../common/security/branch-access.helper';
 
@@ -47,12 +47,12 @@ export class OpenCashSessionHandler implements ICommandHandler<OpenCashSessionCo
         throw new NotFoundException('Usuario no encontrado');
       }
 
-      const isOwner = user.role === UserRole.OWNER;
+      const isOwner = user.isOwner;
 
       // Check branch authorization using Redis Cache-Aside
       await assertUserCanAccessBranch(transactionalManager, this.redisService, {
         userId,
-        userRole: user.role,
+        isOwner: user.isOwner,
         branchId,
         actionDescription: 'abrir caja',
       });
@@ -82,7 +82,7 @@ export class OpenCashSessionHandler implements ICommandHandler<OpenCashSessionCo
       const registerActiveSession = await cashSessionRepo.findOne({
         where: {
           cashRegisterId: register.id,
-          status: 'OPEN',
+          status: CashSessionStatus.OPEN,
         },
         relations: { user: true },
       });
@@ -97,7 +97,7 @@ export class OpenCashSessionHandler implements ICommandHandler<OpenCashSessionCo
       session.userId = userId;
       session.cashRegisterId = register.id;
       session.openingBalance = openingBalance;
-      session.status = 'OPEN';
+      session.status = CashSessionStatus.OPEN;
       session.openedAt = new Date();
       session.closingBalance = null;
       session.closedAt = null;
@@ -105,7 +105,30 @@ export class OpenCashSessionHandler implements ICommandHandler<OpenCashSessionCo
       const savedSession = await cashSessionRepo.save(session);
       this.logger.log(`Cash session opened successfully: ID ${savedSession.id} on register ${register.code}`);
 
-      return savedSession;
+      return {
+        id: savedSession.id,
+        status: savedSession.status,
+        openedAt: savedSession.openedAt,
+        closedAt: savedSession.closedAt,
+        openingBalance: Number(savedSession.openingBalance),
+        closingBalance: null,
+        expectedBalance: null,
+        difference: null,
+        branch: {
+          id: branch.id,
+          name: branch.name,
+          address: branch.address || '',
+        },
+        cashRegister: {
+          id: register.id,
+          name: register.name,
+          code: register.code,
+        },
+        user: {
+          id: user.id,
+          name: user.name,
+        },
+      } as any;
     });
   }
 }

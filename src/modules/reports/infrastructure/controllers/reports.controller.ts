@@ -17,7 +17,7 @@ export class ReportsController {
   async getSalesCost(
     @CurrentUser('tenantId') tenantId: string,
     @CurrentUser('sub') userId: string,
-    @CurrentUser('role') userRole: string,
+    @CurrentUser('isOwner') isOwner: boolean,
     @Query() query: GetReportDto,
   ) {
     return this.queryBus.execute(
@@ -27,7 +27,7 @@ export class ReportsController {
         query.endDate,
         query.branchId || undefined,
         userId,
-        userRole,
+        isOwner,
       ),
     );
   }
@@ -37,7 +37,7 @@ export class ReportsController {
   async getValuedInventory(
     @CurrentUser('tenantId') tenantId: string,
     @CurrentUser('sub') userId: string,
-    @CurrentUser('role') userRole: string,
+    @CurrentUser('isOwner') isOwner: boolean,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
     @Query('branchId') branchId?: string,
@@ -49,7 +49,7 @@ export class ReportsController {
         limit ? Number(limit) : undefined,
         branchId || undefined,
         userId,
-        userRole,
+        isOwner,
       ),
     );
   }
@@ -59,7 +59,7 @@ export class ReportsController {
   async getProductSales(
     @CurrentUser('tenantId') tenantId: string,
     @CurrentUser('sub') userId: string,
-    @CurrentUser('role') userRole: string,
+    @CurrentUser('isOwner') isOwner: boolean,
     @Query() query: GetReportDto,
   ) {
     return this.queryBus.execute(
@@ -69,7 +69,7 @@ export class ReportsController {
         query.endDate,
         query.branchId || undefined,
         userId,
-        userRole,
+        isOwner,
       ),
     );
   }

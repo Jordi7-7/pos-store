@@ -4,6 +4,7 @@ import { Branch } from '../../../branches/domain/entities/branch.entity';
 import { User } from '../../../users/domain/entities/user.entity';
 import { ColumnNumericTransformer } from '../../../../common/database/numeric-transformer';
 import { CashRegister } from './cash-register.entity';
+import { CashSessionStatus } from '../enums/cash-session-status.enum';
 
 @Entity('cash_sessions')
 export class CashSession extends BaseEntity {
@@ -60,8 +61,8 @@ export class CashSession extends BaseEntity {
   })
   difference: number | null;
 
-  @Column()
-  status: string;
+  @Column({ type: 'varchar', default: CashSessionStatus.OPEN })
+  status: CashSessionStatus;
 
   @Column({ name: 'opened_at', type: 'timestamp with time zone' })
   openedAt: Date;

@@ -15,11 +15,11 @@ export class GetValuedInventoryHandler implements IQueryHandler<GetValuedInvento
   ) {}
 
   async execute(query: GetValuedInventoryQuery) {
-    const { tenantId, page, limit, branchId, userId, userRole } = query;
+    const { tenantId, page, limit, branchId, userId, isOwner } = query;
 
     await assertUserCanAccessBranch(this.entityManager, this.redisService, {
       userId,
-      userRole,
+      isOwner,
       branchId,
       actionDescription: 'consultar el reporte de existencias valuadas',
     });
