@@ -48,7 +48,8 @@ export class RefreshTokenHandler implements ICommandHandler<RefreshTokenCommand>
         sub: user.id,
         tenantId: user.tenantId,
         email: user.email,
-        role: user.role,
+        isOwner: user.isOwner,
+        role: user.isOwner ? 'OWNER' : (user.roleEntity?.name || 'USER'),
         name: user.name,
       };
 
@@ -75,7 +76,8 @@ export class RefreshTokenHandler implements ICommandHandler<RefreshTokenCommand>
           id: user.id,
           name: user.name,
           email: user.email,
-          role: user.role,
+          isOwner: user.isOwner,
+          role: user.isOwner ? 'OWNER' : (user.roleEntity?.name || 'USER'),
         },
       };
     } catch (err: any) {

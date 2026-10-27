@@ -74,7 +74,7 @@ export class PinLoginHandler implements ICommandHandler<PinLoginCommand> {
 
     // Resolving effective permissions
     let effectivePermissions: string[] = [];
-    if (matchedUser.role === 'OWNER') {
+    if (matchedUser.isOwner) {
       effectivePermissions = ['*'];
     } else {
       const rolePerms = matchedUser.roleEntity?.permissions || [];
@@ -85,10 +85,12 @@ export class PinLoginHandler implements ICommandHandler<PinLoginCommand> {
     const payload = {
       sub: matchedUser.id,
       tenantId: matchedUser.tenantId,
+      username: matchedUser.username,
       email: matchedUser.email,
-      role: matchedUser.role,
+      isOwner: matchedUser.isOwner,
+      role: matchedUser.isOwner ? 'OWNER' : (matchedUser.roleEntity?.name || 'USER'),
       roleId: matchedUser.roleId || null,
-      roleName: matchedUser.roleEntity?.name || matchedUser.role,
+      roleName: matchedUser.isOwner ? 'Propietario' : (matchedUser.roleEntity?.name || 'Usuario'),
       permissions: effectivePermissions,
       name: matchedUser.name,
     };

@@ -72,7 +72,7 @@ export class LoginHandler implements ICommandHandler<LoginCommand> {
 
     // Resolving effective permissions: roleEntity permissions + customPermissions
     let effectivePermissions: string[] = [];
-    if (user.role === 'OWNER') {
+    if (user.isOwner) {
       effectivePermissions = ['*'];
     } else {
       const rolePerms = user.roleEntity?.permissions || [];
@@ -83,10 +83,12 @@ export class LoginHandler implements ICommandHandler<LoginCommand> {
     const payload = {
       sub: user.id,
       tenantId: user.tenantId,
+      username: user.username,
       email: user.email,
-      role: user.role,
+      isOwner: user.isOwner,
+      role: user.isOwner ? 'OWNER' : (user.roleEntity?.name || 'USER'),
       roleId: user.roleId || null,
-      roleName: user.roleEntity?.name || user.role,
+      roleName: user.isOwner ? 'Propietario' : (user.roleEntity?.name || 'Usuario'),
       permissions: effectivePermissions,
       name: user.name,
     };

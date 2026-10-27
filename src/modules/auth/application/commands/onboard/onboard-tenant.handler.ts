@@ -101,11 +101,44 @@ export class OnboardTenantHandler implements ICommandHandler<OnboardTenantComman
       const user = new User();
       user.tenantId = savedTenant.id;
       user.name = adminName;
+      user.username = email ? email.split('@')[0].toLowerCase().replace(/[^a-z0-9._-]/g, '') : 'admin';
       user.email = email;
       user.password = hashedPassword;
-      user.role = UserRole.OWNER;
+      user.isOwner = true;
       user.pin = defaultPinHash;
       const savedUser = await transactionalManager.save(user);
+
+      // Seed default system roles for the new tenant
+      await transactionalManager.query(
+        `INSERT INTO "roles" ("tenant_id", "name", "description", "permissions", "is_system")
+         VALUES 
+         ($1, 'Administrador', 'Gestión completa de operaciones, catálogo, usuarios y reportes.', $2, true),
+         ($1, 'Gerente / Supervisor', 'Operaciones del día a día, control de stock y reportes.', $3, true),
+         ($1, 'Cajero', 'Ventas en mostrador, emisión de tickets y cobros.', $4, true)`,
+        [
+          savedTenant.id,
+          [
+            'view:dashboard', 'view:pos', 'view:sales', 'view:products', 'view:purchases',
+            'view:customers', 'view:cash_sessions', 'view:reports', 'view:users', 'view:media', 'view:settings',
+            'action:pos.apply_discount', 'action:sales.refund', 'action:sales.cancel',
+            'action:products.create', 'action:products.edit', 'action:products.delete', 'action:products.import', 'action:products.adjust_stock',
+            'action:purchases.create', 'action:cash.open_close', 'action:cash.create_expense',
+            'action:users.manage', 'action:roles.manage', 'action:reports.export'
+          ],
+          [
+            'view:dashboard', 'view:pos', 'view:sales', 'view:products', 'view:purchases',
+            'view:customers', 'view:cash_sessions', 'view:reports', 'view:media',
+            'action:pos.apply_discount', 'action:sales.refund',
+            'action:products.create', 'action:products.edit', 'action:products.adjust_stock',
+            'action:purchases.create', 'action:cash.open_close', 'action:cash.create_expense',
+            'action:reports.export'
+          ],
+          [
+            'view:pos', 'view:sales', 'view:customers',
+            'action:cash.open_close', 'action:cash.create_expense'
+          ]
+        ]
+      );
 
       // D. Create Default Supplier
       const supplier = new Supplier();
@@ -146,7 +179,8 @@ export class OnboardTenantHandler implements ICommandHandler<OnboardTenantComman
           id: savedUser.id,
           name: savedUser.name,
           email: savedUser.email,
-          role: savedUser.role,
+          isOwner: true,
+          role: 'OWNER',
         },
       };
     });

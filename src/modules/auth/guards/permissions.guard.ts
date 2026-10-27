@@ -30,8 +30,8 @@ export class PermissionsGuard implements CanActivate {
       throw new ForbiddenException('Usuario no autenticado.');
     }
 
-    // El Propietario (OWNER) o roles con comodín '*' tienen acceso total automático
-    if (user.role === 'OWNER' || (Array.isArray(user.permissions) && user.permissions.includes('*'))) {
+    // El Propietario (OWNER/isOwner) o roles con comodín '*' tienen acceso total automático
+    if (user.isOwner === true || (Array.isArray(user.permissions) && user.permissions.includes('*'))) {
       return true;
     }
 

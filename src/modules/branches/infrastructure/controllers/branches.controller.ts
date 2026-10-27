@@ -17,6 +17,7 @@ export class BranchesController {
   ) {}
 
   @Get()
+  @RequirePermissions(APP_PERMISSIONS.BRANCHES_MANAGE)
   async findAll(@CurrentUser('tenantId') tenantId: string) {
     return this.queryBus.execute(new GetBranchesQuery(tenantId));
   }

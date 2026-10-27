@@ -83,23 +83,38 @@ export class AuthController {
     }
 
     let effectivePermissions: string[] = [];
-    if (user.role === 'OWNER') {
+    let roleObj: { id: string; name: string } | null = null;
+
+    if (user.isOwner) {
       effectivePermissions = ['*'];
+      roleObj = null;
     } else {
       const rolePerms = user.roleEntity?.permissions || [];
       const customPerms = user.customPermissions || [];
       effectivePermissions = Array.from(new Set([...rolePerms, ...customPerms]));
+      roleObj = user.roleEntity
+        ? {
+            id: user.roleEntity.id,
+            name: user.roleEntity.name,
+          }
+        : null;
     }
+
+    const branches = (user.branches || []).map((b: any) => ({
+      id: b.id,
+      name: b.name,
+      address: b.address || null,
+    }));
 
     return {
       id: user.id,
       name: user.name,
+      username: user.username,
       email: user.email,
-      role: user.role,
-      roleId: user.roleId || null,
-      roleName: user.roleEntity?.name || user.role,
+      isOwner: user.isOwner,
+      role: roleObj,
       permissions: effectivePermissions,
-      branchIds: (user.branches || []).map((b: any) => b.id),
+      branches,
       cashRegisters: (user.cashRegisters || []).map((cr: any) => ({
         id: cr.id,
         name: cr.name,
