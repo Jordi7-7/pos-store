@@ -11,7 +11,7 @@ export class BatchesController {
   constructor(private readonly queryBus: QueryBus) {}
 
   @Get('by-variant/:variantId')
-  @RequirePermissions(APP_PERMISSIONS.VIEW_PRODUCTS)
+  @RequirePermissions(APP_PERMISSIONS.PRODUCTS_GET)
   async getBatchesByVariant(
     @CurrentUser('tenantId') tenantId: string,
     @CurrentUser('sub') userId: string,
@@ -35,7 +35,7 @@ export class BatchesController {
   }
 
   @Get()
-  @RequirePermissions(APP_PERMISSIONS.VIEW_PRODUCTS)
+  @RequirePermissions(APP_PERMISSIONS.PRODUCTS_GET)
   async getBatches(
     @CurrentUser('tenantId') tenantId: string,
     @CurrentUser('sub') userId: string,
