@@ -52,7 +52,11 @@ export class CashRegistersController {
   ) {}
 
   @Get('me')
-  @RequireAnyPermissions(APP_PERMISSIONS.VIEW_POS, APP_PERMISSIONS.VIEW_CASH_REGISTERS)
+  @RequireAnyPermissions(
+    APP_PERMISSIONS.CASH_REGISTERS_GET,
+    APP_PERMISSIONS.POS_SELL,
+    APP_PERMISSIONS.CASH_OPEN_CLOSE,
+  )
   async getMyRegisters(
     @CurrentUser('tenantId') tenantId: string,
     @CurrentUser('sub') userId: string,
@@ -65,7 +69,7 @@ export class CashRegistersController {
   }
 
   @Get()
-  @RequirePermissions(APP_PERMISSIONS.CASH_REGISTERS_MANAGE)
+  @RequirePermissions(APP_PERMISSIONS.CASH_REGISTERS_GET)
   async list(
     @CurrentUser('tenantId') tenantId: string,
     @Query('branchId') branchId?: string,
@@ -76,7 +80,7 @@ export class CashRegistersController {
   }
 
   @Post()
-  @RequirePermissions(APP_PERMISSIONS.CASH_REGISTERS_MANAGE)
+  @RequirePermissions(APP_PERMISSIONS.CASH_REGISTERS_CREATE)
   async create(
     @CurrentUser('tenantId') tenantId: string,
     @Body() dto: CreateCashRegisterDto,
@@ -91,7 +95,7 @@ export class CashRegistersController {
   }
 
   @Put(':id')
-  @RequirePermissions(APP_PERMISSIONS.CASH_REGISTERS_MANAGE)
+  @RequirePermissions(APP_PERMISSIONS.CASH_REGISTERS_EDIT)
   async update(
     @CurrentUser('tenantId') tenantId: string,
     @Param('id') id: string,
@@ -108,7 +112,7 @@ export class CashRegistersController {
   }
 
   @Put(':id/assign-users')
-  @RequirePermissions(APP_PERMISSIONS.CASH_REGISTERS_MANAGE)
+  @RequirePermissions(APP_PERMISSIONS.CASH_REGISTERS_ASSIGN_USERS)
   async assignUsers(
     @CurrentUser('tenantId') tenantId: string,
     @Param('id') id: string,

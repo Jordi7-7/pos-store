@@ -7,10 +7,8 @@ import { UpdateUserDto } from '../../application/commands/update-user/update-use
 import { UpdateUserCommand } from '../../application/commands/update-user/update-user.command';
 import { GeneratePinCommand } from '../../application/commands/generate-pin/generate-pin.command';
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
-import { Roles } from '../../../auth/decorators/roles.decorator';
 import { RequirePermissions } from '../../../auth/decorators/permissions.decorator';
 import { APP_PERMISSIONS } from '../../../../common/enums/permissions.enum';
-import { UserRole } from '../../enums/user-role.enum';
 import { User } from '../../domain/entities/user.entity';
 
 @Controller('users')
@@ -21,8 +19,7 @@ export class UsersController {
   ) {}
 
   @Post()
-  @RequirePermissions(APP_PERMISSIONS.USERS_MANAGE)
-  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @RequirePermissions(APP_PERMISSIONS.USERS_CREATE)
   async create(
     @CurrentUser('tenantId') tenantId: string,
     @Body() dto: CreateUserDto,
@@ -43,8 +40,7 @@ export class UsersController {
   }
 
   @Put(':id')
-  @RequirePermissions(APP_PERMISSIONS.USERS_MANAGE)
-  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @RequirePermissions(APP_PERMISSIONS.USERS_EDIT)
   async update(
     @CurrentUser('tenantId') tenantId: string,
     @CurrentUser('sub') currentUserId: string,
@@ -57,8 +53,7 @@ export class UsersController {
   }
 
   @Post(':id/generate-pin')
-  @RequirePermissions(APP_PERMISSIONS.USERS_MANAGE)
-  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @RequirePermissions(APP_PERMISSIONS.USERS_EDIT)
   async generatePin(
     @CurrentUser('tenantId') tenantId: string,
     @Param('id') targetUserId: string,
@@ -69,8 +64,7 @@ export class UsersController {
   }
 
   @Get()
-  @RequirePermissions(APP_PERMISSIONS.VIEW_USERS)
-  @Roles(UserRole.OWNER, UserRole.ADMIN)
+  @RequirePermissions(APP_PERMISSIONS.USERS_GET)
   async list(@CurrentUser('tenantId') tenantId: string) {
     const rawUsers = await this.entityManager
       .getRepository(User)

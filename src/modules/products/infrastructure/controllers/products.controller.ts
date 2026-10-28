@@ -106,7 +106,7 @@ export class ProductsController {
   }
 
   @Post('categories')
-  @RequirePermissions(APP_PERMISSIONS.PRODUCTS_CREATE)
+  @RequirePermissions(APP_PERMISSIONS.CATEGORIES_CREATE)
   async createCategory(
     @CurrentUser('tenantId') tenantId: string,
     @Body() dto: CreateCategoryDto,
@@ -117,11 +117,13 @@ export class ProductsController {
   }
 
   @Get('categories')
+  @RequirePermissions(APP_PERMISSIONS.CATEGORIES_GET)
   async findCategories(@CurrentUser('tenantId') tenantId: string) {
     return this.queryBus.execute(new GetCategoriesQuery(tenantId));
   }
 
   @Post('attributes')
+  @RequirePermissions(APP_PERMISSIONS.ATTRIBUTES_CREATE)
   async createAttribute(
     @CurrentUser('tenantId') tenantId: string,
     @Body() dto: CreateAttributeDto,
@@ -132,6 +134,7 @@ export class ProductsController {
   }
 
   @Post('attributes/values')
+  @RequirePermissions(APP_PERMISSIONS.ATTRIBUTES_CREATE)
   async createAttributeValue(
     @CurrentUser('tenantId') tenantId: string,
     @Body() dto: CreateAttributeValueDto,
@@ -142,12 +145,13 @@ export class ProductsController {
   }
 
   @Get('attributes')
+  @RequirePermissions(APP_PERMISSIONS.ATTRIBUTES_GET)
   async findAttributes(@CurrentUser('tenantId') tenantId: string) {
     return this.queryBus.execute(new GetAttributesQuery(tenantId));
   }
 
   @Get()
-  @RequirePermissions(APP_PERMISSIONS.VIEW_PRODUCTS)
+  @RequirePermissions(APP_PERMISSIONS.PRODUCTS_GET)
   async find(
     @CurrentUser('tenantId') tenantId: string,
     @Query('page') page?: number,
@@ -235,6 +239,11 @@ export class ProductsController {
   }
 
   @Get('variant/sku/:sku')
+  @RequireAnyPermissions(
+    APP_PERMISSIONS.PRODUCTS_GET,
+    APP_PERMISSIONS.PURCHASES_CREATE,
+    APP_PERMISSIONS.PURCHASES_GET,
+  )
   async findVariantBySku(
     @CurrentUser('tenantId') tenantId: string,
     @Param('sku') sku: string,
@@ -243,7 +252,7 @@ export class ProductsController {
   }
 
   @Get('pos/variant/sku/:sku')
-  @RequirePermissions(APP_PERMISSIONS.VIEW_POS)
+  @RequireAnyPermissions(APP_PERMISSIONS.PRODUCTS_GET, APP_PERMISSIONS.POS_SELL)
   async findPosVariantBySku(
     @CurrentUser('tenantId') tenantId: string,
     @Param('sku') sku: string,
@@ -264,7 +273,7 @@ export class ProductsController {
   }
 
   @Get('pos/variants')
-  @RequirePermissions(APP_PERMISSIONS.VIEW_POS)
+  @RequireAnyPermissions(APP_PERMISSIONS.PRODUCTS_GET, APP_PERMISSIONS.POS_SELL)
   async findPosVariants(
     @CurrentUser('tenantId') tenantId: string,
     @Query('branchId') branchId: string,
@@ -273,7 +282,7 @@ export class ProductsController {
   }
 
   @Get(':id')
-  @RequirePermissions(APP_PERMISSIONS.VIEW_PRODUCTS)
+  @RequirePermissions(APP_PERMISSIONS.PRODUCTS_GET)
   async findOne(
     @CurrentUser('tenantId') tenantId: string,
     @Param('id') id: string,

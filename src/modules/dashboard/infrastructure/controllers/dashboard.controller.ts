@@ -10,7 +10,7 @@ export class DashboardController {
   constructor(private readonly queryBus: QueryBus) {}
 
   @Get('metrics')
-  @RequirePermissions(APP_PERMISSIONS.VIEW_DASHBOARD)
+  @RequirePermissions(APP_PERMISSIONS.DASHBOARD_GET)
   async getMetrics(
     @CurrentUser('tenantId') tenantId: string,
     @Query('branchId') branchId?: string,

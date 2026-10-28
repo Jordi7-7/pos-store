@@ -17,13 +17,13 @@ export class BranchesController {
   ) {}
 
   @Get()
-  @RequirePermissions(APP_PERMISSIONS.BRANCHES_MANAGE)
+  @RequirePermissions(APP_PERMISSIONS.BRANCHES_GET)
   async findAll(@CurrentUser('tenantId') tenantId: string) {
     return this.queryBus.execute(new GetBranchesQuery(tenantId));
   }
 
   @Post()
-  @RequirePermissions(APP_PERMISSIONS.BRANCHES_MANAGE)
+  @RequirePermissions(APP_PERMISSIONS.BRANCHES_CREATE)
   async create(
     @CurrentUser('tenantId') tenantId: string,
     @Body() dto: CreateBranchDto,
@@ -34,7 +34,7 @@ export class BranchesController {
   }
 
   @Put(':id')
-  @RequirePermissions(APP_PERMISSIONS.BRANCHES_MANAGE)
+  @RequirePermissions(APP_PERMISSIONS.BRANCHES_EDIT)
   async update(
     @CurrentUser('tenantId') tenantId: string,
     @Param('id') id: string,

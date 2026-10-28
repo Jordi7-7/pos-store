@@ -26,7 +26,7 @@ export class PurchasesController {
   ) {}
 
   @Post('suppliers')
-  @RequirePermissions(APP_PERMISSIONS.PURCHASES_CREATE)
+  @RequirePermissions(APP_PERMISSIONS.SUPPLIERS_CREATE)
   async createSupplier(
     @CurrentUser('tenantId') tenantId: string,
     @Body() dto: CreateSupplierDto,
@@ -44,13 +44,13 @@ export class PurchasesController {
   }
 
   @Get('suppliers')
-  @RequirePermissions(APP_PERMISSIONS.VIEW_PURCHASES)
+  @RequireAnyPermissions(APP_PERMISSIONS.SUPPLIERS_GET, APP_PERMISSIONS.PURCHASES_CREATE)
   async findSuppliers(@CurrentUser('tenantId') tenantId: string) {
     return this.queryBus.execute(new GetSuppliersQuery(tenantId));
   }
 
   @Put('suppliers/:id')
-  @RequirePermissions(APP_PERMISSIONS.PURCHASES_CREATE)
+  @RequirePermissions(APP_PERMISSIONS.SUPPLIERS_EDIT)
   async updateSupplier(
     @CurrentUser('tenantId') tenantId: string,
     @Param('id') id: string,
@@ -60,7 +60,7 @@ export class PurchasesController {
   }
 
   @Delete('suppliers/:id')
-  @RequirePermissions(APP_PERMISSIONS.PURCHASES_CREATE)
+  @RequirePermissions(APP_PERMISSIONS.SUPPLIERS_DELETE)
   async deleteSupplier(
     @CurrentUser('tenantId') tenantId: string,
     @Param('id') id: string,
@@ -86,7 +86,7 @@ export class PurchasesController {
   }
 
   @Get()
-  @RequirePermissions(APP_PERMISSIONS.VIEW_PURCHASES)
+  @RequirePermissions(APP_PERMISSIONS.PURCHASES_GET)
   async getPurchases(
     @CurrentUser('tenantId') tenantId: string,
     @CurrentUser('sub') userId: string,
@@ -114,7 +114,7 @@ export class PurchasesController {
   }
 
   @Get('by-variant/:variantId')
-  @RequireAnyPermissions(APP_PERMISSIONS.VIEW_PRODUCTS, APP_PERMISSIONS.VIEW_PURCHASES)
+  @RequireAnyPermissions(APP_PERMISSIONS.PRODUCTS_GET, APP_PERMISSIONS.PURCHASES_GET)
   async getPurchasesByVariant(
     @CurrentUser('tenantId') tenantId: string,
     @CurrentUser('sub') userId: string,
@@ -136,6 +136,7 @@ export class PurchasesController {
   }
 
   @Patch(':id/cancel')
+  @RequirePermissions(APP_PERMISSIONS.PURCHASES_CANCEL)
   async cancelPurchase(
     @CurrentUser('tenantId') tenantId: string,
     @Param('id') purchaseOrderId: string,
@@ -147,6 +148,7 @@ export class PurchasesController {
   }
 
   @Post('validate-import')
+  @RequirePermissions(APP_PERMISSIONS.PURCHASES_IMPORT)
   async validateImport(
     @CurrentUser('tenantId') tenantId: string,
     @Body() dto: ValidateImportPurchasesDto,
@@ -157,6 +159,7 @@ export class PurchasesController {
   }
 
   @Post('import')
+  @RequirePermissions(APP_PERMISSIONS.PURCHASES_IMPORT)
   async importPurchases(
     @CurrentUser('tenantId') tenantId: string,
     @Body() dto: ImportPurchasesDto,

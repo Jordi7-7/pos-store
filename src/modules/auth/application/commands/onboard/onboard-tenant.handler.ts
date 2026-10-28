@@ -8,6 +8,7 @@ import { Branch } from '../../../../branches/domain/entities/branch.entity';
 import { HashService } from '../../../services/hash.service';
 import { Supplier } from '../../../../purchases/domain/entities/supplier.entity';
 import { Customer } from '../../../../customers/domain/entities/customer.entity';
+import { APP_PERMISSIONS } from '../../../../../common/enums/permissions.enum';
 
 @CommandHandler(OnboardTenantCommand)
 export class OnboardTenantHandler implements ICommandHandler<OnboardTenantCommand> {
@@ -114,35 +115,97 @@ export class OnboardTenantHandler implements ICommandHandler<OnboardTenantComman
       );
 
       // Seed default system roles for the new tenant
+      const adminPermissions = Array.from(
+        new Set(
+          Object.entries(APP_PERMISSIONS)
+            .filter(([key]) => !['ROLES_MANAGE', 'BRANCHES_MANAGE', 'USERS_MANAGE', 'CASH_REGISTERS_MANAGE'].includes(key))
+            .map(([, val]) => val)
+        )
+      );
+
+      const managerPermissions = [
+        // Vistas de interfaz
+        APP_PERMISSIONS.VIEW_DASHBOARD,
+        APP_PERMISSIONS.VIEW_POS,
+        APP_PERMISSIONS.VIEW_SALES,
+        APP_PERMISSIONS.VIEW_PRODUCTS,
+        APP_PERMISSIONS.VIEW_CATEGORIES,
+        APP_PERMISSIONS.VIEW_ATTRIBUTES,
+        APP_PERMISSIONS.VIEW_PURCHASES,
+        APP_PERMISSIONS.VIEW_SUPPLIERS,
+        APP_PERMISSIONS.VIEW_CASH_SESSIONS,
+        APP_PERMISSIONS.VIEW_CASH_REGISTERS,
+        APP_PERMISSIONS.VIEW_CUSTOMERS,
+        APP_PERMISSIONS.VIEW_MEDIA,
+        APP_PERMISSIONS.VIEW_REPORTS,
+
+        // Acciones GET (consultas a API)
+        APP_PERMISSIONS.DASHBOARD_GET,
+        APP_PERMISSIONS.SALES_GET,
+        APP_PERMISSIONS.PRODUCTS_GET,
+        APP_PERMISSIONS.CATEGORIES_GET,
+        APP_PERMISSIONS.ATTRIBUTES_GET,
+        APP_PERMISSIONS.PURCHASES_GET,
+        APP_PERMISSIONS.SUPPLIERS_GET,
+        APP_PERMISSIONS.CASH_SESSIONS_GET,
+        APP_PERMISSIONS.CASH_REGISTERS_GET,
+        APP_PERMISSIONS.CUSTOMERS_GET,
+        APP_PERMISSIONS.MEDIA_GET,
+        APP_PERMISSIONS.REPORTS_GET,
+
+        // Acciones operativas
+        APP_PERMISSIONS.POS_SELL,
+        APP_PERMISSIONS.POS_APPLY_DISCOUNT,
+        APP_PERMISSIONS.SALES_REFUND,
+        APP_PERMISSIONS.PRODUCTS_CREATE,
+        APP_PERMISSIONS.PRODUCTS_EDIT,
+        APP_PERMISSIONS.PRODUCTS_ADJUST_STOCK,
+        APP_PERMISSIONS.PRODUCTS_IMPORT,
+        APP_PERMISSIONS.PRODUCTS_PRINT_BARCODES,
+        APP_PERMISSIONS.CATEGORIES_CREATE,
+        APP_PERMISSIONS.CATEGORIES_EDIT,
+        APP_PERMISSIONS.ATTRIBUTES_CREATE,
+        APP_PERMISSIONS.ATTRIBUTES_EDIT,
+        APP_PERMISSIONS.PURCHASES_CREATE,
+        APP_PERMISSIONS.PURCHASES_IMPORT,
+        APP_PERMISSIONS.SUPPLIERS_CREATE,
+        APP_PERMISSIONS.SUPPLIERS_EDIT,
+        APP_PERMISSIONS.CASH_OPEN_CLOSE,
+        APP_PERMISSIONS.CASH_CREATE_EXPENSE,
+        APP_PERMISSIONS.CUSTOMERS_CREATE,
+        APP_PERMISSIONS.CUSTOMERS_EDIT,
+        APP_PERMISSIONS.MEDIA_UPLOAD,
+        APP_PERMISSIONS.REPORTS_EXPORT,
+      ];
+
+      const cashierPermissions = [
+        // Vistas de interfaz
+        APP_PERMISSIONS.VIEW_POS,
+        APP_PERMISSIONS.VIEW_SALES,
+
+        // Acciones GET requeridas para operar el POS
+        APP_PERMISSIONS.PRODUCTS_GET,
+        APP_PERMISSIONS.CATEGORIES_GET,
+        APP_PERMISSIONS.CUSTOMERS_GET,
+        APP_PERMISSIONS.CASH_REGISTERS_GET,
+        APP_PERMISSIONS.CASH_SESSIONS_GET,
+        APP_PERMISSIONS.SALES_GET,
+
+        // Acciones operativas del cajero
+        APP_PERMISSIONS.POS_SELL,
+        APP_PERMISSIONS.POS_APPLY_DISCOUNT,
+        APP_PERMISSIONS.CASH_OPEN_CLOSE,
+        APP_PERMISSIONS.CASH_CREATE_EXPENSE,
+        APP_PERMISSIONS.CUSTOMERS_CREATE,
+      ];
+
       await transactionalManager.query(
         `INSERT INTO "roles" ("tenant_id", "name", "description", "permissions", "is_system")
          VALUES 
-         ($1, 'Administrador', 'Gestión completa de operaciones, catálogo, usuarios y reportes.', $2, true),
-         ($1, 'Gerente / Supervisor', 'Operaciones del día a día, control de stock y reportes.', $3, true),
-         ($1, 'Cajero', 'Ventas en mostrador, emisión de tickets y cobros.', $4, true)`,
-        [
-          savedTenant.id,
-          [
-            'view:dashboard', 'view:pos', 'view:sales', 'view:products', 'view:purchases',
-            'view:customers', 'view:cash_sessions', 'view:reports', 'view:users', 'view:media', 'view:settings',
-            'action:pos.apply_discount', 'action:sales.refund', 'action:sales.cancel',
-            'action:products.create', 'action:products.edit', 'action:products.delete', 'action:products.import', 'action:products.adjust_stock',
-            'action:purchases.create', 'action:cash.open_close', 'action:cash.create_expense',
-            'action:users.manage', 'action:roles.manage', 'action:reports.export'
-          ],
-          [
-            'view:dashboard', 'view:pos', 'view:sales', 'view:products', 'view:purchases',
-            'view:customers', 'view:cash_sessions', 'view:reports', 'view:media',
-            'action:pos.apply_discount', 'action:sales.refund',
-            'action:products.create', 'action:products.edit', 'action:products.adjust_stock',
-            'action:purchases.create', 'action:cash.open_close', 'action:cash.create_expense',
-            'action:reports.export'
-          ],
-          [
-            'view:pos', 'view:sales', 'view:customers',
-            'action:cash.open_close', 'action:cash.create_expense'
-          ]
-        ]
+         ($1, 'Administrador', 'Gestión completa de operaciones, catálogo, usuarios y configuración.', $2, true),
+         ($1, 'Gerente / Supervisor', 'Operaciones diarias, inventario, compras, clientes y reportes.', $3, true),
+         ($1, 'Cajero', 'Ventas en mostrador, emisión de tickets, turnos de caja y cobros.', $4, true)`,
+        [savedTenant.id, adminPermissions, managerPermissions, cashierPermissions],
       );
 
       // D. Create Default Supplier

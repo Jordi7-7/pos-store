@@ -33,6 +33,11 @@ export class SalesController {
   ) {}
 
   @Get('cash-sessions/active')
+  @RequireAnyPermissions(
+    APP_PERMISSIONS.CASH_SESSIONS_GET,
+    APP_PERMISSIONS.POS_SELL,
+    APP_PERMISSIONS.CASH_OPEN_CLOSE,
+  )
   async getActiveSession(
     @CurrentUser('tenantId') tenantId: string,
     @CurrentUser('sub') userId: string,
@@ -46,7 +51,7 @@ export class SalesController {
   }
 
   @Post()
-  @RequirePermissions(APP_PERMISSIONS.VIEW_POS)
+  @RequirePermissions(APP_PERMISSIONS.POS_SELL)
   async process(
     @CurrentUser('tenantId') tenantId: string,
     @CurrentUser('sub') userId: string,
@@ -69,7 +74,7 @@ export class SalesController {
   }
 
   @Get('paginated')
-  @RequirePermissions(APP_PERMISSIONS.VIEW_SALES)
+  @RequirePermissions(APP_PERMISSIONS.SALES_GET)
   async findSalesPaginated(
     @CurrentUser('tenantId') tenantId: string,
     @CurrentUser('sub') userId: string,
@@ -93,7 +98,7 @@ export class SalesController {
   }
 
   @Get('by-variant/:variantId')
-  @RequireAnyPermissions(APP_PERMISSIONS.VIEW_PRODUCTS, APP_PERMISSIONS.VIEW_SALES)
+  @RequireAnyPermissions(APP_PERMISSIONS.PRODUCTS_GET, APP_PERMISSIONS.SALES_GET)
   async findSalesByVariant(
     @CurrentUser('tenantId') tenantId: string,
     @CurrentUser('sub') userId: string,
@@ -169,6 +174,7 @@ export class SalesController {
   }
 
   @Get('expenses')
+  @RequirePermissions(APP_PERMISSIONS.CASH_SESSIONS_GET)
   async findExpenses(
     @CurrentUser('tenantId') tenantId: string,
     @Query('cashSessionId') cashSessionId: string,
@@ -203,6 +209,7 @@ export class SalesController {
   }
 
   @Get('refunds')
+  @RequirePermissions(APP_PERMISSIONS.SALES_GET)
   async getRefunds(
     @CurrentUser('tenantId') tenantId: string,
     @Query('cashSessionId') cashSessionId?: string,
@@ -219,6 +226,7 @@ export class SalesController {
   }
 
   @Get('cash-sessions')
+  @RequirePermissions(APP_PERMISSIONS.CASH_SESSIONS_GET)
   async getCashSessions(
     @CurrentUser('tenantId') tenantId: string,
     @CurrentUser('sub') userId: string,
@@ -229,6 +237,7 @@ export class SalesController {
   }
 
   @Get('cash-sessions/:id/details')
+  @RequirePermissions(APP_PERMISSIONS.CASH_SESSIONS_GET)
   async getCashSessionDetails(
     @CurrentUser('tenantId') tenantId: string,
     @Param('id') id: string,
@@ -237,6 +246,7 @@ export class SalesController {
   }
 
   @Get('invoice/:invoiceNumber')
+  @RequirePermissions(APP_PERMISSIONS.SALES_GET)
   async getSaleByInvoice(
     @CurrentUser('tenantId') tenantId: string,
     @Param('invoiceNumber') invoiceNumber: string,

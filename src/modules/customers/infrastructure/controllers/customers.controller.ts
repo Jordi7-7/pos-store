@@ -7,7 +7,7 @@ import { UpdateCustomerDto } from '../dtos/update-customer.dto';
 import { CreateCustomerCommand } from '../../application/commands/create-customer/create-customer.command';
 import { UpdateCustomerCommand } from '../../application/commands/update-customer/update-customer.command';
 import { DeleteCustomerCommand } from '../../application/commands/delete-customer/delete-customer.command';
-import { RequirePermissions } from '../../../auth/decorators/permissions.decorator';
+import { RequirePermissions, RequireAnyPermissions } from '../../../auth/decorators/permissions.decorator';
 import { APP_PERMISSIONS } from '../../../../common/enums/permissions.enum';
 
 @Controller('customers')
@@ -18,7 +18,7 @@ export class CustomersController {
   ) {}
 
   @Get()
-  @RequirePermissions(APP_PERMISSIONS.VIEW_CUSTOMERS)
+  @RequireAnyPermissions(APP_PERMISSIONS.CUSTOMERS_GET, APP_PERMISSIONS.POS_SELL)
   async findAll(@CurrentUser('tenantId') tenantId: string) {
     return this.queryBus.execute(new GetCustomersQuery(tenantId));
   }

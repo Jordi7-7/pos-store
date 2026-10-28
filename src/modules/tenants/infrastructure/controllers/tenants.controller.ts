@@ -8,6 +8,9 @@ import { GetTenantQuery } from '../../application/queries/get-tenant/get-tenant.
 import { GetPublicTenantBySlugQuery } from '../../application/queries/get-public-tenant-by-slug/get-public-tenant-by-slug.query';
 import { UpdateTenantCommand } from '../../application/commands/update-tenant/update-tenant.command';
 
+import { RequirePermissions } from '../../../auth/decorators/permissions.decorator';
+import { APP_PERMISSIONS } from '../../../../common/enums/permissions.enum';
+
 @Controller('tenants')
 export class TenantsController {
   constructor(
@@ -27,11 +30,13 @@ export class TenantsController {
   }
 
   @Get('current')
+  @RequirePermissions(APP_PERMISSIONS.SETTINGS_GET)
   async getCurrent(@CurrentUser('tenantId') tenantId: string) {
     return this.queryBus.execute(new GetTenantQuery(tenantId));
   }
 
   @Put('current')
+  @RequirePermissions(APP_PERMISSIONS.SETTINGS_EDIT)
   async updateCurrent(
     @CurrentUser('tenantId') tenantId: string,
     @Body() dto: UpdateTenantDto,

@@ -3,6 +3,8 @@ import { EntityManager } from 'typeorm';
 import { S3Service } from '../../services/s3.service';
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
 import { ProductImage } from '../../../products/domain/entities/product-image.entity';
+import { RequirePermissions } from '../../../auth/decorators/permissions.decorator';
+import { APP_PERMISSIONS } from '../../../../common/enums/permissions.enum';
 
 @Controller('media')
 export class MediaController {
@@ -14,6 +16,7 @@ export class MediaController {
   ) {}
 
   @Get('presigned-url')
+  @RequirePermissions(APP_PERMISSIONS.MEDIA_UPLOAD)
   async getPresignedUrl(
     @CurrentUser('tenantId') tenantId: string,
     @Query('filename') filename: string,
@@ -26,6 +29,7 @@ export class MediaController {
   }
 
   @Get()
+  @RequirePermissions(APP_PERMISSIONS.MEDIA_GET)
   async getImages(
     @CurrentUser('tenantId') tenantId: string,
     @Query('page') page?: number,
@@ -78,6 +82,7 @@ export class MediaController {
   }
 
   @Post('register')
+  @RequirePermissions(APP_PERMISSIONS.MEDIA_UPLOAD)
   async registerImage(
     @CurrentUser('tenantId') tenantId: string,
     @Body('url') url: string,
@@ -97,6 +102,7 @@ export class MediaController {
   }
 
   @Delete(':id')
+  @RequirePermissions(APP_PERMISSIONS.MEDIA_DELETE)
   async deleteImage(
     @CurrentUser('tenantId') tenantId: string,
     @Param('id') id: string,

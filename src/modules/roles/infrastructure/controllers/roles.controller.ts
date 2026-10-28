@@ -37,6 +37,7 @@ export class RolesController {
   }
 
   @Get()
+  @RequirePermissions(APP_PERMISSIONS.ROLES_GET)
   async listRoles(@CurrentUser('tenantId') tenantId: string) {
     const roleRepo = this.entityManager.getRepository(Role);
     const userRepo = this.entityManager.getRepository(User);
@@ -65,7 +66,7 @@ export class RolesController {
   }
 
   @Post()
-  @RequirePermissions(APP_PERMISSIONS.ROLES_MANAGE)
+  @RequirePermissions(APP_PERMISSIONS.ROLES_CREATE)
   async createRole(
     @CurrentUser('tenantId') tenantId: string,
     @Body() dto: CreateRoleDto,
@@ -90,7 +91,7 @@ export class RolesController {
   }
 
   @Put(':id')
-  @RequirePermissions(APP_PERMISSIONS.ROLES_MANAGE)
+  @RequirePermissions(APP_PERMISSIONS.ROLES_EDIT)
   async updateRole(
     @CurrentUser('tenantId') tenantId: string,
     @Param('id') id: string,
@@ -136,7 +137,7 @@ export class RolesController {
   }
 
   @Delete(':id')
-  @RequirePermissions(APP_PERMISSIONS.ROLES_MANAGE)
+  @RequirePermissions(APP_PERMISSIONS.ROLES_DELETE)
   async deleteRole(
     @CurrentUser('tenantId') tenantId: string,
     @Param('id') id: string,

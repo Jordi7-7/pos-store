@@ -13,7 +13,7 @@ export class ReportsController {
   constructor(private readonly queryBus: QueryBus) {}
 
   @Get('sales-cost')
-  @RequirePermissions(APP_PERMISSIONS.VIEW_REPORTS)
+  @RequirePermissions(APP_PERMISSIONS.REPORTS_GET)
   async getSalesCost(
     @CurrentUser('tenantId') tenantId: string,
     @CurrentUser('sub') userId: string,
@@ -33,7 +33,7 @@ export class ReportsController {
   }
 
   @Get('valued-inventory')
-  @RequirePermissions(APP_PERMISSIONS.VIEW_REPORTS)
+  @RequirePermissions(APP_PERMISSIONS.REPORTS_GET)
   async getValuedInventory(
     @CurrentUser('tenantId') tenantId: string,
     @CurrentUser('sub') userId: string,
@@ -55,7 +55,7 @@ export class ReportsController {
   }
 
   @Get('product-sales')
-  @RequirePermissions(APP_PERMISSIONS.VIEW_REPORTS)
+  @RequirePermissions(APP_PERMISSIONS.REPORTS_GET)
   async getProductSales(
     @CurrentUser('tenantId') tenantId: string,
     @CurrentUser('sub') userId: string,
