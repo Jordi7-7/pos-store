@@ -9,6 +9,7 @@ import { RefreshTokenHandler } from './application/commands/refresh/refresh-toke
 import { LogoutHandler } from './application/commands/logout/logout.handler';
 import { PinLoginHandler } from './application/commands/pin-login/pin-login.handler';
 import { HashService } from './services/hash.service';
+import { OnboardingSecretGuard } from './guards/onboarding-secret.guard';
 
 @Module({
   imports: [
@@ -25,12 +26,13 @@ import { HashService } from './services/hash.service';
   controllers: [AuthController],
   providers: [
     HashService,
+    OnboardingSecretGuard,
     OnboardTenantHandler,
     LoginHandler,
     RefreshTokenHandler,
     LogoutHandler,
     PinLoginHandler,
   ],
-  exports: [HashService, JwtModule],
+  exports: [HashService, JwtModule, OnboardingSecretGuard],
 })
 export class AuthModule {}

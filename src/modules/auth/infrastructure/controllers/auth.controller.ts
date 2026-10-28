@@ -1,4 +1,4 @@
-import { Controller, Post, Body, HttpCode, HttpStatus, Get, UnauthorizedException } from '@nestjs/common';
+import { Controller, Post, Body, HttpCode, HttpStatus, Get, UnauthorizedException, UseGuards } from '@nestjs/common';
 import { CommandBus } from '@nestjs/cqrs';
 import { EntityManager } from 'typeorm';
 import { User } from '../../../users/domain/entities/user.entity';
@@ -12,6 +12,7 @@ import { LogoutCommand } from '../../application/commands/logout/logout.command'
 import { PinLoginCommand } from '../../application/commands/pin-login/pin-login.command';
 import { Public } from '../../decorators/public.decorator';
 import { CurrentUser } from '../../decorators/current-user.decorator';
+import { OnboardingSecretGuard } from '../../guards/onboarding-secret.guard';
 
 @Controller('auth')
 export class AuthController {
@@ -21,6 +22,7 @@ export class AuthController {
   ) {}
 
   @Public()
+  @UseGuards(OnboardingSecretGuard)
   @Post('onboard')
   async onboard(@Body() dto: OnboardTenantDto) {
     return this.commandBus.execute(
