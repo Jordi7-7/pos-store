@@ -23,17 +23,31 @@ export class AuthGuard implements CanActivate {
       context.getHandler(),
       context.getClass(),
     ]);
-    if (isPublic) {
-      return true;
-    }
 
     const request = context.switchToHttp().getRequest();
     const token = this.extractTokenFromHeader(request);
+
+    if (isPublic) {
+      // Si la ruta es pública pero el cliente envió un token (ej. logout), lo decodificamos opcionalmente
+      if (token) {
+        try {
+          const jwtSecret = this.configService.get<string>('JWT_SECRET') || process.env.JWT_SECRET ;
+          const payload = await this.jwtService.verifyAsync(token, {
+            secret: jwtSecret,
+          });
+          request['user'] = payload;
+        } catch {
+          // Token inválido o expirado en ruta pública: se continúa sin bloquear
+        }
+      }
+      return true;
+    }
+
     if (!token) {
       throw new UnauthorizedException('Missing authentication token');
     }
     try {
-      const jwtSecret = this.configService.get<string>('JWT_SECRET') || process.env.JWT_SECRET || 'fallback_secret';
+      const jwtSecret = this.configService.get<string>('JWT_SECRET') || process.env.JWT_SECRET ;
       const payload = await this.jwtService.verifyAsync(token, {
         secret: jwtSecret,
       });
