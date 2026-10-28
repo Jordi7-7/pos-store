@@ -193,7 +193,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"tenantName\": \"Mi Negocio Demo\",\n  \"ruc\": \"0999999999001\",\n  \"country\": \"EC\",\n  \"currencyCode\": \"USD\",\n  \"currencySymbol\": \"$\",\n  \"timezone\": \"America/Guayaquil\",\n  \"adminName\": \"Juan Administrador\",\n  \"email\": \"demo@negocio.com\",\n  \"password\": \"Password123!\",\n  \"branchName\": \"Matriz Central\",\n  \"branchAddress\": \"Av. Principal 123\",\n  \"slug\": \"mi-negocio-demo\"\n}"
+              "raw": "{\n  \"tenantName\": \"Mi Negocio Demo\",\n  \"ruc\": \"0999999999001\",\n  \"country\": \"EC\",\n  \"currencyCode\": \"USD\",\n  \"currencySymbol\": \"$\",\n  \"timezone\": \"America/Guayaquil\",\n  \"adminName\": \"Juan Administrador\",\n  \"username\": \"admin\",\n  \"email\": \"demo@negocio.com\",\n  \"password\": \"Password123!\",\n  \"branchName\": \"Matriz Central\",\n  \"branchAddress\": \"Av. Principal 123\",\n  \"slug\": \"mi-negocio-demo\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/auth/onboard",

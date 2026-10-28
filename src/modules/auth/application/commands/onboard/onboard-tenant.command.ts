@@ -7,10 +7,11 @@ export class OnboardTenantCommand {
     public readonly currencySymbol: string,
     public readonly timezone: string,
     public readonly adminName: string,
-    public readonly email: string,
+    public readonly username: string,
     public readonly password: string,
     public readonly branchName: string,
     public readonly branchAddress: string,
+    public readonly email?: string | null,
     public readonly slug?: string,
   ) {}
 }

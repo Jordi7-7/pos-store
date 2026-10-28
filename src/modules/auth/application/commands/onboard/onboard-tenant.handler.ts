@@ -5,7 +5,6 @@ import { OnboardTenantCommand } from './onboard-tenant.command';
 import { Tenant } from '../../../../tenants/domain/entities/tenant.entity';
 import { User } from '../../../../users/domain/entities/user.entity';
 import { Branch } from '../../../../branches/domain/entities/branch.entity';
-import { UserRole } from '../../../../users/enums/user-role.enum';
 import { HashService } from '../../../services/hash.service';
 import { Supplier } from '../../../../purchases/domain/entities/supplier.entity';
 import { Customer } from '../../../../customers/domain/entities/customer.entity';
@@ -28,26 +27,26 @@ export class OnboardTenantHandler implements ICommandHandler<OnboardTenantComman
       currencySymbol,
       timezone,
       adminName,
+      username,
       email,
       password,
       branchName,
       branchAddress,
     } = command;
-    this.logger.log(`Onboarding tenant request received for RUC: ${ruc}, Admin: ${email}`);
+
+    const cleanUsername = username.toLowerCase().trim().replace(/[^a-z0-9._-]/g, '');
+    if (!cleanUsername) {
+      throw new BadRequestException('El nombre de usuario es obligatorio y debe contener caracteres válidos.');
+    }
+    const cleanEmail = email && email.trim() ? email.toLowerCase().trim() : null;
+
+    this.logger.log(`Onboarding tenant request received for RUC: ${ruc}, Admin Username: ${cleanUsername}`);
     const tenantExists = await this.entityManager.findOne(Tenant, {
       where: { ruc },
     });
     if (tenantExists) {
       this.logger.warn(`Onboarding failed: Tenant RUC ${ruc} already registered`);
       throw new BadRequestException(`Tenant with RUC ${ruc} already registered`);
-    }
-
-    const userExists = await this.entityManager.findOne(User, {
-      where: { email },
-    });
-    if (userExists) {
-      this.logger.warn(`Onboarding failed: email ${email} is already in use`);
-      throw new BadRequestException(`Email ${email} is already in use`);
     }
 
     return this.entityManager.transaction(async (transactionalManager) => {
@@ -101,12 +100,18 @@ export class OnboardTenantHandler implements ICommandHandler<OnboardTenantComman
       const user = new User();
       user.tenantId = savedTenant.id;
       user.name = adminName;
-      user.username = email ? email.split('@')[0].toLowerCase().replace(/[^a-z0-9._-]/g, '') : 'admin';
-      user.email = email;
+      user.username = cleanUsername;
+      user.email = cleanEmail;
       user.password = hashedPassword;
       user.isOwner = true;
       user.pin = defaultPinHash;
       const savedUser = await transactionalManager.save(user);
+
+      // Link owner user to the initial branch in user_branches
+      await transactionalManager.query(
+        `INSERT INTO "user_branches" ("user_id", "branch_id") VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+        [savedUser.id, savedBranch.id],
+      );
 
       // Seed default system roles for the new tenant
       await transactionalManager.query(
@@ -178,6 +183,7 @@ export class OnboardTenantHandler implements ICommandHandler<OnboardTenantComman
         user: {
           id: savedUser.id,
           name: savedUser.name,
+          username: savedUser.username,
           email: savedUser.email,
           isOwner: true,
           role: 'OWNER',

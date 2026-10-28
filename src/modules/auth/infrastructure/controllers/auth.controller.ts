@@ -32,10 +32,11 @@ export class AuthController {
         dto.currencySymbol,
         dto.timezone,
         dto.adminName,
-        dto.email,
+        dto.username,
         dto.password,
         dto.branchName,
         dto.branchAddress,
+        dto.email,
         dto.slug,
       ),
     );
