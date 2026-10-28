@@ -10,6 +10,7 @@ import { Batch, BatchOriginType } from '../../../../batches/domain/entities/batc
 import { InventoryMovement } from '../../../domain/entities/inventory-movement.entity';
 import { Branch } from '../../../../branches/domain/entities/branch.entity';
 import { InventoryMovementReason } from '../../../../../common/enums/inventory-movement-reason.enum';
+import { InventoryMovementType } from '../../../../../common/enums/inventory-movement-type.enum';
 import { ProductType } from '../../../domain/enums/product-type.enum';
 
 @CommandHandler(ImportProductsCommand)
@@ -120,8 +121,8 @@ export class ImportProductsHandler implements ICommandHandler<ImportProductsComm
         });
         const savedVariants = await variantRepo.save(variantsToCreate);
 
-        // 3. Bulk create Stocks, Batches and Movements if stock is provided and branchId is present
-        if (branchId && savedBatchHeader) {
+        // 3. Bulk create Stocks, Batches and Movements if branchId is present
+        if (branchId) {
           const currentBatchHeader = savedBatchHeader;
           const stocksToCreate: ProductStock[] = [];
           const batchesToCreate: ProductBatch[] = [];
@@ -129,7 +130,7 @@ export class ImportProductsHandler implements ICommandHandler<ImportProductsComm
 
           chunk.forEach((item, idx) => {
             const qty = Number(item.quantity);
-            if (qty > 0) {
+            if (!isNaN(qty)) {
               const variantId = savedVariants[idx].id;
               const purchasePrice = Number(savedVariants[idx].purchasePrice) || 0;
 
@@ -139,32 +140,50 @@ export class ImportProductsHandler implements ICommandHandler<ImportProductsComm
               stock.quantity = qty;
               stocksToCreate.push(stock);
 
-              const batch = new ProductBatch();
-              batch.tenantId = tenantId;
-              batch.branchId = branchId;
-              batch.batchId = currentBatchHeader.id;
-              batch.variantId = variantId;
-              batch.initialQuantity = qty;
-              batch.remainingQuantity = qty;
-              batch.unitCost = purchasePrice;
-              batchesToCreate.push(batch);
+              if (qty > 0 && currentBatchHeader) {
+                const batch = new ProductBatch();
+                batch.tenantId = tenantId;
+                batch.branchId = branchId;
+                batch.batchId = currentBatchHeader.id;
+                batch.variantId = variantId;
+                batch.initialQuantity = qty;
+                batch.remainingQuantity = qty;
+                batch.unitCost = purchasePrice;
+                batchesToCreate.push(batch);
 
-              const movement = new InventoryMovement();
-              movement.tenantId = tenantId;
-              movement.originBranchId = null;
-              movement.destinationBranchId = branchId;
-              movement.variantId = variantId;
-              movement.purchaseOrderId = null;
-              movement.quantity = qty;
-              movement.type = 'IN';
-              movement.reason = InventoryMovementReason.INITIAL_STOCK;
-              movementsToCreate.push(movement);
+                const movement = new InventoryMovement();
+                movement.tenantId = tenantId;
+                movement.originBranchId = null;
+                movement.destinationBranchId = branchId;
+                movement.variantId = variantId;
+                movement.purchaseOrderId = null;
+                movement.quantity = qty;
+                movement.type = InventoryMovementType.IN;
+                movement.reason = InventoryMovementReason.INITIAL_STOCK;
+                movementsToCreate.push(movement);
+              } else if (qty < 0) {
+                // Negative initial stock: deficit/debt in branch, recorded as OUT movement
+                const movement = new InventoryMovement();
+                movement.tenantId = tenantId;
+                movement.originBranchId = branchId;
+                movement.destinationBranchId = null;
+                movement.variantId = variantId;
+                movement.purchaseOrderId = null;
+                movement.quantity = Math.abs(qty);
+                movement.type = InventoryMovementType.OUT;
+                movement.reason = InventoryMovementReason.INITIAL_STOCK;
+                movementsToCreate.push(movement);
+              }
             }
           });
 
           if (stocksToCreate.length > 0) {
             await stockRepo.save(stocksToCreate);
+          }
+          if (batchesToCreate.length > 0) {
             await batchRepo.save(batchesToCreate);
+          }
+          if (movementsToCreate.length > 0) {
             await movementRepo.save(movementsToCreate);
           }
         }
