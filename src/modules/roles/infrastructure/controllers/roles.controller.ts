@@ -47,12 +47,13 @@ export class RolesController {
       order: { isSystem: 'DESC', createdAt: 'ASC' },
     });
 
-    // Conteo de usuarios asignados por rol
+    // Conteo de usuarios asignados por rol (excluyendo al propietario que no requiere rol)
     const counts = await userRepo
       .createQueryBuilder('user')
       .select('user.roleId', 'roleId')
       .addSelect('COUNT(user.id)', 'count')
       .where('user.tenantId = :tenantId', { tenantId })
+      .andWhere('user.isOwner = false')
       .groupBy('user.roleId')
       .getRawMany();
 
@@ -106,10 +107,6 @@ export class RolesController {
       throw new NotFoundException('Rol no encontrado.');
     }
 
-    if (role.name === 'Propietario' && dto.name && dto.name.trim() !== role.name) {
-      throw new BadRequestException('El nombre del rol Propietario no puede ser modificado.');
-    }
-
     if (dto.name && dto.name.trim() !== role.name) {
       const duplicate = await roleRepo.findOne({
         where: { tenantId, name: dto.name.trim() },
@@ -125,12 +122,7 @@ export class RolesController {
     }
 
     if (dto.permissions !== undefined) {
-      // Si es OWNER, sus permisos siempre son ['*']
-      if (role.name === 'Propietario') {
-        role.permissions = ['*'];
-      } else {
-        role.permissions = dto.permissions;
-      }
+      role.permissions = dto.permissions;
     }
 
     return roleRepo.save(role);
@@ -152,10 +144,16 @@ export class RolesController {
       throw new NotFoundException('Rol no encontrado.');
     }
 
-    const isOwnerRole = role.name === 'Propietario' || (Array.isArray(role.permissions) && role.permissions.includes('*'));
-    if (isOwnerRole) {
-      throw new BadRequestException('El rol principal de Propietario es fundamental para el sistema y no puede ser eliminado.');
-    }
+    // Si el usuario asignado es el Propietario (isOwner: true), desasociamos su roleId legacy automáticamente
+    await userRepo
+      .createQueryBuilder()
+      .update(User)
+      .set({ roleId: null })
+      .where('tenantId = :tenantId AND roleId = :roleId AND isOwner = true', {
+        tenantId,
+        roleId: role.id,
+      })
+      .execute();
 
     const assignedUsers = await userRepo.count({
       where: { tenantId, roleId: role.id },

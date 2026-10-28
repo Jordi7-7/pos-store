@@ -70,7 +70,10 @@ export class UpdateUserHandler implements ICommandHandler<UpdateUserCommand> {
       user.password = await this.hashService.hash(dto.password);
     }
 
-    if (dto.roleId !== undefined) {
+    if (user.isOwner) {
+      // El Propietario tiene acceso absoluto por is_owner: true y no requiere roleId
+      user.roleId = null;
+    } else if (dto.roleId !== undefined) {
       if (dto.roleId) {
         const roleEntity = await this.entityManager.query(
           `SELECT id, name FROM "roles" WHERE "id" = $1 AND "tenant_id" = $2`,
