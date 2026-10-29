@@ -80,14 +80,25 @@ export class GetDashboardMetricsHandler implements IQueryHandler<GetDashboardMet
     const startOfPrevWeek = now.minus({ weeks: 1 }).startOf('week').toJSDate();
     const endOfPrevWeek = now.minus({ weeks: 1 }).endOf('week').toJSDate();
 
+    const thirtyDaysAgo = now.minus({ days: 30 }).startOf('day').toJSDate();
     const sixMonthsAgo = now.minus({ months: 6 }).startOf('day').toJSDate();
 
     const branchFilterSql = branchId ? 'AND s.branch_id = $2' : '';
+    const branchFilterSql2 = branchId ? 'AND s2.branch_id = $2' : '';
     const refundBranchFilterSql = branchId ? 'AND r.branch_id = $2' : '';
+    const refundBranchFilterSql2 = branchId ? 'AND r2.branch_id = $2' : '';
+
     const queryParamsToday: any[] = branchId ? [tenantId, branchId, startOfToday, endOfToday] : [tenantId, startOfToday, endOfToday];
     const todayStartIdx = branchId ? '$3' : '$2';
     const todayEndIdx = branchId ? '$4' : '$3';
 
+    const topProductsParams: any[] = branchId ? [tenantId, branchId, thirtyDaysAgo] : [tenantId, thirtyDaysAgo];
+    const topProductsDateIdx = branchId ? '$3' : '$2';
+
+    const lowStockParams: any[] = branchId ? [tenantId, branchId, sixMonthsAgo] : [tenantId, sixMonthsAgo];
+    const lowStockDateIdx = branchId ? '$3' : '$2';
+
+    const yesterdayParams: any[] = branchId ? [tenantId, branchId, startOfYesterday, endOfYesterday] : [tenantId, startOfYesterday, endOfYesterday];
     const yesterdayStartIdx = branchId ? '$3' : '$2';
     const yesterdayEndIdx = branchId ? '$4' : '$3';
 
@@ -96,9 +107,6 @@ export class GetDashboardMetricsHandler implements IQueryHandler<GetDashboardMet
 
     const prevWeekStartIdx = branchId ? '$3' : '$2';
     const prevWeekEndIdx = branchId ? '$4' : '$3';
-
-    const lowStockParams: any[] = branchId ? [tenantId, branchId, sixMonthsAgo] : [tenantId, sixMonthsAgo];
-    const lowStockDateIdx = branchId ? '$3' : '$2';
 
     // 2. Ejecutar consultas optimizadas en paralelo
     const [
@@ -111,18 +119,21 @@ export class GetDashboardMetricsHandler implements IQueryHandler<GetDashboardMet
       weekDailyRaw,
       prevWeekRaw,
     ] = await Promise.all([
-      // A. Ventas Brutas de Hoy & Unidades Vendidas
+      // A. Ventas Brutas de Hoy & Unidades Vendidas (filtradas de forma directa por hoy)
       this.entityManager.query(
         `
         SELECT 
           COALESCE(SUM(s.total), 0) AS "totalSales",
-          COALESCE(SUM(items.qty), 0) AS "itemsCount"
+          COALESCE((
+            SELECT SUM(si.quantity)
+            FROM sale_items si
+            INNER JOIN sales s2 ON s2.id = si.sale_id
+            WHERE s2.tenant_id = $1
+              ${branchFilterSql2}
+              AND s2.status != 'REFUNDED'
+              AND s2.created_at BETWEEN ${todayStartIdx} AND ${todayEndIdx}
+          ), 0) AS "itemsCount"
         FROM sales s
-        LEFT JOIN (
-          SELECT sale_id, SUM(quantity) AS qty
-          FROM sale_items
-          GROUP BY sale_id
-        ) items ON items.sale_id = s.id
         WHERE s.tenant_id = $1 
           ${branchFilterSql}
           AND s.status != 'REFUNDED'
@@ -131,19 +142,21 @@ export class GetDashboardMetricsHandler implements IQueryHandler<GetDashboardMet
         queryParamsToday,
       ),
 
-      // B. Devoluciones de Hoy & Unidades Devueltas
+      // B. Devoluciones de Hoy & Unidades Devueltas (filtradas de forma directa por hoy)
       this.entityManager.query(
         `
         SELECT 
           COALESCE(SUM(r.total_refunded), 0) AS "totalRefunded",
-          COALESCE(SUM(items.qty), 0) AS "refundedItemsCount",
-          COUNT(DISTINCT r.id) AS "refundsCount"
+          COALESCE((
+            SELECT SUM(ri.quantity)
+            FROM refund_items ri
+            INNER JOIN refunds r2 ON r2.id = ri.refund_id
+            WHERE r2.tenant_id = $1
+              ${refundBranchFilterSql2}
+              AND r2.created_at BETWEEN ${todayStartIdx} AND ${todayEndIdx}
+          ), 0) AS "refundedItemsCount",
+          COUNT(r.id) AS "refundsCount"
         FROM refunds r
-        LEFT JOIN (
-          SELECT refund_id, SUM(quantity) AS qty
-          FROM refund_items
-          GROUP BY refund_id
-        ) items ON items.refund_id = r.id
         WHERE r.tenant_id = $1 
           ${refundBranchFilterSql}
           AND r.created_at BETWEEN ${todayStartIdx} AND ${todayEndIdx}
@@ -168,18 +181,31 @@ export class GetDashboardMetricsHandler implements IQueryHandler<GetDashboardMet
         queryParamsToday,
       ),
 
-      // C. Productos Más Vendidos (Top 5 del mes o histórico reciente)
+      // D. Productos Más Vendidos (Top 5 en los últimos 30 días, filtrado con CTE eficiente)
       this.entityManager.query(
         `
+        WITH top_variants AS (
+          SELECT 
+            si.variant_id,
+            SUM(si.quantity) AS "quantitySold"
+          FROM sale_items si
+          INNER JOIN sales s ON s.id = si.sale_id
+          WHERE s.tenant_id = $1
+            ${branchFilterSql}
+            AND s.status != 'REFUNDED'
+            AND s.created_at >= ${topProductsDateIdx}
+          GROUP BY si.variant_id
+          ORDER BY "quantitySold" DESC
+          LIMIT 5
+        )
         SELECT 
-          pv.id AS "variantId",
+          tv.variant_id AS "variantId",
           COALESCE(p.name, '') AS "productName",
           pv.sku AS "sku",
           pi.url AS "imageUrl",
-          SUM(si.quantity) AS "quantitySold"
-        FROM sale_items si
-        INNER JOIN sales s ON s.id = si.sale_id
-        INNER JOIN product_variants pv ON pv.id = si.variant_id
+          tv."quantitySold"
+        FROM top_variants tv
+        INNER JOIN product_variants pv ON pv.id = tv.variant_id
         INNER JOIN products p ON p.id = pv.product_id
         LEFT JOIN LATERAL (
           SELECT pim.url 
@@ -188,17 +214,12 @@ export class GetDashboardMetricsHandler implements IQueryHandler<GetDashboardMet
           WHERE pimap.product_id = p.id
           LIMIT 1
         ) pi ON true
-        WHERE s.tenant_id = $1
-          ${branchFilterSql}
-          AND s.status != 'REFUNDED'
-        GROUP BY pv.id, p.name, pv.sku, pi.url
-        ORDER BY "quantitySold" DESC
-        LIMIT 5
+        ORDER BY tv."quantitySold" DESC
         `,
-        branchId ? [tenantId, branchId] : [tenantId],
+        topProductsParams,
       ),
 
-      // D. Productos con Poco Inventario (<= 5 unidades en la sucursal, creados o con lotes en los últimos 6 meses)
+      // E. Productos con Poco Inventario (<= 5 unidades en la sucursal, creados o con lotes en los últimos 6 meses - LIMIT 50)
       this.entityManager.query(
         `
         SELECT 
@@ -223,38 +244,40 @@ export class GetDashboardMetricsHandler implements IQueryHandler<GetDashboardMet
         GROUP BY pv.id, p.name, pv.sku
         HAVING COALESCE(SUM(ps.quantity), 0) <= 5
         ORDER BY "stock" ASC
+        LIMIT 50
         `,
         lowStockParams,
       ),
 
-      // E. Productos Vendidos el Día Anterior (Ayer) con su Stock Actual (sin límite para permitir scroll)
+      // F. Productos Vendidos el Día Anterior (Ayer) con su Stock Actual (LIMIT 50 para evitar sobrecarga)
       this.entityManager.query(
         `
-        SELECT DISTINCT
+        WITH sold_yesterday AS (
+          SELECT DISTINCT si.variant_id
+          FROM sale_items si
+          INNER JOIN sales s ON s.id = si.sale_id
+          WHERE s.tenant_id = $1
+            ${branchFilterSql}
+            AND s.status != 'REFUNDED'
+            AND s.created_at BETWEEN ${yesterdayStartIdx} AND ${yesterdayEndIdx}
+          LIMIT 50
+        )
+        SELECT 
           pv.id AS "variantId",
           p.name AS "productName",
           pv.sku AS "sku",
-          COALESCE(stocks.current_stock, 0) AS "currentStock"
-        FROM sale_items si
-        INNER JOIN sales s ON s.id = si.sale_id
-        INNER JOIN product_variants pv ON pv.id = si.variant_id
+          COALESCE(SUM(ps.quantity), 0) AS "currentStock"
+        FROM sold_yesterday sy
+        INNER JOIN product_variants pv ON pv.id = sy.variant_id
         INNER JOIN products p ON p.id = pv.product_id
-        LEFT JOIN (
-          SELECT variant_id, SUM(quantity) as current_stock
-          FROM product_stocks
-          ${branchId ? 'WHERE branch_id = $2' : ''}
-          GROUP BY variant_id
-        ) stocks ON stocks.variant_id = pv.id
-        WHERE s.tenant_id = $1
-          ${branchFilterSql}
-          AND s.status != 'REFUNDED'
-          AND s.created_at BETWEEN ${yesterdayStartIdx} AND ${yesterdayEndIdx}
+        LEFT JOIN product_stocks ps ON ps.variant_id = pv.id ${branchId ? 'AND ps.branch_id = $2' : ''}
+        GROUP BY pv.id, p.name, pv.sku
         ORDER BY p.name ASC
         `,
-        branchId ? [tenantId, branchId, startOfYesterday, endOfYesterday] : [tenantId, startOfYesterday, endOfYesterday],
+        yesterdayParams,
       ),
 
-      // F. Resumen Diario de la Semana Actual
+      // G. Resumen Diario de la Semana Actual
       this.entityManager.query(
         `
         SELECT 
@@ -272,7 +295,7 @@ export class GetDashboardMetricsHandler implements IQueryHandler<GetDashboardMet
         branchId ? [tenantId, branchId, startOfWeek, endOfWeek] : [tenantId, startOfWeek, endOfWeek],
       ),
 
-      // G. Total de la Semana Anterior (para % comparativo)
+      // H. Total de la Semana Anterior (para % comparativo)
       this.entityManager.query(
         `
         SELECT COALESCE(SUM(s.total), 0) AS "prevWeekTotal"
