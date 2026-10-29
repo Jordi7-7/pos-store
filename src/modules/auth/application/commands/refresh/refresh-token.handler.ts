@@ -36,6 +36,7 @@ export class RefreshTokenHandler implements ICommandHandler<RefreshTokenCommand>
 
       const user = await this.entityManager.findOne(User, {
         where: { id: userId },
+        relations: { roleEntity: true },
       });
       if (!user) {
         this.logger.warn(`Refresh failed: User ID ${userId} not found in database.`);
@@ -44,18 +45,32 @@ export class RefreshTokenHandler implements ICommandHandler<RefreshTokenCommand>
 
       this.logger.log(`Tokens rotated successfully for User ID: ${userId}`);
 
+      // Resolving effective permissions
+      let effectivePermissions: string[] = [];
+      if (user.isOwner) {
+        effectivePermissions = ['*'];
+      } else {
+        const rolePerms = user.roleEntity?.permissions || [];
+        const customPerms = user.customPermissions || [];
+        effectivePermissions = Array.from(new Set([...rolePerms, ...customPerms]));
+      }
+
       const userPayload = {
         sub: user.id,
         tenantId: user.tenantId,
+        username: user.username,
         email: user.email,
         isOwner: user.isOwner,
         role: user.isOwner ? 'OWNER' : (user.roleEntity?.name || 'USER'),
+        roleId: user.roleId || null,
+        roleName: user.isOwner ? 'Propietario' : (user.roleEntity?.name || 'Usuario'),
+        permissions: effectivePermissions,
         name: user.name,
       };
 
       const accessToken = this.jwtService.sign(userPayload, {
         secret: this.configService.get<string>('JWT_SECRET'),
-        expiresIn: this.configService.get<string>('JWT_EXPIRES_IN', '15m') as any,
+        expiresIn: this.configService.get<string>('JWT_EXPIRES_IN', '1d') as any,
       });
 
       const newRefreshToken = this.jwtService.sign(
@@ -72,13 +87,6 @@ export class RefreshTokenHandler implements ICommandHandler<RefreshTokenCommand>
       return {
         accessToken,
         refreshToken: newRefreshToken,
-        user: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          isOwner: user.isOwner,
-          role: user.isOwner ? 'OWNER' : (user.roleEntity?.name || 'USER'),
-        },
       };
     } catch (err: any) {
       this.logger.warn(`Refresh failed: Token signature/expiry validation error: ${err?.message}`);

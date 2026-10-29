@@ -16,7 +16,7 @@ export class LogoutHandler implements ICommandHandler<LogoutCommand> {
       await this.redisService.del(redisKey);
       this.logger.log(`Session cleared in Redis for User ID: ${command.userId}`);
     } else {
-      this.logger.log(`Logout request received without user ID (already anonymous or expired)`);
+      this.logger.log(`Logout request received without user ID (already anonymous)`);
     }
   }
 }

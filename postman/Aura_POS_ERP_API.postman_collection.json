@@ -143,7 +143,8 @@
                   "if (pm.response.code === 200) {",
                   "    var data = pm.response.json();",
                   "    pm.collectionVariables.set('authToken', data.accessToken);",
-                  "    console.log('PIN Auth Token configurado con éxito.');",
+                  "    if (data.refreshToken) pm.collectionVariables.set('refreshToken', data.refreshToken);",
+                  "    console.log('PIN Auth Token y Refresh Token configurados con éxito.');",
                   "}"
                 ],
                 "type": "text/javascript"
@@ -245,6 +246,22 @@
         },
         {
           "name": "Refrescar Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var data = pm.response.json();",
+                  "    if (data.accessToken) pm.collectionVariables.set('authToken', data.accessToken);",
+                  "    if (data.refreshToken) pm.collectionVariables.set('refreshToken', data.refreshToken);",
+                  "    console.log('Tokens rotados exitosamente.');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "auth": {
               "type": "noauth"

@@ -32,12 +32,24 @@ export class AuthGuard implements CanActivate {
       if (token) {
         try {
           const jwtSecret = this.configService.get<string>('JWT_SECRET') || process.env.JWT_SECRET ;
-          const payload = await this.jwtService.verifyAsync(token, {
-            secret: jwtSecret,
-          });
-          request['user'] = payload;
+          let payload;
+          try {
+            payload = await this.jwtService.verifyAsync(token, {
+              secret: jwtSecret,
+            });
+          } catch (err: any) {
+            if (err?.name === 'TokenExpiredError') {
+              payload = await this.jwtService.verifyAsync(token, {
+                secret: jwtSecret,
+                ignoreExpiration: true,
+              });
+            }
+          }
+          if (payload) {
+            request['user'] = payload;
+          }
         } catch {
-          // Token inválido o expirado en ruta pública: se continúa sin bloquear
+          // Token inválido o corrupto en ruta pública: se continúa sin bloquear
         }
       }
       return true;
