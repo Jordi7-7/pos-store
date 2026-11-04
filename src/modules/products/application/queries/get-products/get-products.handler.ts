@@ -10,7 +10,7 @@ export class GetProductsHandler implements IQueryHandler<GetProductsQuery> {
   constructor(private readonly entityManager: EntityManager) {}
 
   async execute(query: GetProductsQuery): Promise<PaginatedProductsResponseDto> {
-    const { tenantId, page = 1, limit = 10, search, productType, branchId } = query;
+    const { tenantId, page = 1, limit = 10, search, productType, branchId, inStockOnly } = query;
     const repo = this.entityManager.getRepository(Product);
     const take = limit;
     const skip = (page - 1) * limit;
@@ -42,6 +42,32 @@ export class GetProductsHandler implements IQueryHandler<GetProductsQuery> {
 
     if (productType && (productType === ProductType.SIMPLE || productType === ProductType.VARIABLE)) {
       qb.andWhere('product.type = :productType', { productType });
+    }
+
+    if (inStockOnly) {
+      if (branchId) {
+        qb.andWhere(
+          `EXISTS (
+            SELECT 1 FROM product_variants pv
+            INNER JOIN product_stocks ps ON ps.variant_id = pv.id
+            WHERE pv.product_id = product.id
+              AND pv.deleted_at IS NULL
+              AND ps.branch_id = :stockBranchId
+              AND ps.quantity > 0
+          )`,
+          { stockBranchId: branchId },
+        );
+      } else {
+        qb.andWhere(
+          `EXISTS (
+            SELECT 1 FROM product_variants pv
+            INNER JOIN product_stocks ps ON ps.variant_id = pv.id
+            WHERE pv.product_id = product.id
+              AND pv.deleted_at IS NULL
+              AND ps.quantity > 0
+          )`,
+        );
+      }
     }
 
     const [products, total] = await qb

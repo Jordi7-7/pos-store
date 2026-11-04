@@ -6,6 +6,7 @@ export class GetProductsQuery {
     public readonly search?: string,
     public readonly productType?: string,
     public readonly branchId?: string,
+    public readonly inStockOnly?: boolean,
   ) {}
 }
 

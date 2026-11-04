@@ -157,13 +157,15 @@ export class ProductsController {
     @Query('search') search?: string,
     @Query('type') type?: string,
     @Query('branchId') branchId?: string,
+    @Query('inStockOnly') inStockOnly?: string | boolean,
   ) {
     const p = page ? Number(page) : undefined;
     const l = limit ? Number(limit) : undefined;
     const b = branchId || undefined;
+    const inStock = inStockOnly === 'true' || inStockOnly === true;
 
     return this.queryBus.execute(
-      new GetProductsQuery(tenantId, p, l, search, type, b),
+      new GetProductsQuery(tenantId, p, l, search, type, b, inStock),
     );
   }
 
