@@ -7,6 +7,7 @@ import { CashSession } from '../../../domain/entities/cash-session.entity';
 import { Sale } from '../../../domain/entities/sale.entity';
 import { Expense } from '../../../domain/entities/expense.entity';
 import { Refund } from '../../../domain/entities/refund.entity';
+import { PaymentMethod } from '../../../domain/entities/sale-payment.entity';
 
 @QueryHandler(GetCashSessionDetailsQuery)
 export class GetCashSessionDetailsHandler implements IQueryHandler<GetCashSessionDetailsQuery> {
@@ -178,17 +179,15 @@ export class GetCashSessionDetailsHandler implements IQueryHandler<GetCashSessio
       const saleTotal = Number(s.total || 0);
       grossSales += saleTotal;
 
-      if (s.status !== 'REFUNDED') {
-        const payments = s.payments || [];
-        if (payments.length > 0) {
-          payments.forEach((p) => {
-            const amt = Number(p.amount || 0);
-            if (p.paymentMethod === 'TARJETA') cardSales += amt;
-            else if (p.paymentMethod === 'EFECTIVO') cashSales += amt;
-          });
-        } else {
-          cashSales += saleTotal;
-        }
+      const payments = s.payments || [];
+      if (payments.length > 0) {
+        payments.forEach((p) => {
+          const amt = Number(p.amount || 0);
+          if (p.paymentMethod === PaymentMethod.TARJETA) cardSales += amt;
+          else if (p.paymentMethod === PaymentMethod.EFECTIVO) cashSales += amt;
+        });
+      } else {
+        cashSales += saleTotal;
       }
 
       const totalItems = (s.items || []).reduce((acc, it) => acc + Number(it.quantity || 0), 0);
@@ -208,7 +207,7 @@ export class GetCashSessionDetailsHandler implements IQueryHandler<GetCashSessio
         customerName: s.customer?.name || 'CONSUMIDOR FINAL',
         userName: s.user?.name || 'Sin especificar',
         totalItems,
-        paymentMethod: s.payments?.[0]?.paymentMethod || 'EFECTIVO',
+        paymentMethod: s.payments?.[0]?.paymentMethod || PaymentMethod.EFECTIVO,
         payments: s.payments,
         items: s.items,
         user: s.user ? { id: s.user.id, name: s.user.name } : undefined,
