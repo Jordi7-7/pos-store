@@ -12,8 +12,6 @@ import { CreateCategoryDto } from '../../application/commands/create-category/cr
 import { CreateCategoryCommand } from '../../application/commands/create-category/create-category.command';
 import { GetCategoriesQuery } from '../../application/queries/get-categories/get-categories.query';
 import { GetProductsQuery } from '../../application/queries/get-products/get-products.query';
-import { GetProductsBySkuAndBarcodeQuery } from '../../application/queries/get-products-by-sku-and-barcode/get-products-by-sku-and-barcode.query';
-import { GetProductsByNameQuery } from '../../application/queries/get-products-by-name/get-products-by-name.query';
 import { GetProductByIdQuery } from '../../application/queries/get-product-by-id/get-product-by-id.query';
 import { GetVariantBySkuQuery } from '../../application/queries/get-variant-by-sku/get-variant-by-sku.query';
 import { GetPosVariantBySkuQuery } from '../../application/queries/get-pos-variant-by-sku/get-pos-variant-by-sku.query';
@@ -164,22 +162,8 @@ export class ProductsController {
     const l = limit ? Number(limit) : undefined;
     const b = branchId || undefined;
 
-    if (search && search.trim() !== '') {
-      const codeResult = await this.queryBus.execute(
-        new GetProductsBySkuAndBarcodeQuery(tenantId, search, p, l, type, b),
-      );
-
-      if (codeResult && codeResult.meta && codeResult.meta.total > 0) {
-        return codeResult;
-      }
-
-      return this.queryBus.execute(
-        new GetProductsByNameQuery(tenantId, search, p, l, type, b),
-      );
-    }
-
     return this.queryBus.execute(
-      new GetProductsQuery(tenantId, p, l, undefined, type, b),
+      new GetProductsQuery(tenantId, p, l, search, type, b),
     );
   }
 

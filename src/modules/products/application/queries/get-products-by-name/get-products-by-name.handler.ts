@@ -39,7 +39,8 @@ export class GetProductsByNameHandler implements IQueryHandler<GetProductsByName
     }
 
     const [products, total] = await qb
-      .orderBy('product.createdAt', 'DESC')
+      .orderBy('product.baseSku', 'ASC')
+      .addOrderBy('product.name', 'ASC')
       .skip(skip)
       .take(take)
       .getManyAndCount();
@@ -60,7 +61,9 @@ export class GetProductsByNameHandler implements IQueryHandler<GetProductsByName
         categoryId: product.categoryId,
         categoryName: product.category ? product.category.name : null,
         images: parentImages.map(img => ({ id: img.id, url: img.url })),
-        variants: (product.variants || []).map(variant => {
+        variants: (product.variants || [])
+          .sort((a, b) => (a.sku || '').localeCompare(b.sku || ''))
+          .map(variant => {
           const varImages = (variant.images && variant.images.length > 0)
             ? variant.images.map(img => ({ id: img.id, url: img.url }))
             : parentImages.map(img => ({ id: img.id, url: img.url }));

@@ -73,7 +73,7 @@ export class CreateSimpleProductHandler implements ICommandHandler<CreateSimpleP
       product.name = name;
       product.description = description;
       product.type = ProductType.SIMPLE;
-      product.baseSku = null;
+      product.baseSku = sku ? sku.trim().toUpperCase() : null;
 
       // Link Category if provided
       if (categoryId) {

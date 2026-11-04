@@ -99,7 +99,7 @@ export class ImportProductsHandler implements ICommandHandler<ImportProductsComm
           prod.name = item.name.trim();
           prod.description = '';
           prod.type = ProductType.SIMPLE;
-          prod.baseSku = null;
+          prod.baseSku = item.sku ? item.sku.trim().toUpperCase() : null;
           return prod;
         });
         const savedProducts = await productRepo.save(productsToCreate);

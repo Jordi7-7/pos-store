@@ -10,7 +10,7 @@ export class GetProductsHandler implements IQueryHandler<GetProductsQuery> {
   constructor(private readonly entityManager: EntityManager) {}
 
   async execute(query: GetProductsQuery): Promise<PaginatedProductsResponseDto> {
-    const { tenantId, page = 1, limit = 10, productType, branchId } = query;
+    const { tenantId, page = 1, limit = 10, search, productType, branchId } = query;
     const repo = this.entityManager.getRepository(Product);
     const take = limit;
     const skip = (page - 1) * limit;
@@ -32,12 +32,21 @@ export class GetProductsHandler implements IQueryHandler<GetProductsQuery> {
       .leftJoinAndSelect('attributeValues.attribute', 'attribute')
       .where('product.tenantId = :tenantId', { tenantId });
 
+    if (search && search.trim() !== '') {
+      const searchTerm = `%${search.trim()}%`;
+      qb.andWhere(
+        '(product.name ILIKE :searchTerm OR product.baseSku ILIKE :searchTerm OR variants.sku ILIKE :searchTerm OR variants.barcode ILIKE :searchTerm)',
+        { searchTerm },
+      );
+    }
+
     if (productType && (productType === ProductType.SIMPLE || productType === ProductType.VARIABLE)) {
       qb.andWhere('product.type = :productType', { productType });
     }
 
     const [products, total] = await qb
-      .orderBy('product.createdAt', 'DESC')
+      .orderBy('product.baseSku', 'ASC')
+      .addOrderBy('product.name', 'ASC')
       .skip(skip)
       .take(take)
       .getManyAndCount();
@@ -58,7 +67,9 @@ export class GetProductsHandler implements IQueryHandler<GetProductsQuery> {
         categoryId: product.categoryId,
         categoryName: product.category ? product.category.name : null,
         images: parentImages.map(img => ({ id: img.id, url: img.url })),
-        variants: (product.variants || []).map(variant => {
+        variants: (product.variants || [])
+          .sort((a, b) => (a.sku || '').localeCompare(b.sku || ''))
+          .map(variant => {
           const varImages = (variant.images && variant.images.length > 0)
             ? variant.images.map(img => ({ id: img.id, url: img.url }))
             : parentImages.map(img => ({ id: img.id, url: img.url }));
