@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsEmail, MinLength, IsOptional } from 'class-validator';
+import { IsString, IsNotEmpty, IsEmail, MinLength, IsOptional, IsTimeZone } from 'class-validator';
 
 export class OnboardTenantDto {
   // Tenant Details
@@ -26,8 +26,7 @@ export class OnboardTenantDto {
   @IsNotEmpty()
   currencySymbol: string;
 
-  @IsString()
-  @IsNotEmpty()
+  @IsTimeZone({ message: 'La zona horaria no es válida (ej. America/Guayaquil).' })
   timezone: string;
 
   // Admin User Details

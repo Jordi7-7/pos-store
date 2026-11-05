@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsTimeZone } from 'class-validator';
 
 export class UpdateTenantDto {
   @IsString()
@@ -16,8 +16,7 @@ export class UpdateTenantDto {
   @IsOptional()
   currencyCode?: string;
 
-  @IsString()
-  @IsNotEmpty()
+  @IsTimeZone({ message: 'La zona horaria no es válida (ej. America/Guayaquil).' })
   @IsOptional()
   timezone?: string;
 
