@@ -5,6 +5,7 @@ import {
   HttpStatus,
   NotFoundException,
 } from '@nestjs/common';
+import { DomainError } from '../domain/domain.error';
 import { ApiErrorBody } from './api-error-body';
 import { AllExceptionsFilter } from './all-exceptions.filter';
 import { AppException } from './app.exception';
@@ -56,6 +57,13 @@ describe('AllExceptionsFilter', () => {
 
     expect(status).toBe(409);
     expect(body).toMatchObject({ code: 'INSUFFICIENT_STOCK', message: 'Stock insuficiente.', details: { sku: 'A1' } });
+  });
+
+  it('traduce DomainError a 400 con su código, mensaje y details', () => {
+    const { status, body } = run(new DomainError(ErrorCode.InvalidRefund, 'No se puede', { saleId: 's1' }));
+
+    expect(status).toBe(HttpStatus.BAD_REQUEST);
+    expect(body).toMatchObject({ code: ErrorCode.InvalidRefund, message: 'No se puede', details: { saleId: 's1' } });
   });
 
   it('convierte errores de class-validator en VALIDATION_FAILED con message como texto', () => {

@@ -1,6 +1,7 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { Request, Response } from 'express';
+import { DomainError } from '../domain/domain.error';
 import { ApiErrorBody } from './api-error-body';
 import { AppException } from './app.exception';
 import { ErrorCode } from './error-codes';
@@ -50,6 +51,21 @@ function normalizeHttpException(exception: HttpException): NormalizedError {
   return { status, code: fallbackCode, message };
 }
 
+function normalizeDomainError(error: DomainError): NormalizedError {
+  return { status: HttpStatus.BAD_REQUEST, code: error.code, message: error.message, details: error.details };
+}
+
+function normalize(exception: unknown): NormalizedError {
+  if (exception instanceof HttpException) return normalizeHttpException(exception);
+  if (exception instanceof DomainError) return normalizeDomainError(exception);
+  return {
+    status: HttpStatus.INTERNAL_SERVER_ERROR,
+    code: ErrorCode.Internal,
+    // Nunca filtrar detalles internos al cliente.
+    message: 'Error interno del servidor.',
+  };
+}
+
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger(AllExceptionsFilter.name);
@@ -62,15 +78,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const requestIdHeader = request.headers['x-request-id'];
     const requestId = typeof requestIdHeader === 'string' && requestIdHeader ? requestIdHeader : randomUUID();
 
-    const normalized: NormalizedError =
-      exception instanceof HttpException
-        ? normalizeHttpException(exception)
-        : {
-            status: HttpStatus.INTERNAL_SERVER_ERROR,
-            code: ErrorCode.Internal,
-            // Nunca filtrar detalles internos al cliente.
-            message: 'Error interno del servidor.',
-          };
+    const normalized = normalize(exception);
 
     if (normalized.status >= HttpStatus.INTERNAL_SERVER_ERROR) {
       const detail = exception instanceof Error ? (exception.stack ?? exception.message) : String(exception);

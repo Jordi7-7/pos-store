@@ -13,4 +13,26 @@ export enum ErrorCode {
   PayloadTooLarge = 'PAYLOAD_TOO_LARGE',
   TooManyRequests = 'TOO_MANY_REQUESTS',
   Internal = 'INTERNAL_ERROR',
+
+  // Autenticación
+  InvalidPin = 'INVALID_PIN',
+  TooManyAttempts = 'TOO_MANY_ATTEMPTS',
+  PinAlreadyInUse = 'PIN_ALREADY_IN_USE',
+  SessionExpired = 'SESSION_EXPIRED',
+
+  InvalidReference = 'INVALID_REFERENCE',
+
+  // Cajas
+  CashRegisterNotAssigned = 'CASH_REGISTER_NOT_ASSIGNED',
+  CashRegisterBusy = 'CASH_REGISTER_BUSY',
+
+  // Ventas
+  InvalidSaleAmounts = 'INVALID_SALE_AMOUNTS',
+  InsufficientPayment = 'INSUFFICIENT_PAYMENT',
+  InvalidRefund = 'INVALID_REFUND',
+
+  // Media
+  InvalidMediaUrl = 'INVALID_MEDIA_URL',
+  UnsupportedMediaType = 'UNSUPPORTED_MEDIA_TYPE',
+  MediaNotOwned = 'MEDIA_NOT_OWNED',
 }
