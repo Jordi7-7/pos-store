@@ -1,98 +1,105 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# pos-store — API del POS/ERP multitenant
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+Backend de un sistema **POS / ERP SaaS** para tiendas: ventas con turnos de caja, inventario por sucursal con costo FIFO, compras, catálogo con variantes, clientes, proveedores, reportes y panel. Cada tienda (tenant) está aislada de las demás; dentro de una tienda, cada usuario ve solo sus sucursales.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+**Stack:** NestJS 11 · CQRS (`@nestjs/cqrs`) · TypeORM 1.0 · PostgreSQL 16 · Redis 7 · JWT con refresh rotatorio · Cloudflare R2 (API S3) para imágenes · TypeScript 6 · pnpm 11 · Node 24 · Jest 30.
 
-## Description
+Forma parte de un monorepo con `pos-store-front` (web React), `pos-store-mobile` (Expo) y `test-docker` (despliegue). Este repositorio es **solo el backend**.
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+---
 
-## Project setup
+## Documentación
+
+| Documento | Para qué |
+|---|---|
+| [`CLAUDE.md`](CLAUDE.md) | Reglas de trabajo y contexto completo (léelo primero si vas a modificar código) |
+| [`architecture_guide.md`](architecture_guide.md) | Arquitectura, convenciones y reglas que el código debe cumplir |
+| [`docs/database.md`](docs/database.md) | Esquema, restricciones únicas, concurrencia y cómo escribir migraciones |
+| [`docs/deployment.md`](docs/deployment.md) | Despliegue: variables, comprobaciones previas, migraciones, marcha atrás |
+| [`docs/error-codes.md`](docs/error-codes.md) | Catálogo de códigos de error (el front y el móvil deciden por `code`) |
+| [`docs/project-history.md`](docs/project-history.md) | Historia del refactor, decisiones y trabajo pendiente |
+
+---
+
+## Puesta en marcha (desarrollo)
+
+Requisitos: Node 24, pnpm 11, PostgreSQL 16 y Redis 7 (Docker sirve para los dos).
 
 ```bash
-$ pnpm install
+pnpm install
+
+# Redis (el docker-compose de esta carpeta solo levanta Redis)
+docker compose up -d redis
+# PostgreSQL: usa una instancia local o un contenedor; crea la base y apunta DB_* a ella
+
+cp .env.example .env          # ← rellena con TUS valores; .env.example no debe contener secretos reales
+pnpm migration:run            # aplica el esquema
+pnpm start:dev                # http://localhost:3000   (GET /health)
 ```
 
-## Compile and run the project
+### Variables de entorno
+Descritas en [`docs/deployment.md` §2](docs/deployment.md). Las críticas (`JWT_SECRET`, `REFRESH_TOKEN_SECRET`, `DB_PASSWORD`, y `CORS_ORIGINS` en producción) **hacen que la API no arranque** si faltan o son inseguras.
+
+### Dar de alta una tienda
+`POST /auth/onboard` (protegido con la cabecera `x-onboarding-key` = `ONBOARDING_API_KEY`) crea la tienda, su sucursal inicial, el propietario, tres roles (Administrador, Gerente / Supervisor, Cajero), un proveedor `GENERICO` y el cliente `CONSUMIDOR FINAL`. Después se inicia sesión con el `slug` de la tienda.
+
+---
+
+## Scripts
+
+| Comando | Qué hace |
+|---|---|
+| `pnpm start:dev` / `start:prod` | Arranque con recarga / desde `dist` |
+| `pnpm build` | Compila a `dist/` |
+| `pnpm typecheck` | `tsc --noEmit` |
+| `pnpm lint` | ESLint estricto (sin `--fix`); la deuda heredada está en `eslint-suppressions.json` |
+| `pnpm lint:prune` | Retira de esa lista lo que ya se arregló |
+| `pnpm test` | Tests unitarios (rápidos, sin base de datos) |
+| `pnpm test:integration` | Tests de integración contra **Postgres y Redis reales** |
+| `pnpm verify` | `typecheck` + `lint` + `test` (lo mínimo antes de subir cambios) |
+| `pnpm migration:run` / `migration:revert` | Aplica / deshace una migración (desarrollo) |
+| `pnpm migration:run:prod` | Aplica migraciones desde `dist` (producción) |
+| `python3 scripts/generate-error-catalog.py` | Regenera `docs/error-codes.md` |
+
+### Tests de integración
+Necesitan Postgres y Redis accesibles con las variables `DB_*` y `REDIS_*` (el usuario debe poder crear bases). Cada suite **crea una base con nombre único, aplica las migraciones y la borra al terminar**; no toca la base configurada. Para reproducir el CI en local:
 
 ```bash
-# development
-$ pnpm run start
-
-# watch mode
-$ pnpm run start:dev
-
-# production mode
-$ pnpm run start:prod
+docker run -d --name pg-it -e POSTGRES_PASSWORD=postgres -p 5432:5432 postgres:16-alpine
+docker run -d --name redis-it -p 6379:6379 redis:7-alpine
+DB_HOST=localhost DB_PORT=5432 DB_USERNAME=postgres DB_PASSWORD=postgres DB_DATABASE=postgres \
+REDIS_HOST=localhost REDIS_PORT=6379 pnpm test:integration
 ```
 
-## Run tests
+---
 
-```bash
-# unit tests
-$ pnpm run test
+## Estructura
 
-# e2e tests
-$ pnpm run test:e2e
-
-# test coverage
-$ pnpm run test:cov
+```
+src/
+  common/            Money, errores, seguridad, utilidades compartidas
+  config/            validación de entorno, conexión a la BD
+  database/migrations/
+  modules/           auth, batches, branches, customers, dashboard, media, products,
+                     purchases, reports, roles, sales, tenants, users
+    <modulo>/{domain, application/{commands,queries,services}, infrastructure/{controllers,dtos}}
+test/integration/    flujos reales sobre Postgres + Redis
+docs/                base de datos, despliegue, errores, historia
 ```
 
-## Deployment
+## Contrato de la API en dos líneas
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+- **Autenticación:** `Authorization: Bearer <access token>`; `POST /auth/refresh` rota el refresh token.
+- **Errores:** todas las respuestas de error son `{ statusCode, code, message, details?, path, timestamp, requestId }`. Los clientes deben decidir qué mostrar por **`code`** (ver `docs/error-codes.md`). El `requestId` también viaja en `x-request-id`: pídelo al reportar un fallo.
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+Colección de ejemplos: `postman/Aura_POS_ERP_API.postman_collection.json`.
 
-```bash
-$ pnpm install -g @nestjs/mau
-$ mau deploy
-```
+## Reglas para contribuir (resumen)
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+1. Escrituras como **comando + handler** en transacción; `tenantId` explícito y filtrado en cada consulta.
+2. Errores con `AppException(ErrorCode.X, …)`, nunca excepciones HTTP sueltas; documenta el código nuevo.
+3. Dinero con `Money`; SKU con `normalizeSku`; nada de `any`.
+4. Todo defecto de dinero, stock, permisos o concurrencia lleva **un test que falla sin la corrección**.
+5. `pnpm verify` y `pnpm test:integration` en verde antes de subir.
 
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+Licencia: privada (`UNLICENSED`).
