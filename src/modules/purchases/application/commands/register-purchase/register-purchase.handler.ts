@@ -2,7 +2,7 @@ import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { Money } from '../../../../../common/domain/money';
 import { receiveStock } from '../../../../products/application/services/inventory-stock';
 import { weightedAverageCost } from '../../../../products/domain/services/stock-rules';
-import { Logger, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Logger, HttpStatus } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { RedisService } from '../../../../../common/redis/redis.service';
 import { assertUserCanOperateInBranch } from '../../../../../common/security/branch-access.helper';
@@ -17,6 +17,8 @@ import { InventoryMovement } from '../../../../products/domain/entities/inventor
 import { Batch, BatchOriginType } from '../../../../batches/domain/entities/batch.entity';
 import { InventoryMovementReason } from '../../../../../common/enums/inventory-movement-reason.enum';
 import { PurchaseOrderStatus } from '../../../../purchases/domain/enums/purchase-order-status.enum';
+import { AppException } from '../../../../../common/errors/app.exception';
+import { ErrorCode } from '../../../../../common/errors/error-codes';
 
 @CommandHandler(RegisterPurchaseCommand)
 export class RegisterPurchaseHandler implements ICommandHandler<RegisterPurchaseCommand> {
@@ -57,7 +59,7 @@ export class RegisterPurchaseHandler implements ICommandHandler<RegisterPurchase
         });
         if (!supplier) {
           this.logger.warn(`Purchase failed: Supplier ID ${supplierId} not found under Tenant ${tenantId}`);
-          throw new NotFoundException(`Supplier with ID ${supplierId} not found`);
+          throw new AppException(ErrorCode.SupplierNotFound, 'Proveedor no encontrado.', HttpStatus.NOT_FOUND, { supplierId });
         }
       } else {
         supplier = await supplierRepo.findOne({
@@ -71,7 +73,7 @@ export class RegisterPurchaseHandler implements ICommandHandler<RegisterPurchase
         }
         if (!supplier) {
           this.logger.warn(`Purchase failed: No supplier found or provided under Tenant ${tenantId}`);
-          throw new NotFoundException(`Supplier not found`);
+          throw new AppException(ErrorCode.SupplierNotFound, 'Proveedor no encontrado.', HttpStatus.NOT_FOUND);
         }
       }
 
@@ -81,7 +83,7 @@ export class RegisterPurchaseHandler implements ICommandHandler<RegisterPurchase
       });
       if (!branch) {
         this.logger.warn(`Purchase failed: Branch ID ${branchId} not found under Tenant ${tenantId}`);
-        throw new NotFoundException(`Branch with ID ${branchId} not found`);
+        throw new AppException(ErrorCode.BranchNotFound, 'Sucursal no encontrada.', HttpStatus.NOT_FOUND, { branchId });
       }
 
       // 4. Calculate total amount
@@ -120,7 +122,7 @@ export class RegisterPurchaseHandler implements ICommandHandler<RegisterPurchase
         });
         if (!variant) {
           this.logger.warn(`Purchase failed: Variant ID ${itemDto.variantId} not found for Tenant ${tenantId}`);
-          throw new NotFoundException(`Product Variant with ID ${itemDto.variantId} not found`);
+          throw new AppException(ErrorCode.VariantNotFound, 'Variante no encontrada.', HttpStatus.NOT_FOUND, { variantId: itemDto.variantId });
         }
 
         // Get total stock across all branches to calculate PMP

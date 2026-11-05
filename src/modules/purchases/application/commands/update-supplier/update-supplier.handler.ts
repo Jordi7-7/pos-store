@@ -1,9 +1,11 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Not } from 'typeorm';
-import { NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import { Logger, HttpStatus } from '@nestjs/common';
 import { UpdateSupplierCommand } from './update-supplier.command';
 import { Supplier } from '../../../domain/entities/supplier.entity';
+import { AppException } from '../../../../../common/errors/app.exception';
+import { ErrorCode } from '../../../../../common/errors/error-codes';
 
 @CommandHandler(UpdateSupplierCommand)
 export class UpdateSupplierHandler implements ICommandHandler<UpdateSupplierCommand> {
@@ -21,7 +23,7 @@ export class UpdateSupplierHandler implements ICommandHandler<UpdateSupplierComm
       where: { id, tenantId },
     });
     if (!supplier) {
-      throw new NotFoundException(`Supplier with ID ${id} not found`);
+      throw new AppException(ErrorCode.SupplierNotFound, 'Proveedor no encontrado.', HttpStatus.NOT_FOUND, { id });
     }
 
     if (input.identityNumber !== undefined) {
@@ -29,7 +31,7 @@ export class UpdateSupplierHandler implements ICommandHandler<UpdateSupplierComm
         where: { tenantId, identityNumber: input.identityNumber, id: Not(id) },
       });
       if (existing) {
-        throw new BadRequestException(`Supplier with identity number "${input.identityNumber}" already exists`);
+        throw new AppException(ErrorCode.SupplierIdentityTaken, `Ya existe un proveedor con el documento "${input.identityNumber}".`, HttpStatus.CONFLICT, { identityNumber: input.identityNumber });
       }
       supplier.identityNumber = input.identityNumber;
     }

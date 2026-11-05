@@ -1,7 +1,7 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { Money } from '../../../../../common/domain/money';
 import { receiveStock } from '../../../../products/application/services/inventory-stock';
-import { Logger, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Logger, HttpStatus } from '@nestjs/common';
 import { EntityManager, In } from 'typeorm';
 import { RedisService } from '../../../../../common/redis/redis.service';
 import { assertUserCanOperateInBranch } from '../../../../../common/security/branch-access.helper';
@@ -15,6 +15,8 @@ import { Batch, BatchOriginType } from '../../../../batches/domain/entities/batc
 import { InventoryMovement } from '../../../../products/domain/entities/inventory-movement.entity';
 import { InventoryMovementReason } from '../../../../../common/enums/inventory-movement-reason.enum';
 import { PurchaseOrderStatus } from '../../../../purchases/domain/enums/purchase-order-status.enum';
+import { AppException } from '../../../../../common/errors/app.exception';
+import { ErrorCode } from '../../../../../common/errors/error-codes';
 
 @CommandHandler(ImportPurchasesCommand)
 export class ImportPurchasesHandler implements ICommandHandler<ImportPurchasesCommand> {
@@ -31,13 +33,11 @@ export class ImportPurchasesHandler implements ICommandHandler<ImportPurchasesCo
     this.logger.log(`Executing bulk purchase import: ${items.length} items for Branch: ${branchId}`);
 
     if (items.length === 0) {
-      throw new BadRequestException('No se proporcionaron registros para importar.');
+      throw new AppException(ErrorCode.ImportEmpty, 'No se proporcionaron registros para importar.', HttpStatus.BAD_REQUEST);
     }
 
     if (items.length > 3000) {
-      throw new BadRequestException(
-        `El archivo contiene ${items.length} filas. El límite máximo permitido por importación es de 3,000 registros.`,
-      );
+      throw new AppException(ErrorCode.ImportLimitExceeded, `El archivo contiene ${items.length} filas. El límite máximo permitido por importación es de 3,000 registros.`, HttpStatus.BAD_REQUEST, { received: items.length, max: 3000 });
     }
 
     return this.entityManager.transaction(async (tm) => {
@@ -59,7 +59,7 @@ export class ImportPurchasesHandler implements ICommandHandler<ImportPurchasesCo
       // Verify branch exists
       const branch = await branchRepo.findOne({ where: { id: branchId, tenantId } });
       if (!branch) {
-        throw new NotFoundException(`La sucursal destino con ID ${branchId} no existe.`);
+        throw new AppException(ErrorCode.BranchNotFound, `La sucursal destino con ID ${branchId} no existe.`, HttpStatus.NOT_FOUND, { branchId });
       }
 
       // Resolve supplier (by supplierId or default to GENERICO)
@@ -67,7 +67,7 @@ export class ImportPurchasesHandler implements ICommandHandler<ImportPurchasesCo
       if (command.supplierId) {
         supplier = await supplierRepo.findOne({ where: { id: command.supplierId, tenantId } });
         if (!supplier) {
-          throw new NotFoundException(`El proveedor seleccionado con ID ${command.supplierId} no existe.`);
+          throw new AppException(ErrorCode.SupplierNotFound, `El proveedor seleccionado con ID ${command.supplierId} no existe.`, HttpStatus.NOT_FOUND, { supplierId: command.supplierId });
         }
       } else {
         supplier = await supplierRepo.findOne({ where: { identityNumber: 'GENERICO', tenantId } });
@@ -75,7 +75,7 @@ export class ImportPurchasesHandler implements ICommandHandler<ImportPurchasesCo
           supplier = await supplierRepo.findOne({ where: { tenantId } });
         }
         if (!supplier) {
-          throw new NotFoundException('No se encontró un proveedor configurado para este tenant.');
+          throw new AppException(ErrorCode.DefaultSupplierNotFound, 'No se encontró un proveedor configurado para este tenant.', HttpStatus.NOT_FOUND);
         }
       }
 
@@ -96,13 +96,13 @@ export class ImportPurchasesHandler implements ICommandHandler<ImportPurchasesCo
       }
 
       if (missingSkus.length > 0) {
-        throw new BadRequestException(`Los siguientes SKUs no existen en el catálogo: ${missingSkus.join(', ')}`);
+        throw new AppException(ErrorCode.SkusNotFound, `Los siguientes SKUs no existen en el catálogo: ${missingSkus.join(', ')}`, HttpStatus.NOT_FOUND, { skus: missingSkus });
       }
 
       // Verify all items have positive quantities
       for (const itemDto of items) {
         if (Number(itemDto.quantity) <= 0) {
-          throw new BadRequestException(`La cantidad para el SKU ${itemDto.sku} debe ser mayor a 0.`);
+          throw new AppException(ErrorCode.InvalidQuantity, `La cantidad para el SKU ${itemDto.sku} debe ser mayor a 0.`, HttpStatus.BAD_REQUEST, { sku: itemDto.sku });
         }
       }
 

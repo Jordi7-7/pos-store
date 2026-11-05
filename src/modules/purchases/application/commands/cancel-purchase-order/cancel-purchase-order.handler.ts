@@ -1,10 +1,5 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import {
-  Logger,
-  NotFoundException,
-  BadRequestException,
-  ConflictException,
-} from '@nestjs/common';
+import { Logger, HttpStatus } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { RedisService } from '../../../../../common/redis/redis.service';
 import { assertUserCanOperateInBranch } from '../../../../../common/security/branch-access.helper';
@@ -17,6 +12,8 @@ import { Batch, BatchStatus } from '../../../../batches/domain/entities/batch.en
 import { InventoryMovement } from '../../../../products/domain/entities/inventory-movement.entity';
 import { InventoryMovementReason } from '../../../../../common/enums/inventory-movement-reason.enum';
 import { PurchaseOrderStatus } from '../../../../purchases/domain/enums/purchase-order-status.enum';
+import { AppException } from '../../../../../common/errors/app.exception';
+import { ErrorCode } from '../../../../../common/errors/error-codes';
 
 @CommandHandler(CancelPurchaseOrderCommand)
 export class CancelPurchaseOrderHandler
@@ -54,9 +51,7 @@ export class CancelPurchaseOrderHandler
       });
 
       if (!order) {
-        throw new NotFoundException(
-          `Purchase order with ID ${purchaseOrderId} not found`,
-        );
+        throw new AppException(ErrorCode.PurchaseOrderNotFound, 'Orden de compra no encontrada.', HttpStatus.NOT_FOUND, { purchaseOrderId });
       }
 
       await assertUserCanOperateInBranch(tm, this.redisService, {
@@ -67,15 +62,11 @@ export class CancelPurchaseOrderHandler
       });
 
       if (order.status === PurchaseOrderStatus.CANCELLED) {
-        throw new BadRequestException(
-          `Purchase order ${purchaseOrderId} is already cancelled`,
-        );
+        throw new AppException(ErrorCode.PurchaseOrderAlreadyCancelled, 'La orden de compra ya está cancelada.', HttpStatus.CONFLICT, { purchaseOrderId });
       }
 
       if (order.status !== PurchaseOrderStatus.COMPLETED) {
-        throw new BadRequestException(
-          `Only COMPLETED purchase orders can be cancelled`,
-        );
+        throw new AppException(ErrorCode.PurchaseOrderNotCancellable, 'Solo se pueden cancelar órdenes de compra completadas.', HttpStatus.CONFLICT);
       }
 
       // 2. Verify no items have been sold: all batches must be fully intact
@@ -89,10 +80,7 @@ export class CancelPurchaseOrderHandler
         const initial = Number(batch.initialQuantity);
         const remaining = Number(batch.remainingQuantity);
         if (remaining < initial) {
-          throw new ConflictException(
-            `Cannot cancel this purchase order because some units from this batch have already been sold. ` +
-              `Batch ${batch.id}: ${initial - remaining} unit(s) already consumed.`,
-          );
+          throw new AppException(ErrorCode.PurchaseBatchAlreadySold, `No se puede cancelar la orden de compra porque ya se vendieron ${initial - remaining} unidad(es) de uno de sus lotes.`, HttpStatus.CONFLICT, { batchId: batch.id, consumed: initial - remaining });
         }
       }
 
@@ -107,16 +95,12 @@ export class CancelPurchaseOrderHandler
         });
 
         if (!branchStock) {
-          throw new NotFoundException(
-            `Stock record not found for variant ${item.variantId} in branch ${order.branchId}`,
-          );
+          throw new AppException(ErrorCode.StockRecordNotFound, 'No existe registro de stock de la variante en la sucursal de la orden.', HttpStatus.NOT_FOUND, { variantId: item.variantId, branchId: order.branchId });
         }
 
         const newQty = Number(branchStock.quantity) - Number(item.quantity);
         if (newQty < 0) {
-          throw new ConflictException(
-            `Insufficient stock to cancel: variant ${item.variantId} would go negative`,
-          );
+          throw new AppException(ErrorCode.InsufficientStock, 'No hay stock suficiente para cancelar: la variante quedaría en negativo.', HttpStatus.CONFLICT, { variantId: item.variantId });
         }
 
         branchStock.quantity = newQty;

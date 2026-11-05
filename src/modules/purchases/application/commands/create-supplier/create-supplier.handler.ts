@@ -1,8 +1,10 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import { Logger, BadRequestException } from '@nestjs/common';
+import { Logger, HttpStatus } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { CreateSupplierCommand } from './create-supplier.command';
 import { Supplier } from '../../../domain/entities/supplier.entity';
+import { AppException } from '../../../../../common/errors/app.exception';
+import { ErrorCode } from '../../../../../common/errors/error-codes';
 
 @CommandHandler(CreateSupplierCommand)
 export class CreateSupplierHandler implements ICommandHandler<CreateSupplierCommand> {
@@ -26,7 +28,7 @@ export class CreateSupplierHandler implements ICommandHandler<CreateSupplierComm
 
     if (existing) {
       this.logger.warn(`Supplier creation failed: Identity Number ${identityNumber} already exists for Tenant ${tenantId}`);
-      throw new BadRequestException(`Supplier with identity number "${identityNumber}" already exists`);
+      throw new AppException(ErrorCode.SupplierIdentityTaken, `Ya existe un proveedor con el documento "${identityNumber}".`, HttpStatus.CONFLICT, { identityNumber });
     }
 
     const supplier = new Supplier();

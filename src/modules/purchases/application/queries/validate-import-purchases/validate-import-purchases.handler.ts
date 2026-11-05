@@ -1,8 +1,10 @@
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
-import { BadRequestException } from '@nestjs/common';
+import { HttpStatus } from '@nestjs/common';
 import { EntityManager, In } from 'typeorm';
 import { ValidateImportPurchasesQuery } from './validate-import-purchases.query';
 import { ProductVariant } from '../../../../products/domain/entities/product-variant.entity';
+import { AppException } from '../../../../../common/errors/app.exception';
+import { ErrorCode } from '../../../../../common/errors/error-codes';
 
 @QueryHandler(ValidateImportPurchasesQuery)
 export class ValidateImportPurchasesHandler implements IQueryHandler<ValidateImportPurchasesQuery> {
@@ -18,9 +20,7 @@ export class ValidateImportPurchasesHandler implements IQueryHandler<ValidateImp
     }
 
     if (items.length > 3000) {
-      throw new BadRequestException(
-        `El archivo contiene ${items.length} filas. El límite máximo permitido por importación es de 3,000 registros.`,
-      );
+      throw new AppException(ErrorCode.ImportLimitExceeded, `El archivo contiene ${items.length} filas. El límite máximo permitido por importación es de 3,000 registros.`, HttpStatus.BAD_REQUEST, { received: items.length, max: 3000 });
     }
 
     const variants: ProductVariant[] = [];

@@ -1,10 +1,12 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import { Logger, HttpStatus } from '@nestjs/common';
 import { DeleteSupplierCommand } from './delete-supplier.command';
 import { Supplier } from '../../../domain/entities/supplier.entity';
 import { PurchaseOrder } from '../../../domain/entities/purchase-order.entity';
+import { AppException } from '../../../../../common/errors/app.exception';
+import { ErrorCode } from '../../../../../common/errors/error-codes';
 
 @CommandHandler(DeleteSupplierCommand)
 export class DeleteSupplierHandler implements ICommandHandler<DeleteSupplierCommand> {
@@ -24,7 +26,7 @@ export class DeleteSupplierHandler implements ICommandHandler<DeleteSupplierComm
       where: { id, tenantId },
     });
     if (!supplier) {
-      throw new NotFoundException(`Supplier with ID ${id} not found`);
+      throw new AppException(ErrorCode.SupplierNotFound, 'Proveedor no encontrado.', HttpStatus.NOT_FOUND, { id });
     }
 
     // Check if supplier has associated purchases
@@ -33,7 +35,7 @@ export class DeleteSupplierHandler implements ICommandHandler<DeleteSupplierComm
     });
 
     if (countPurchases > 0) {
-      throw new BadRequestException('No se puede eliminar el proveedor porque tiene órdenes de compra asociadas.');
+      throw new AppException(ErrorCode.SupplierHasPurchases, 'No se puede eliminar el proveedor porque tiene órdenes de compra asociadas.', HttpStatus.CONFLICT);
     }
 
     await this.supplierRepository.softRemove(supplier);
