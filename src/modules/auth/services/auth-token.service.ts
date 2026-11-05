@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService, JwtSignOptions } from '@nestjs/jwt';
@@ -52,6 +53,8 @@ export class AuthTokenService {
       {
         secret: this.configService.getOrThrow<string>('REFRESH_TOKEN_SECRET'),
         expiresIn: this.ttl('REFRESH_TOKEN_EXPIRES_IN', DEFAULT_REFRESH_TTL),
+        // Sin identificador único, dos emisiones en el mismo segundo dan el mismo token y la rotación no invalida nada
+        jwtid: randomUUID(),
       },
     );
 

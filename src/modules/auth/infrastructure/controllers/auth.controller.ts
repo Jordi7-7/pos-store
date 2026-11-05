@@ -48,8 +48,8 @@ export class AuthController {
   @Public()
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  async login(@Body() dto: LoginDto) {
-    return this.commandBus.execute(new LoginCommand(dto.email, dto.password, dto.tenantSlug));
+  async login(@Body() dto: LoginDto, @Ip() clientIp: string) {
+    return this.commandBus.execute(new LoginCommand(dto.email, dto.password, dto.tenantSlug, clientIp));
   }
 
   @Public()

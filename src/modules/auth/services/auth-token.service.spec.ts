@@ -76,13 +76,9 @@ describe('AuthTokenService', () => {
       expect(stored?.ttl).toBeLessThanOrEqual(7 * 24 * 3600);
     });
 
-    it('una nueva sesión reemplaza al refresh token anterior', async () => {
+    it('una nueva sesión reemplaza al refresh token anterior, aunque se emita en el mismo segundo', async () => {
       const first = await service.issueSession(cashier);
-      // El JWT incluye iat en segundos: sin avanzar el reloj dos emisiones seguidas darían el mismo token
-      const now = Date.now();
-      const clock = jest.spyOn(Date, 'now').mockReturnValue(now + 2000);
       const second = await service.issueSession(cashier);
-      clock.mockRestore();
 
       expect(second.refreshToken).not.toBe(first.refreshToken);
       await expect(service.assertIsCurrentRefreshToken('u1', first.refreshToken)).rejects.toMatchObject({ code: ErrorCode.SessionExpired });
