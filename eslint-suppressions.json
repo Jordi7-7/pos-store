@@ -161,25 +161,6 @@
       "count": 3
     }
   },
-  "src/modules/dashboard/application/queries/get-dashboard-metrics/get-dashboard-metrics.handler.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 7
-    },
-    "@typescript-eslint/no-unsafe-assignment": {
-      "count": 24
-    },
-    "@typescript-eslint/no-unsafe-call": {
-      "count": 4
-    },
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 30
-    }
-  },
-  "src/modules/dashboard/infrastructure/controllers/dashboard.controller.ts": {
-    "@typescript-eslint/no-unsafe-return": {
-      "count": 1
-    }
-  },
   "src/modules/media/services/s3.service.ts": {
     "@typescript-eslint/no-unused-vars": {
       "count": 1

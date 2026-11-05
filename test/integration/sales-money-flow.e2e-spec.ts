@@ -23,6 +23,9 @@ import { CashSession } from '../../src/modules/sales/domain/entities/cash-sessio
 import { PaymentMethod } from '../../src/modules/sales/domain/entities/sale-payment.entity';
 import { Sale } from '../../src/modules/sales/domain/entities/sale.entity';
 import { CashSessionStatus } from '../../src/modules/sales/domain/enums/cash-session-status.enum';
+import { DashboardReadQueries } from '../../src/modules/dashboard/application/queries/get-dashboard-metrics/dashboard-read-queries';
+import { GetDashboardMetricsHandler } from '../../src/modules/dashboard/application/queries/get-dashboard-metrics/get-dashboard-metrics.handler';
+import { GetDashboardMetricsQuery } from '../../src/modules/dashboard/application/queries/get-dashboard-metrics/get-dashboard-metrics.query';
 import { Tenant } from '../../src/modules/tenants/domain/entities/tenant.entity';
 import { User } from '../../src/modules/users/domain/entities/user.entity';
 
@@ -240,6 +243,47 @@ describe('Flujo de dinero: venta, devolución y cierre de caja', () => {
     );
 
     await new CloseCashSessionHandler(db.manager).execute(new CloseCashSessionCommand(tenantId, sessionId, 0));
+  });
+
+  describe('dashboard', () => {
+    const metrics = (scopeBranchId?: string) =>
+      new GetDashboardMetricsHandler(db.manager, new DashboardReadQueries(db.manager)).execute(
+        new GetDashboardMetricsQuery(tenantId, scopeBranchId),
+      );
+
+    it('refleja una venta y una devolución del día en todas las secciones del panel', async () => {
+      const before = await metrics(branchId);
+      const sessionId = await openSession(0);
+      try {
+        const sale = await sell(sessionId, [{ variantId, quantity: 2, price: 10 }], 20);
+        await refund(sale.id, sessionId, 1);
+        const after = await metrics(branchId);
+
+        expect(after.today.totalSales - before.today.totalSales).toBe(20);
+        expect(after.today.itemsCount - before.today.itemsCount).toBe(2);
+        expect(after.today.refunds.totalRefunded - before.today.refunds.totalRefunded).toBe(10);
+        expect(after.today.refunds.count - before.today.refunds.count).toBe(1);
+        expect(after.today.netSales).toBe(Math.max(0, after.today.totalSales - after.today.refunds.totalRefunded));
+        expect(after.paymentMethods.cash.amount - before.paymentMethods.cash.amount).toBe(20);
+        expect(after.weekSummary.totalWeek - before.weekSummary.totalWeek).toBe(20);
+        expect(after.topProducts.map((product) => product.sku)).toContain('CAM-1');
+        expect(Array.isArray(after.lowStockProducts)).toBe(true);
+        expect(Array.isArray(after.yesterdaySoldProducts)).toBe(true);
+
+        // Sin sucursal agrega todas las del tenant
+        expect((await metrics()).today.totalSales).toBe(after.today.totalSales);
+      } finally {
+        await new CloseCashSessionHandler(db.manager).execute(new CloseCashSessionCommand(tenantId, sessionId, 10));
+      }
+    });
+
+    it('una zona horaria inválida guardada en el tenant no rompe el panel ni llega al SQL', async () => {
+      await db.getRepository(Tenant).update({ id: tenantId }, { timezone: "UTC'; SELECT 1; --" });
+
+      await expect(metrics(branchId)).resolves.toBeDefined();
+
+      await db.getRepository(Tenant).update({ id: tenantId }, { timezone: 'America/Guayaquil' });
+    });
   });
 
   describe('stock', () => {
