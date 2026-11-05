@@ -6,6 +6,7 @@ import { UpdateSupplierCommand } from './update-supplier.command';
 import { Supplier } from '../../../domain/entities/supplier.entity';
 import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
+import { isUniqueViolation } from '../../../../../common/errors/database-errors';
 
 @CommandHandler(UpdateSupplierCommand)
 export class UpdateSupplierHandler implements ICommandHandler<UpdateSupplierCommand> {
@@ -49,7 +50,13 @@ export class UpdateSupplierHandler implements ICommandHandler<UpdateSupplierComm
       supplier.address = input.address || null;
     }
 
-    const saved = await this.supplierRepository.save(supplier);
+    const saved = await this.supplierRepository.save(supplier).catch((error: unknown) => {
+      // Dos peticiones con el mismo documento pasan la comprobación previa a la vez
+      if (isUniqueViolation(error)) {
+        throw new AppException(ErrorCode.SupplierIdentityTaken, `Ya existe un proveedor con el documento "${supplier.identityNumber}".`, HttpStatus.CONFLICT, { identityNumber: supplier.identityNumber });
+      }
+      throw error;
+    });
     this.logger.log(`Supplier updated successfully: ${saved.name} (${saved.id})`);
     return saved;
   }

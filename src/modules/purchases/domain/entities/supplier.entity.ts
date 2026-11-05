@@ -1,8 +1,9 @@
-import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, Column, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { BaseEntity } from '../../../../common/database/base.entity';
 import { Tenant } from '../../../tenants/domain/entities/tenant.entity';
 
 @Entity('suppliers')
+@Index('UQ_suppliers_tenant_identity', ['tenantId', 'identityNumber'], { unique: true, where: '"deleted_at" IS NULL' })
 export class Supplier extends BaseEntity {
   @Column({ name: 'tenant_id', type: 'uuid' })
   tenantId: string;
