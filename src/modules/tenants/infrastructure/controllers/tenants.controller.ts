@@ -8,7 +8,7 @@ import { GetTenantQuery } from '../../application/queries/get-tenant/get-tenant.
 import { GetPublicTenantBySlugQuery } from '../../application/queries/get-public-tenant-by-slug/get-public-tenant-by-slug.query';
 import { UpdateTenantCommand } from '../../application/commands/update-tenant/update-tenant.command';
 
-import { RequirePermissions } from '../../../auth/decorators/permissions.decorator';
+import { RequireAnyPermissions, RequirePermissions } from '../../../auth/decorators/permissions.decorator';
 import { APP_PERMISSIONS } from '../../../../common/enums/permissions.enum';
 
 @Controller('tenants')
@@ -25,6 +25,7 @@ export class TenantsController {
   }
 
   @Get('metadata')
+  @RequireAnyPermissions(APP_PERMISSIONS.SETTINGS_GET, APP_PERMISSIONS.SETTINGS_EDIT)
   async getMetadata() {
     return this.queryBus.execute(new GetTenantMetadataQuery());
   }

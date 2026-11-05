@@ -1,8 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import * as crypto from 'crypto';
+import { AppException } from '../../../common/errors/app.exception';
+import { ErrorCode } from '../../../common/errors/error-codes';
+import { ALLOWED_IMAGE_TYPES } from './safe-image-fetcher';
 
 @Injectable()
 export class S3Service {
@@ -32,12 +35,8 @@ export class S3Service {
     filename: string,
     contentType: string,
   ): Promise<{ uploadUrl: string; fileUrl: string }> {
-    const fileUuid = crypto.randomUUID();
-    const cleanFilename = filename.replace(/\s+/g, '-').toLowerCase();
-    
-    // Hash tenantId using SHA-256 and grab first 16 chars to keep S3 URL clean but anonymous
-    const tenantHash = crypto.createHash('sha256').update(tenantId).digest('hex').substring(0, 16);
-    const key = `${tenantHash}/products/${fileUuid}-${cleanFilename}`;
+    this.assertAllowedContentType(contentType);
+    const key = this.buildKey(tenantId, filename);
 
     this.logger.log(`Generating S3/R2 presigned upload URL for Key: ${key}`);
 
@@ -112,10 +111,8 @@ export class S3Service {
     contentType: string,
     buffer: Buffer,
   ): Promise<string> {
-    const fileUuid = crypto.randomUUID();
-    const cleanFilename = filename.replace(/\s+/g, '-').toLowerCase();
-    const tenantHash = crypto.createHash('sha256').update(tenantId).digest('hex').substring(0, 16);
-    const key = `${tenantHash}/products/${fileUuid}-${cleanFilename}`;
+    this.assertAllowedContentType(contentType);
+    const key = this.buildKey(tenantId, filename);
 
     this.logger.log(`Uploading S3/R2 asset buffer for Key: ${key}`);
 
@@ -139,6 +136,49 @@ export class S3Service {
           : `https://${this.bucketName}.s3.${region}.amazonaws.com/${key}`);
 
     return fileUrl;
+  }
+
+  /** Prefijo de claves de un tenant (hash anónimo). Todo objeto del tenant vive bajo él. */
+  tenantKeyPrefix(tenantId: string): string {
+    return `${crypto.createHash('sha256').update(tenantId).digest('hex').substring(0, 16)}/`;
+  }
+
+  /** true si la URL o clave pertenece al espacio de almacenamiento del tenant. */
+  belongsToTenant(tenantId: string, urlOrKey: string): boolean {
+    const key = this.cleanUrl(urlOrKey);
+    return !key.includes('..') && key.startsWith(this.tenantKeyPrefix(tenantId));
+  }
+
+  /** Lanza 403 si la clave no pertenece al tenant (evita registrar/borrar objetos ajenos). */
+  assertBelongsToTenant(tenantId: string, urlOrKey: string): void {
+    if (!this.belongsToTenant(tenantId, urlOrKey)) {
+      throw new AppException(
+        ErrorCode.MediaNotOwned,
+        'El archivo no pertenece a esta tienda.',
+        HttpStatus.FORBIDDEN,
+      );
+    }
+  }
+
+  private buildKey(tenantId: string, filename: string): string {
+    const base = filename.split(/[\\/]/).pop() ?? 'file';
+    const safeName =
+      base
+        .toLowerCase()
+        .replace(/[^a-z0-9._-]+/g, '-')
+        .replace(/^[-.]+/, '')
+        .slice(-100) || 'file';
+    return `${this.tenantKeyPrefix(tenantId)}products/${crypto.randomUUID()}-${safeName}`;
+  }
+
+  private assertAllowedContentType(contentType: string): void {
+    if (!ALLOWED_IMAGE_TYPES.includes(contentType)) {
+      throw new AppException(
+        ErrorCode.UnsupportedMediaType,
+        'Tipo de archivo no permitido. Solo se aceptan imágenes JPEG, PNG, WebP, GIF o AVIF.',
+        HttpStatus.UNSUPPORTED_MEDIA_TYPE,
+      );
+    }
   }
 
   cleanUrl(url: string): string {

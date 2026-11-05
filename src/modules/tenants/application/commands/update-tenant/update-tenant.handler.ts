@@ -16,17 +16,17 @@ export class UpdateTenantHandler implements ICommandHandler<UpdateTenantCommand>
   ) {}
 
   async execute(command: UpdateTenantCommand): Promise<Tenant> {
-    const { id, dto } = command;
+    const { id, input } = command;
     const tenant = await this.entityManager.findOne(Tenant, { where: { id } });
     if (!tenant) {
       throw new NotFoundException(`Tenant with ID ${id} not found`);
     }
 
-    if (dto.name !== undefined) {
-      tenant.name = dto.name;
+    if (input.name !== undefined) {
+      tenant.name = input.name;
     }
-    if (dto.slug !== undefined) {
-      const cleanSlug = dto.slug.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    if (input.slug !== undefined) {
+      const cleanSlug = input.slug.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
       const existingSlugTenant = await this.entityManager.findOne(Tenant, {
         where: { slug: cleanSlug, id: Not(id) },
       });
@@ -35,10 +35,14 @@ export class UpdateTenantHandler implements ICommandHandler<UpdateTenantCommand>
       }
       tenant.slug = cleanSlug;
     }
-    if (dto.logoUrl !== undefined) {
-      const newLogoUrl = dto.logoUrl ? dto.logoUrl.trim() : null;
+    if (input.logoUrl !== undefined) {
+      const newLogoUrl = input.logoUrl ? input.logoUrl.trim() : null;
+      if (newLogoUrl) {
+        // El logo debe vivir en el espacio de almacenamiento del propio tenant
+        this.s3Service.assertBelongsToTenant(id, newLogoUrl);
+      }
       // If logo changed and there was an old logo in the bucket, delete the previous file
-      if (tenant.logoUrl && tenant.logoUrl !== newLogoUrl) {
+      if (tenant.logoUrl && tenant.logoUrl !== newLogoUrl && this.s3Service.belongsToTenant(id, tenant.logoUrl)) {
         try {
           this.logger.log(`Deleting previous tenant logo from S3/bucket: ${tenant.logoUrl}`);
           await this.s3Service.deleteFile(tenant.logoUrl);
@@ -48,16 +52,16 @@ export class UpdateTenantHandler implements ICommandHandler<UpdateTenantCommand>
       }
       tenant.logoUrl = newLogoUrl;
     }
-    if (dto.country !== undefined) {
-      tenant.country = dto.country;
+    if (input.country !== undefined) {
+      tenant.country = input.country;
     }
-    if (dto.currencyCode !== undefined) {
-      tenant.currencyCode = dto.currencyCode;
-      const symbol = getSymbolFromCurrency(dto.currencyCode);
+    if (input.currencyCode !== undefined) {
+      tenant.currencyCode = input.currencyCode;
+      const symbol = getSymbolFromCurrency(input.currencyCode);
       tenant.currencySymbol = symbol || '$';
     }
-    if (dto.timezone !== undefined) {
-      tenant.timezone = dto.timezone;
+    if (input.timezone !== undefined) {
+      tenant.timezone = input.timezone;
     }
 
     return this.entityManager.save(Tenant, tenant);

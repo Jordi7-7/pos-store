@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Delete, Query, Body, Param, BadRequestException, NotFoundException, ConflictException, Logger } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { S3Service } from '../../services/s3.service';
+import { fetchRemoteImage } from '../../services/safe-image-fetcher';
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
 import { ProductImage } from '../../../products/domain/entities/product-image.entity';
 import { RequirePermissions } from '../../../auth/decorators/permissions.decorator';
@@ -95,6 +96,8 @@ export class MediaController {
     const imageRepo = this.entityManager.getRepository(ProductImage);
     const image = new ProductImage();
     image.tenantId = tenantId;
+    // Solo se pueden registrar objetos del propio tenant (evita apuntar a archivos ajenos)
+    this.s3Service.assertBelongsToTenant(tenantId, url);
     image.url = this.s3Service.cleanUrl(url);
     image.description = description;
 
@@ -140,8 +143,12 @@ export class MediaController {
       throw new ConflictException('No se puede eliminar la imagen porque está asignada a uno o más productos.');
     }
 
-    // Delete physically from S3/R2 bucket
-    await this.s3Service.deleteFile(image.url);
+    // Delete physically from S3/R2 bucket (solo si el objeto es del tenant; si no, se borra solo el registro)
+    if (this.s3Service.belongsToTenant(tenantId, image.url)) {
+      await this.s3Service.deleteFile(image.url);
+    } else {
+      this.logger.warn(`Image ${image.id} points outside Tenant ${tenantId} storage; skipping S3 deletion.`);
+    }
 
     // Delete from database
     await imageRepo.remove(image);
@@ -150,6 +157,7 @@ export class MediaController {
   }
 
   @Post('upload-by-url')
+  @RequirePermissions(APP_PERMISSIONS.MEDIA_UPLOAD)
   async uploadByUrl(
     @CurrentUser('tenantId') tenantId: string,
     @Body('url') url: string,
@@ -159,43 +167,34 @@ export class MediaController {
       throw new BadRequestException('url is required');
     }
 
+    this.logger.log(`Fetching remote image for Tenant ${tenantId}`);
+
+    // Descarga segura: bloquea IPs privadas/metadatos, redirecciones, tipos no imagen y tamaños excesivos.
+    const { buffer, contentType } = await fetchRemoteImage(url);
+
+    // Extract filename from URL or generate one
+    let filename = 'downloaded-image.jpg';
     try {
-      this.logger.log(`Fetching remote image for Tenant ${tenantId} from URL: ${url}`);
-      
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch image from URL: ${response.statusText}`);
+      const pathname = new URL(url).pathname;
+      const lastSegment = pathname.substring(pathname.lastIndexOf('/') + 1);
+      if (lastSegment && lastSegment.includes('.')) {
+        filename = lastSegment;
       }
-
-      const contentType = response.headers.get('content-type') || 'image/jpeg';
-      const arrayBuffer = await response.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
-
-      // Extract filename from URL or generate one
-      let filename = 'downloaded-image.jpg';
-      try {
-        const parsedUrl = new URL(url);
-        const pathname = parsedUrl.pathname;
-        const lastSegment = pathname.substring(pathname.lastIndexOf('/') + 1);
-        if (lastSegment && lastSegment.includes('.')) {
-          filename = lastSegment;
-        }
-      } catch (e) {}
-
-      // Upload buffer to S3/R2
-      const fileUrl = await this.s3Service.uploadFileBuffer(tenantId, filename, contentType, buffer);
-
-      // Register image in database
-      const imageRepo = this.entityManager.getRepository(ProductImage);
-      const image = new ProductImage();
-      image.tenantId = tenantId;
-      image.url = this.s3Service.cleanUrl(fileUrl);
-      image.description = description || 'Imagen arrastrada de internet';
-
-      return imageRepo.save(image);
-    } catch (error: any) {
-      throw new BadRequestException(`No se pudo procesar la imagen de la URL: ${error.message}`);
+    } catch {
+      // se conserva el nombre por defecto
     }
+
+    // Upload buffer to S3/R2
+    const fileUrl = await this.s3Service.uploadFileBuffer(tenantId, filename, contentType, buffer);
+
+    // Register image in database
+    const imageRepo = this.entityManager.getRepository(ProductImage);
+    const image = new ProductImage();
+    image.tenantId = tenantId;
+    image.url = this.s3Service.cleanUrl(fileUrl);
+    image.description = description || 'Imagen arrastrada de internet';
+
+    return imageRepo.save(image);
   }
 }
 
