@@ -4,6 +4,7 @@ import { GetProductsBySkuAndBarcodeQuery } from './get-products-by-sku-and-barco
 import { Product } from '../../../domain/entities/product.entity';
 import { ProductType } from '../../../domain/enums/product-type.enum';
 import { PaginatedProductsResponseDto, ProductListItemResponseDto } from '../../read-models/product-response';
+import { containsPattern } from '../../../../../common/utils/like';
 
 @QueryHandler(GetProductsBySkuAndBarcodeQuery)
 export class GetProductsBySkuAndBarcodeHandler implements IQueryHandler<GetProductsBySkuAndBarcodeQuery> {
@@ -12,7 +13,7 @@ export class GetProductsBySkuAndBarcodeHandler implements IQueryHandler<GetProdu
   async execute(query: GetProductsBySkuAndBarcodeQuery): Promise<PaginatedProductsResponseDto> {
     const { tenantId, code, page = 1, limit = 10, productType, branchId } = query;
     const repo = this.entityManager.getRepository(Product);
-    const searchCode = `%${code.trim()}%`;
+    const searchCode = containsPattern(code);
     const take = limit;
     const skip = (page - 1) * limit;
 

@@ -4,6 +4,7 @@ import { GetProductsByNameQuery } from './get-products-by-name.query';
 import { Product } from '../../../domain/entities/product.entity';
 import { ProductType } from '../../../domain/enums/product-type.enum';
 import { PaginatedProductsResponseDto, ProductListItemResponseDto } from '../../read-models/product-response';
+import { containsPattern } from '../../../../../common/utils/like';
 
 @QueryHandler(GetProductsByNameQuery)
 export class GetProductsByNameHandler implements IQueryHandler<GetProductsByNameQuery> {
@@ -12,7 +13,7 @@ export class GetProductsByNameHandler implements IQueryHandler<GetProductsByName
   async execute(query: GetProductsByNameQuery): Promise<PaginatedProductsResponseDto> {
     const { tenantId, name, page = 1, limit = 10, productType, branchId } = query;
     const repo = this.entityManager.getRepository(Product);
-    const searchName = `%${name.trim()}%`;
+    const searchName = containsPattern(name);
     const take = limit;
     const skip = (page - 1) * limit;
 

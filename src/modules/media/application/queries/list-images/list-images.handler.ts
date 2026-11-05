@@ -2,6 +2,7 @@ import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
 import { EntityManager } from 'typeorm';
 import { ListImagesQuery } from './list-images.query';
 import { ProductImage } from '../../../../products/domain/entities/product-image.entity';
+import { containsPattern } from '../../../../../common/utils/like';
 
 const DEFAULT_PAGE_SIZE = 20;
 /** Sin parámetros de paginación se devuelve la galería completa hasta este tope. */
@@ -29,7 +30,7 @@ export class ListImagesHandler implements IQueryHandler<ListImagesQuery> {
       .orderBy('image.createdAt', 'DESC');
 
     if (search && search.trim() !== '') {
-      qb.andWhere('image.description ILIKE :search', { search: `%${search.trim()}%` });
+      qb.andWhere('image.description ILIKE :search', { search: containsPattern(search) });
     }
 
     if (isPaginated) {

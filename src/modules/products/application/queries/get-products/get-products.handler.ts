@@ -4,6 +4,7 @@ import { GetProductsQuery } from './get-products.query';
 import { Product } from '../../../domain/entities/product.entity';
 import { ProductType } from '../../../domain/enums/product-type.enum';
 import { PaginatedProductsResponseDto, ProductListItemResponseDto } from '../../read-models/product-response';
+import { containsPattern } from '../../../../../common/utils/like';
 
 @QueryHandler(GetProductsQuery)
 export class GetProductsHandler implements IQueryHandler<GetProductsQuery> {
@@ -33,7 +34,7 @@ export class GetProductsHandler implements IQueryHandler<GetProductsQuery> {
       .where('product.tenantId = :tenantId', { tenantId });
 
     if (search && search.trim() !== '') {
-      const searchTerm = `%${search.trim()}%`;
+      const searchTerm = containsPattern(search);
       qb.andWhere(
         '(product.name ILIKE :searchTerm OR product.baseSku ILIKE :searchTerm OR variants.sku ILIKE :searchTerm OR variants.barcode ILIKE :searchTerm)',
         { searchTerm },

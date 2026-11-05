@@ -1,10 +1,11 @@
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
 import { EntityManager } from 'typeorm';
 import { GetBatchesQuery } from './get-batches.query';
-import { Batch, BatchOriginType } from '../../../domain/entities/batch.entity';
+import { Batch, BatchOriginType, BatchStatus } from '../../../domain/entities/batch.entity';
 import { parseReportDates } from '../../../../reports/application/queries/parse-dates.helper';
 import { RedisService } from '../../../../../common/redis/redis.service';
 import { assertUserCanAccessBranch } from '../../../../../common/security/branch-access.helper';
+import { containsPattern } from '../../../../../common/utils/like';
 
 @QueryHandler(GetBatchesQuery)
 export class GetBatchesHandler implements IQueryHandler<GetBatchesQuery> {
@@ -49,7 +50,7 @@ export class GetBatchesHandler implements IQueryHandler<GetBatchesQuery> {
     }
 
     if (search && search.trim()) {
-      const term = `%${search.trim().toLowerCase()}%`;
+      const term = containsPattern(search).toLowerCase();
       qb.andWhere(
         '(LOWER(batch.code) LIKE :term OR LOWER(product.name) LIKE :term OR LOWER(variant.sku) LIKE :term OR LOWER(purchaseOrder.invoiceNumber) LIKE :term)',
         { term },
@@ -136,11 +137,11 @@ export class GetBatchesHandler implements IQueryHandler<GetBatchesQuery> {
         totalCostValue: Number(totalCostValue.toFixed(2)),
         totalInitialCostValue: Number(totalInitialCostValue.toFixed(2)),
         status:
-          batch.status === 'CANCELLED'
-            ? 'CANCELLED'
+          batch.status === BatchStatus.CANCELLED
+            ? BatchStatus.CANCELLED
             : totalRemainingQuantity > 0
-              ? 'ACTIVE'
-              : 'DEPLETED',
+              ? BatchStatus.ACTIVE
+              : BatchStatus.DEPLETED,
         items,
       };
     });

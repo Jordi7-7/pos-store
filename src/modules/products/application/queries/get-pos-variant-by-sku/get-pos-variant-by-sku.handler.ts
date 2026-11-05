@@ -1,5 +1,4 @@
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
-import { NotFoundException } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { GetPosVariantBySkuQuery } from './get-pos-variant-by-sku.query';
 import { ProductVariant } from '../../../domain/entities/product-variant.entity';
