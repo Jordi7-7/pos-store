@@ -15,6 +15,7 @@ import { InventoryMovementReason } from '../../../../../common/enums/inventory-m
 import { ProductType } from '../../../domain/enums/product-type.enum';
 import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
+import { translatingSkuConflict } from '../../services/sku-conflict';
 
 
 @CommandHandler(CreateSimpleProductCommand)
@@ -24,7 +25,11 @@ export class CreateSimpleProductHandler implements ICommandHandler<CreateSimpleP
 
   constructor(private readonly entityManager: EntityManager) {}
 
-  async execute(command: CreateSimpleProductCommand): Promise<Product> {
+  execute(command: CreateSimpleProductCommand): Promise<Product> {
+    return translatingSkuConflict(() => this.run(command));
+  }
+
+  private async run(command: CreateSimpleProductCommand): Promise<Product> {
     const {
       tenantId,
       name,

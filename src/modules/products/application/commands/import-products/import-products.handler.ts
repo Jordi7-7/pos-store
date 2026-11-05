@@ -16,6 +16,8 @@ import { InventoryMovementType } from '../../../../../common/enums/inventory-mov
 import { ProductType } from '../../../domain/enums/product-type.enum';
 import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
+import { repeatedSkus } from './repeated-skus';
+import { translatingSkuConflict } from '../../services/sku-conflict';
 
 export interface ImportProductsResult {
   importedCount: number;
@@ -31,7 +33,11 @@ export class ImportProductsHandler implements ICommandHandler<ImportProductsComm
     private readonly redisService: RedisService,
   ) {}
 
-  async execute(command: ImportProductsCommand): Promise<ImportProductsResult> {
+  execute(command: ImportProductsCommand): Promise<ImportProductsResult> {
+    return translatingSkuConflict(() => this.run(command));
+  }
+
+  private async run(command: ImportProductsCommand): Promise<ImportProductsResult> {
     const { tenantId, userId, branchId, items } = command;
     this.logger.log(`Executing bulk product import: ${items.length} items for Tenant: ${tenantId}`);
 
@@ -51,6 +57,17 @@ export class ImportProductsHandler implements ICommandHandler<ImportProductsComm
           branchId,
           actionDescription: 'importar productos',
         });
+      }
+
+      // Después del control de acceso: no se procesa el contenido de quien no puede importar
+      const repeated = repeatedSkus(items.map((item) => item.sku));
+      if (repeated.length > 0) {
+        throw new AppException(
+          ErrorCode.DuplicateSkuInImport,
+          `El archivo repite estos SKUs: ${repeated.slice(0, 10).join(', ')}`,
+          HttpStatus.BAD_REQUEST,
+          { skus: repeated },
+        );
       }
 
       const productRepo = tm.getRepository(Product);

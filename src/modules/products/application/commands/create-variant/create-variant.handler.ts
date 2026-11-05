@@ -13,6 +13,7 @@ import { InventoryMovement } from '../../../domain/entities/inventory-movement.e
 import { InventoryMovementReason } from '../../../../../common/enums/inventory-movement-reason.enum';
 import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
+import { translatingSkuConflict } from '../../services/sku-conflict';
 
 @CommandHandler(CreateVariantCommand)
 export class CreateVariantHandler implements ICommandHandler<CreateVariantCommand> {
@@ -20,7 +21,11 @@ export class CreateVariantHandler implements ICommandHandler<CreateVariantComman
 
   constructor(private readonly entityManager: EntityManager) {}
 
-  async execute(command: CreateVariantCommand): Promise<ProductVariant> {
+  execute(command: CreateVariantCommand): Promise<ProductVariant> {
+    return translatingSkuConflict(() => this.run(command));
+  }
+
+  private async run(command: CreateVariantCommand): Promise<ProductVariant> {
     const { tenantId, productId, variantDto } = command;
     this.logger.log(`Creating variant for product ${productId} under Tenant: ${tenantId}`);
 

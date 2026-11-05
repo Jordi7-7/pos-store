@@ -6,6 +6,7 @@ import { ProductVariant } from '../../../domain/entities/product-variant.entity'
 import { ProductImage } from '../../../domain/entities/product-image.entity';
 import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
+import { translatingSkuConflict } from '../../services/sku-conflict';
 
 @CommandHandler(UpdateVariantCommand)
 export class UpdateVariantHandler implements ICommandHandler<UpdateVariantCommand> {
@@ -13,7 +14,11 @@ export class UpdateVariantHandler implements ICommandHandler<UpdateVariantComman
 
   constructor(private readonly entityManager: EntityManager) {}
 
-  async execute(command: UpdateVariantCommand): Promise<ProductVariant> {
+  execute(command: UpdateVariantCommand): Promise<ProductVariant> {
+    return translatingSkuConflict(() => this.run(command));
+  }
+
+  private async run(command: UpdateVariantCommand): Promise<ProductVariant> {
     const {
       tenantId,
       variantId,

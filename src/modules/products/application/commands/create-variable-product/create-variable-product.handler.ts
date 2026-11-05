@@ -16,6 +16,7 @@ import { InventoryMovementReason } from '../../../../../common/enums/inventory-m
 import { ProductType } from '../../../domain/enums/product-type.enum';
 import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
+import { translatingSkuConflict } from '../../services/sku-conflict';
 
 
 @CommandHandler(CreateVariableProductCommand)
@@ -24,7 +25,11 @@ export class CreateVariableProductHandler implements ICommandHandler<CreateVaria
 
   constructor(private readonly entityManager: EntityManager) {}
 
-  async execute(command: CreateVariableProductCommand): Promise<Product> {
+  execute(command: CreateVariableProductCommand): Promise<Product> {
+    return translatingSkuConflict(() => this.run(command));
+  }
+
+  private async run(command: CreateVariableProductCommand): Promise<Product> {
     const { tenantId, name, description, variants, imageIds, categoryId, baseSku } = command;
 
     this.logger.log(`Creating variable product: ${name} with ${variants.length} variant(s) for Tenant: ${tenantId}`);

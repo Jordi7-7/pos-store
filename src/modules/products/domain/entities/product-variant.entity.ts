@@ -8,8 +8,11 @@ import { ProductImage } from './product-image.entity';
 import { Tenant } from '../../../tenants/domain/entities/tenant.entity';
 import { Tag } from './tag.entity';
 
+/** Índice único parcial (tenant, sku) de las variantes no eliminadas. */
+export const PRODUCT_VARIANT_SKU_INDEX = 'idx_product_variants_tenant_sku';
+
 @Entity('product_variants')
-@Index('idx_product_variants_tenant_sku', ['tenantId', 'sku'], { unique: true, where: 'deleted_at IS NULL' })
+@Index(PRODUCT_VARIANT_SKU_INDEX, ['tenantId', 'sku'], { unique: true, where: 'deleted_at IS NULL' })
 @Index('idx_product_variants_tenant_barcode', ['tenantId', 'barcode'], { unique: false, where: 'deleted_at IS NULL' })
 export class ProductVariant extends BaseEntity {
   @Column({ name: 'product_id', type: 'uuid' })

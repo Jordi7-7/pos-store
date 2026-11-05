@@ -9,6 +9,7 @@ import { ProductVariant } from '../../../domain/entities/product-variant.entity'
 import { ProductType } from '../../../domain/enums/product-type.enum';
 import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
+import { translatingSkuConflict } from '../../services/sku-conflict';
 
 @CommandHandler(UpdateSimpleProductCommand)
 export class UpdateSimpleProductHandler implements ICommandHandler<UpdateSimpleProductCommand> {
@@ -16,7 +17,11 @@ export class UpdateSimpleProductHandler implements ICommandHandler<UpdateSimpleP
 
   constructor(private readonly entityManager: EntityManager) {}
 
-  async execute(command: UpdateSimpleProductCommand): Promise<Product> {
+  execute(command: UpdateSimpleProductCommand): Promise<Product> {
+    return translatingSkuConflict(() => this.run(command));
+  }
+
+  private async run(command: UpdateSimpleProductCommand): Promise<Product> {
     const {
       tenantId,
       id,
