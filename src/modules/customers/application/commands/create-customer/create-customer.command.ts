@@ -1,8 +1,13 @@
-import { CreateCustomerDto } from '../../../infrastructure/dtos/create-customer.dto';
+export interface CreateCustomerInput {
+  identityNumber: string;
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+}
 
 export class CreateCustomerCommand {
   constructor(
     public readonly tenantId: string,
-    public readonly dto: CreateCustomerDto,
+    public readonly input: CreateCustomerInput,
   ) {}
 }

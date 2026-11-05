@@ -1,9 +1,9 @@
 import { Controller, Get, Post, Put, Body, Param } from '@nestjs/common';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
 import { GetBranchesQuery } from '../../application/queries/get-branches/get-branches.query';
-import { CreateBranchDto } from '../../application/commands/create-branch/create-branch.dto';
+import { CreateBranchDto } from '../dtos/create-branch.dto';
 import { CreateBranchCommand } from '../../application/commands/create-branch/create-branch.command';
-import { UpdateBranchDto } from '../../application/commands/update-branch/update-branch.dto';
+import { UpdateBranchDto } from '../dtos/update-branch.dto';
 import { UpdateBranchCommand } from '../../application/commands/update-branch/update-branch.command';
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
 import { RequirePermissions } from '../../../auth/decorators/permissions.decorator';

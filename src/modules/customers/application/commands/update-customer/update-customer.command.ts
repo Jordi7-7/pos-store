@@ -1,9 +1,14 @@
-import { UpdateCustomerDto } from '../../../infrastructure/dtos/update-customer.dto';
+export interface UpdateCustomerInput {
+  identityNumber?: string;
+  name?: string;
+  email?: string | null;
+  phone?: string | null;
+}
 
 export class UpdateCustomerCommand {
   constructor(
     public readonly tenantId: string,
     public readonly id: string,
-    public readonly dto: UpdateCustomerDto,
+    public readonly input: UpdateCustomerInput,
   ) {}
 }

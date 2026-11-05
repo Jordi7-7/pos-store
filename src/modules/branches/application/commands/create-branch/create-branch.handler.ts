@@ -1,17 +1,20 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { EntityManager } from 'typeorm';
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, Logger } from '@nestjs/common';
 import { CreateBranchCommand } from './create-branch.command';
 import { Branch } from '../../../domain/entities/branch.entity';
 
 @CommandHandler(CreateBranchCommand)
 export class CreateBranchHandler implements ICommandHandler<CreateBranchCommand> {
+  private readonly logger = new Logger(CreateBranchHandler.name);
+
   constructor(private readonly entityManager: EntityManager) {}
 
   async execute(command: CreateBranchCommand): Promise<Branch> {
     const { tenantId, name, address, isActive } = command;
+    this.logger.log(`Creating branch for Tenant ${tenantId}`);
 
-    return this.entityManager.transaction(async (manager) => {
+    const saved = await this.entityManager.transaction(async (manager) => {
       const branchRepo = manager.getRepository(Branch);
 
       // Validate unique name per tenant
@@ -19,6 +22,7 @@ export class CreateBranchHandler implements ICommandHandler<CreateBranchCommand>
         where: { tenantId, name: name.trim() },
       });
       if (existing) {
+        this.logger.warn(`Branch creation rejected: duplicate name in Tenant ${tenantId}`);
         throw new ConflictException(`Ya existe una sucursal con el nombre "${name.trim()}".`);
       }
 
@@ -36,5 +40,8 @@ export class CreateBranchHandler implements ICommandHandler<CreateBranchCommand>
 
       return branchRepo.save(branch);
     });
+
+    this.logger.log(`Branch ${saved.id} created for Tenant ${tenantId}`);
+    return saved;
   }
 }
