@@ -342,6 +342,46 @@ describe('Flujo de dinero: venta, devolución y cierre de caja', () => {
     }
   });
 
+  it('el detalle de la sesión carga todos los ítems y pagos de cada venta (varias líneas y varios pagos)', async () => {
+    const sessionId = await openSession(0);
+    try {
+      const sale = await new ProcessSaleHandler(db.manager, redis).execute(
+        new ProcessSaleCommand(
+          tenantId,
+          userId,
+          branchId,
+          sessionId,
+          undefined,
+          [
+            { variantId, quantity: 1, price: 10 },
+            { variantId, quantity: 2, price: 8 },
+          ],
+          [
+            { paymentMethod: PaymentMethod.EFECTIVO, amount: 6 },
+            { paymentMethod: PaymentMethod.TARJETA, amount: 20 },
+          ],
+        ),
+      );
+
+      const handler = new GetCashSessionDetailsHandler(
+        db.getRepository(CashSession),
+        db.getRepository(Sale),
+        db.getRepository(Expense),
+        db.getRepository(Refund),
+      );
+      const details = await handler.execute(new GetCashSessionDetailsQuery(tenantId, sessionId));
+      const detail = details.sales.find((item) => item.id === sale.id);
+
+      expect(detail?.items).toHaveLength(2);
+      expect(detail?.items?.map((item) => Number(item.quantity)).sort()).toEqual([1, 2]);
+      expect(detail?.items?.every((item) => item.variant?.sku === 'CAM-1' && item.variant.product?.name === 'Camisa')).toBe(true);
+      expect(detail?.payments).toHaveLength(2);
+      expect(details.kpis).toMatchObject({ grossSales: 26, cashSales: 6, cardSales: 20, salesCount: 1 });
+    } finally {
+      await new CloseCashSessionHandler(db.manager).execute(new CloseCashSessionCommand(tenantId, sessionId, 6));
+    }
+  });
+
   describe('dashboard', () => {
     const metrics = (scopeBranchId?: string) =>
       new GetDashboardMetricsHandler(db.manager, new DashboardReadQueries(db.manager)).execute(

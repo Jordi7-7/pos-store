@@ -51,6 +51,8 @@ export class GetCashSessionDetailsHandler implements IQueryHandler<GetCashSessio
         withDeleted: true,
         select: SALE_SELECT,
         relations: SALE_RELATIONS,
+        // Una consulta por relación: un solo JOIN multiplicaría filas (pagos × ítems × atributos) por venta
+        relationLoadStrategy: 'query',
         order: { createdAt: 'DESC' },
       }),
       this.expenses.find({
