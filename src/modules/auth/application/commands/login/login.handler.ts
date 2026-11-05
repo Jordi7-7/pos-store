@@ -1,4 +1,4 @@
-import { Logger, UnauthorizedException } from '@nestjs/common';
+import { Logger, HttpStatus } from '@nestjs/common';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -10,6 +10,8 @@ import { RedisService } from '../../../../../common/redis/redis.service';
 
 import { Tenant } from '../../../../tenants/domain/entities/tenant.entity';
 import { resolveEffectivePermissions } from '../../../domain/effective-permissions';
+import { AppException } from '../../../../../common/errors/app.exception';
+import { ErrorCode } from '../../../../../common/errors/error-codes';
 
 @CommandHandler(LoginCommand)
 export class LoginHandler implements ICommandHandler<LoginCommand> {
@@ -29,7 +31,7 @@ export class LoginHandler implements ICommandHandler<LoginCommand> {
 
     if (!tenantSlug || !tenantSlug.trim()) {
       this.logger.warn(`Login rejected: missing tenantSlug for identifier ${identifier}`);
-      throw new UnauthorizedException('El identificador de la tienda es obligatorio para iniciar sesión');
+      throw new AppException(ErrorCode.TenantSlugRequired, 'El identificador de la tienda es obligatorio para iniciar sesión', HttpStatus.UNAUTHORIZED);
     }
 
     const cleanSlug = tenantSlug.toLowerCase().trim();
@@ -38,7 +40,7 @@ export class LoginHandler implements ICommandHandler<LoginCommand> {
     });
     if (!tenant) {
       this.logger.warn(`Login failed: tenant with slug ${tenantSlug} not found`);
-      throw new UnauthorizedException('Tienda no encontrada o credenciales inválidas');
+      throw new AppException(ErrorCode.InvalidCredentials, 'Tienda no encontrada o credenciales inválidas', HttpStatus.UNAUTHORIZED);
     }
 
     const user = await this.entityManager
@@ -57,18 +59,18 @@ export class LoginHandler implements ICommandHandler<LoginCommand> {
 
     if (!user) {
       this.logger.warn(`Login failed: user with identifier ${identifier} not found`);
-      throw new UnauthorizedException('Invalid email/username or password');
+      throw new AppException(ErrorCode.InvalidCredentials, 'Correo, usuario o contraseña incorrectos.', HttpStatus.UNAUTHORIZED);
     }
 
     if (user.isActive === false) {
       this.logger.warn(`Login failed: user ${user.id} (${identifier}) is deactivated`);
-      throw new UnauthorizedException('Usuario deshabilitado. Contacta a un administrador.');
+      throw new AppException(ErrorCode.UserDisabled, 'Usuario deshabilitado. Contacta a un administrador.', HttpStatus.UNAUTHORIZED);
     }
 
     const isPasswordValid = await this.hashService.compare(password, user.password || '');
     if (!isPasswordValid) {
       this.logger.warn(`Login failed: incorrect password for identifier ${identifier}`);
-      throw new UnauthorizedException('Invalid email/username or password');
+      throw new AppException(ErrorCode.InvalidCredentials, 'Correo, usuario o contraseña incorrectos.', HttpStatus.UNAUTHORIZED);
     }
 
     const effectivePermissions = resolveEffectivePermissions(user);

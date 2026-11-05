@@ -1,8 +1,10 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { EntityManager } from 'typeorm';
-import { ConflictException, Logger } from '@nestjs/common';
+import { Logger, HttpStatus } from '@nestjs/common';
 import { CreateBranchCommand } from './create-branch.command';
 import { Branch } from '../../../domain/entities/branch.entity';
+import { AppException } from '../../../../../common/errors/app.exception';
+import { ErrorCode } from '../../../../../common/errors/error-codes';
 
 @CommandHandler(CreateBranchCommand)
 export class CreateBranchHandler implements ICommandHandler<CreateBranchCommand> {
@@ -23,7 +25,7 @@ export class CreateBranchHandler implements ICommandHandler<CreateBranchCommand>
       });
       if (existing) {
         this.logger.warn(`Branch creation rejected: duplicate name in Tenant ${tenantId}`);
-        throw new ConflictException(`Ya existe una sucursal con el nombre "${name.trim()}".`);
+        throw new AppException(ErrorCode.BranchNameTaken, `Ya existe una sucursal con el nombre "${name.trim()}".`, HttpStatus.CONFLICT, { name: name.trim() });
       }
 
       // Calculate sequential branch code

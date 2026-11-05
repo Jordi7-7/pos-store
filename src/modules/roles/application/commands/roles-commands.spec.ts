@@ -1,4 +1,3 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { APP_PERMISSIONS } from '../../../../common/enums/permissions.enum';
 import { ErrorCode } from '../../../../common/errors/error-codes';
@@ -42,7 +41,7 @@ describe('Comandos de roles', () => {
 
     it("rechaza permisos con '*'", async () => {
       findOne.mockResolvedValue(null);
-      await expect(handler.execute(new CreateRoleCommand('t1', 'Evil', undefined, ['*']))).rejects.toThrow(BadRequestException);
+      await expect(handler.execute(new CreateRoleCommand('t1', 'Evil', undefined, ['*']))).rejects.toMatchObject({ code: ErrorCode.InvalidPermissions });
       expect(save).not.toHaveBeenCalled();
     });
 
@@ -69,7 +68,7 @@ describe('Comandos de roles', () => {
 
     it("rechaza permisos con '*' al editar", async () => {
       findOne.mockResolvedValue({ id: 'r1', tenantId: 't1', isSystem: false, name: 'Cajero' });
-      await expect(handler.execute(new UpdateRoleCommand('t1', 'r1', undefined, undefined, ['*']))).rejects.toThrow(BadRequestException);
+      await expect(handler.execute(new UpdateRoleCommand('t1', 'r1', undefined, undefined, ['*']))).rejects.toMatchObject({ code: ErrorCode.InvalidPermissions });
     });
 
     it('rechaza renombrar a un nombre que ya usa otro rol', async () => {
@@ -79,7 +78,7 @@ describe('Comandos de roles', () => {
 
     it('devuelve 404 si el rol no existe en el tenant', async () => {
       findOne.mockResolvedValue(null);
-      await expect(handler.execute(new UpdateRoleCommand('t1', 'r1', 'X'))).rejects.toThrow(NotFoundException);
+      await expect(handler.execute(new UpdateRoleCommand('t1', 'r1', 'X'))).rejects.toMatchObject({ code: ErrorCode.RoleNotFound });
     });
   });
 

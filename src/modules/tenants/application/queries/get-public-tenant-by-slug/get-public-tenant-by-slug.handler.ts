@@ -1,8 +1,10 @@
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
 import { EntityManager } from 'typeorm';
-import { NotFoundException } from '@nestjs/common';
+import { HttpStatus } from '@nestjs/common';
 import { GetPublicTenantBySlugQuery } from './get-public-tenant-by-slug.query';
 import { Tenant } from '../../../domain/entities/tenant.entity';
+import { AppException } from '../../../../../common/errors/app.exception';
+import { ErrorCode } from '../../../../../common/errors/error-codes';
 
 export interface PublicTenantDto {
   id: string;
@@ -26,7 +28,7 @@ export class GetPublicTenantBySlugHandler implements IQueryHandler<GetPublicTena
     });
 
     if (!tenant) {
-      throw new NotFoundException(`Tienda con identificador "${query.slug}" no encontrada`);
+      throw new AppException(ErrorCode.TenantNotFound, `Tienda con identificador "${query.slug}" no encontrada`, HttpStatus.NOT_FOUND, { slug: query.slug });
     }
 
     return {

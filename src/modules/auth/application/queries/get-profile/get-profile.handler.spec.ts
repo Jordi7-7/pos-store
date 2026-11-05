@@ -1,4 +1,4 @@
-import { UnauthorizedException } from '@nestjs/common';
+import { ErrorCode } from '../../../../../common/errors/error-codes';
 import { EntityManager } from 'typeorm';
 import { User } from '../../../../users/domain/entities/user.entity';
 import { GetProfileHandler } from './get-profile.handler';
@@ -34,6 +34,6 @@ describe('GetProfileHandler', () => {
 
   it('rechaza si el usuario no existe en ese tenant', async () => {
     const { handler } = handlerFor(null);
-    await expect(handler.execute(new GetProfileQuery('t1', 'u1'))).rejects.toThrow(UnauthorizedException);
+    await expect(handler.execute(new GetProfileQuery('t1', 'u1'))).rejects.toMatchObject({ code: ErrorCode.UserNotFound });
   });
 });

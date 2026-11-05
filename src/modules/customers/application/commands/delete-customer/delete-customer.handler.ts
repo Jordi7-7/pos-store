@@ -1,9 +1,11 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { NotFoundException, Logger } from '@nestjs/common';
+import { Logger, HttpStatus } from '@nestjs/common';
 import { DeleteCustomerCommand } from './delete-customer.command';
 import { Customer } from '../../../domain/entities/customer.entity';
+import { AppException } from '../../../../../common/errors/app.exception';
+import { ErrorCode } from '../../../../../common/errors/error-codes';
 
 @CommandHandler(DeleteCustomerCommand)
 export class DeleteCustomerHandler implements ICommandHandler<DeleteCustomerCommand> {
@@ -23,7 +25,7 @@ export class DeleteCustomerHandler implements ICommandHandler<DeleteCustomerComm
     });
     if (!customer) {
       this.logger.warn(`Customer deletion rejected: ${id} not found in Tenant ${tenantId}`);
-      throw new NotFoundException(`Customer with ID ${id} not found`);
+      throw new AppException(ErrorCode.CustomerNotFound, 'Cliente no encontrado.', HttpStatus.NOT_FOUND, { id });
     }
 
     await this.customerRepository.softRemove(customer);

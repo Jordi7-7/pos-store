@@ -1,4 +1,5 @@
-import { ExecutionContext, ForbiddenException } from '@nestjs/common';
+import { AppException } from '../../../common/errors/app.exception';
+import { ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { APP_PERMISSIONS } from '../../../common/enums/permissions.enum';
 import {
@@ -42,9 +43,7 @@ describe('PermissionsGuard', () => {
 
   it('lanza Forbidden si la ruta exige permisos y no hay usuario', () => {
     const guard = buildGuard({ all: [APP_PERMISSIONS.VIEW_POS] });
-    expect(() => guard.canActivate(buildContext(undefined))).toThrow(
-      ForbiddenException,
-    );
+    expect(() => guard.canActivate(buildContext(undefined))).toThrow(AppException);
   });
 
   it('el propietario tiene acceso total', () => {
@@ -68,7 +67,7 @@ describe('PermissionsGuard', () => {
       guard.canActivate(
         buildContext({ permissions: [APP_PERMISSIONS.VIEW_POS] }),
       ),
-    ).toThrow(ForbiddenException);
+    ).toThrow(AppException);
     expect(
       guard.canActivate(
         buildContext({
@@ -86,9 +85,7 @@ describe('PermissionsGuard', () => {
       any: [APP_PERMISSIONS.VIEW_POS, APP_PERMISSIONS.VIEW_DASHBOARD],
     });
 
-    expect(() => guard.canActivate(buildContext({ permissions: [] }))).toThrow(
-      ForbiddenException,
-    );
+    expect(() => guard.canActivate(buildContext({ permissions: [] }))).toThrow(AppException);
     expect(
       guard.canActivate(
         buildContext({ permissions: [APP_PERMISSIONS.VIEW_DASHBOARD] }),

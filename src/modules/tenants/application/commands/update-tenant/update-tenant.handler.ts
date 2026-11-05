@@ -1,10 +1,12 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { EntityManager, Not } from 'typeorm';
-import { NotFoundException, ConflictException, Logger } from '@nestjs/common';
+import { Logger, HttpStatus } from '@nestjs/common';
 import { UpdateTenantCommand } from './update-tenant.command';
 import { Tenant } from '../../../domain/entities/tenant.entity';
 import { S3Service } from '../../../../media/services/s3.service';
 import getSymbolFromCurrency from 'currency-symbol-map';
+import { AppException } from '../../../../../common/errors/app.exception';
+import { ErrorCode } from '../../../../../common/errors/error-codes';
 
 @CommandHandler(UpdateTenantCommand)
 export class UpdateTenantHandler implements ICommandHandler<UpdateTenantCommand> {
@@ -19,7 +21,7 @@ export class UpdateTenantHandler implements ICommandHandler<UpdateTenantCommand>
     const { id, input } = command;
     const tenant = await this.entityManager.findOne(Tenant, { where: { id } });
     if (!tenant) {
-      throw new NotFoundException(`Tenant with ID ${id} not found`);
+      throw new AppException(ErrorCode.TenantNotFound, 'Tienda no encontrada.', HttpStatus.NOT_FOUND, { id });
     }
 
     if (input.name !== undefined) {
@@ -31,7 +33,7 @@ export class UpdateTenantHandler implements ICommandHandler<UpdateTenantCommand>
         where: { slug: cleanSlug, id: Not(id) },
       });
       if (existingSlugTenant) {
-        throw new ConflictException(`El identificador "${cleanSlug}" ya está en uso por otra tienda`);
+        throw new AppException(ErrorCode.TenantSlugTaken, `El identificador "${cleanSlug}" ya está en uso por otra tienda`, HttpStatus.CONFLICT, { slug: cleanSlug });
       }
       tenant.slug = cleanSlug;
     }

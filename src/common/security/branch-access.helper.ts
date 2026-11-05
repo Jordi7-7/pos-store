@@ -1,6 +1,8 @@
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import { HttpStatus } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { RedisService } from '../redis/redis.service';
+import { AppException } from '../errors/app.exception';
+import { ErrorCode } from '../errors/error-codes';
 
 const USER_BRANCHES_CACHE_TTL = 3600; // 1 hour
 
@@ -83,15 +85,11 @@ export async function assertUserCanAccessBranch(
   }
 
   if (!branchId) {
-    throw new BadRequestException(
-      `Debes seleccionar una sucursal para ${actionDescription}.`,
-    );
+    throw new AppException(ErrorCode.BranchRequired, `Debes seleccionar una sucursal para ${actionDescription}.`, HttpStatus.BAD_REQUEST);
   }
 
   if (!userId) {
-    throw new ForbiddenException(
-      `Usuario no autenticado o no válido para ${actionDescription}.`,
-    );
+    throw new AppException(ErrorCode.UserNotAuthenticated, `Usuario no autenticado o no válido para ${actionDescription}.`, HttpStatus.FORBIDDEN);
   }
 
   const userBranchIds = await getUserAssignedBranchIds(
@@ -101,9 +99,7 @@ export async function assertUserCanAccessBranch(
   );
 
   if (!userBranchIds.includes(branchId)) {
-    throw new ForbiddenException(
-      `No tienes permisos para ${actionDescription} en la sucursal seleccionada.`,
-    );
+    throw new AppException(ErrorCode.BranchAccessDenied, `No tienes permisos para ${actionDescription} en la sucursal seleccionada.`, HttpStatus.FORBIDDEN, { branchId });
   }
 }
 
@@ -126,7 +122,7 @@ export async function assertUserCanOperateInBranch(
   const { tenantId, userId, branchId, actionDescription } = options;
 
   if (!userId) {
-    throw new ForbiddenException(`Usuario no autenticado o no válido para ${actionDescription}.`);
+    throw new AppException(ErrorCode.UserNotAuthenticated, `Usuario no autenticado o no válido para ${actionDescription}.`, HttpStatus.FORBIDDEN);
   }
 
   const rows: Array<{ is_owner: boolean }> = await entityManager.query(
@@ -134,7 +130,7 @@ export async function assertUserCanOperateInBranch(
     [userId, tenantId],
   );
   if (rows.length === 0) {
-    throw new ForbiddenException(`Usuario no válido para ${actionDescription}.`);
+    throw new AppException(ErrorCode.UserNotValid, `Usuario no válido para ${actionDescription}.`, HttpStatus.FORBIDDEN);
   }
 
   await assertUserCanAccessBranch(entityManager, redisService, {

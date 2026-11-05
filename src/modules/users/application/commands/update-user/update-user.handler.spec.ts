@@ -1,4 +1,3 @@
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { RedisService } from '../../../../../common/redis/redis.service';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
@@ -41,9 +40,7 @@ describe('UpdateUserHandler', () => {
       tenantId: 't1',
     });
 
-    await expect(run('owner', { name: 'Hacked' }, 'manager')).rejects.toThrow(
-      ForbiddenException,
-    );
+    await expect(run('owner', { name: 'Hacked' }, 'manager')).rejects.toMatchObject({ code: ErrorCode.OwnerOnlyEditsSelf });
     expect(save).not.toHaveBeenCalled();
   });
 
@@ -69,7 +66,7 @@ describe('UpdateUserHandler', () => {
 
     await expect(
       run('u2', { customPermissions: ['*'] }, 'manager'),
-    ).rejects.toThrow(BadRequestException);
+    ).rejects.toMatchObject({ code: ErrorCode.InvalidPermissions });
     expect(save).not.toHaveBeenCalled();
   });
 
@@ -96,9 +93,7 @@ describe('UpdateUserHandler', () => {
       tenantId: 't1',
     });
 
-    await expect(run('u2', { isActive: false }, 'u2')).rejects.toThrow(
-      BadRequestException,
-    );
+    await expect(run('u2', { isActive: false }, 'u2')).rejects.toMatchObject({ code: ErrorCode.CannotDeactivateSelf });
   });
 
   it('rechaza branchIds de otro tenant antes de guardar nada', async () => {

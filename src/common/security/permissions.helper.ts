@@ -1,5 +1,7 @@
-import { BadRequestException } from '@nestjs/common';
+import { HttpStatus } from '@nestjs/common';
 import { APP_PERMISSIONS } from '../enums/permissions.enum';
+import { AppException } from '../errors/app.exception';
+import { ErrorCode } from '../errors/error-codes';
 
 const VALID_PERMISSIONS: ReadonlySet<string> = new Set(
   Object.values(APP_PERMISSIONS),
@@ -18,7 +20,7 @@ export function assertValidPermissions(
     (permission) => !VALID_PERMISSIONS.has(permission),
   );
   if (invalid.length > 0) {
-    throw new BadRequestException(`Permisos no válidos: ${invalid.join(', ')}`);
+    throw new AppException(ErrorCode.InvalidPermissions, `Permisos no válidos: ${invalid.join(', ')}`, HttpStatus.BAD_REQUEST, { invalid });
   }
   return Array.from(new Set(permissions));
 }

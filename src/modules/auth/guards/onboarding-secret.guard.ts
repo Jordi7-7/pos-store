@@ -1,12 +1,8 @@
-import {
-  CanActivate,
-  ExecutionContext,
-  Injectable,
-  UnauthorizedException,
-  Logger,
-} from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable, Logger, HttpStatus } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Request } from 'express';
+import { AppException } from '../../../common/errors/app.exception';
+import { ErrorCode } from '../../../common/errors/error-codes';
 
 @Injectable()
 export class OnboardingSecretGuard implements CanActivate {
@@ -24,7 +20,7 @@ export class OnboardingSecretGuard implements CanActivate {
       this.logger.error(
         'ONBOARDING_API_KEY no está configurada en las variables de entorno. Petición bloqueada por seguridad.',
       );
-      throw new UnauthorizedException('No autorizado');
+      throw new AppException(ErrorCode.OnboardingUnauthorized, 'No autorizado', HttpStatus.UNAUTHORIZED);
     }
 
     const incomingKey =
@@ -34,7 +30,7 @@ export class OnboardingSecretGuard implements CanActivate {
       this.logger.warn(
         `Intento de creación de tenant no autorizado desde IP: ${request.ip}`,
       );
-      throw new UnauthorizedException('No autorizado');
+      throw new AppException(ErrorCode.OnboardingUnauthorized, 'No autorizado', HttpStatus.UNAUTHORIZED);
     }
 
     return true;

@@ -1,8 +1,10 @@
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
 import { EntityManager } from 'typeorm';
-import { NotFoundException } from '@nestjs/common';
+import { HttpStatus } from '@nestjs/common';
 import { GetTenantQuery } from './get-tenant.query';
 import { Tenant } from '../../../domain/entities/tenant.entity';
+import { AppException } from '../../../../../common/errors/app.exception';
+import { ErrorCode } from '../../../../../common/errors/error-codes';
 
 @QueryHandler(GetTenantQuery)
 export class GetTenantHandler implements IQueryHandler<GetTenantQuery> {
@@ -13,7 +15,7 @@ export class GetTenantHandler implements IQueryHandler<GetTenantQuery> {
       where: { id: query.id },
     });
     if (!tenant) {
-      throw new NotFoundException(`Tenant with ID ${query.id} not found`);
+      throw new AppException(ErrorCode.TenantNotFound, 'Tienda no encontrada.', HttpStatus.NOT_FOUND, { id: query.id });
     }
     return tenant;
   }

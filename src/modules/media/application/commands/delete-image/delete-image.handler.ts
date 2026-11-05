@@ -1,5 +1,5 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import { HttpStatus, Logger, NotFoundException } from '@nestjs/common';
+import { HttpStatus, Logger } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { DeleteImageCommand } from './delete-image.command';
 import { ProductImage } from '../../../../products/domain/entities/product-image.entity';
@@ -30,7 +30,7 @@ export class DeleteImageHandler implements ICommandHandler<DeleteImageCommand> {
     const image = await imageRepo.findOne({ where: { id, tenantId } });
     if (!image) {
       this.logger.warn(`Image deletion failed: ID ${id} not found for Tenant ${tenantId}`);
-      throw new NotFoundException('Image not found');
+      throw new AppException(ErrorCode.MediaNotFound, 'Imagen no encontrada.', HttpStatus.NOT_FOUND);
     }
 
     const isUsed = await this.isAssignedToProductOrVariant(id);

@@ -1,4 +1,3 @@
-import { NotFoundException } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
@@ -41,7 +40,7 @@ describe('GeneratePinHandler', () => {
   it('consulta el usuario filtrando por tenantId', async () => {
     findOne.mockResolvedValue(null);
 
-    await expect(handler.execute(new GeneratePinCommand('t1', 'u1'))).rejects.toThrow(NotFoundException);
+    await expect(handler.execute(new GeneratePinCommand('t1', 'u1'))).rejects.toMatchObject({ code: ErrorCode.UserNotFound });
     expect(findOne).toHaveBeenCalledWith({ where: { id: 'u1', tenantId: 't1' } });
     expect(save).not.toHaveBeenCalled();
   });

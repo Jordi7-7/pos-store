@@ -1,9 +1,11 @@
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
-import { Logger, UnauthorizedException } from '@nestjs/common';
+import { Logger, HttpStatus } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { GetProfileQuery } from './get-profile.query';
 import { User } from '../../../../users/domain/entities/user.entity';
 import { resolveEffectivePermissions } from '../../../domain/effective-permissions';
+import { AppException } from '../../../../../common/errors/app.exception';
+import { ErrorCode } from '../../../../../common/errors/error-codes';
 
 export interface Profile {
   id: string;
@@ -43,7 +45,7 @@ export class GetProfileHandler implements IQueryHandler<GetProfileQuery> {
     });
     if (!user) {
       this.logger.warn(`Profile not found for User ID ${userId} under Tenant ${tenantId}`);
-      throw new UnauthorizedException('User not found');
+      throw new AppException(ErrorCode.UserNotFound, 'Usuario no encontrado.', HttpStatus.UNAUTHORIZED);
     }
 
     const { tenant } = user;

@@ -1,8 +1,10 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { EntityManager, Not } from 'typeorm';
-import { NotFoundException, ConflictException, Logger } from '@nestjs/common';
+import { Logger, HttpStatus } from '@nestjs/common';
 import { UpdateBranchCommand } from './update-branch.command';
 import { Branch } from '../../../domain/entities/branch.entity';
+import { AppException } from '../../../../../common/errors/app.exception';
+import { ErrorCode } from '../../../../../common/errors/error-codes';
 
 @CommandHandler(UpdateBranchCommand)
 export class UpdateBranchHandler implements ICommandHandler<UpdateBranchCommand> {
@@ -20,7 +22,7 @@ export class UpdateBranchHandler implements ICommandHandler<UpdateBranchCommand>
     });
     if (!branch) {
       this.logger.warn(`Branch update rejected: ${branchId} not found in Tenant ${tenantId}`);
-      throw new NotFoundException('Sucursal no encontrada.');
+      throw new AppException(ErrorCode.BranchNotFound, 'Sucursal no encontrada.', HttpStatus.NOT_FOUND);
     }
 
     if (name !== undefined && name.trim() !== '') {
@@ -33,7 +35,7 @@ export class UpdateBranchHandler implements ICommandHandler<UpdateBranchCommand>
       });
       if (existing) {
         this.logger.warn(`Branch update rejected: duplicate name for ${branchId} in Tenant ${tenantId}`);
-        throw new ConflictException(`Ya existe otra sucursal con el nombre "${name.trim()}".`);
+        throw new AppException(ErrorCode.BranchNameTaken, `Ya existe otra sucursal con el nombre "${name.trim()}".`, HttpStatus.CONFLICT, { name: name.trim() });
       }
       branch.name = name.trim();
     }

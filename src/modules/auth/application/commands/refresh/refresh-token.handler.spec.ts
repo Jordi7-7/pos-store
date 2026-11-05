@@ -1,4 +1,4 @@
-import { UnauthorizedException } from '@nestjs/common';
+import { ErrorCode } from '../../../../../common/errors/error-codes';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { EntityManager } from 'typeorm';
@@ -37,7 +37,7 @@ describe('RefreshTokenHandler', () => {
   it('rechaza y revoca la sesión de un usuario desactivado', async () => {
     findOne.mockResolvedValue({ id: 'u1', tenantId: 't1', isActive: false } as User);
 
-    await expect(handler.execute(new RefreshTokenCommand('old-refresh'))).rejects.toThrow(UnauthorizedException);
+    await expect(handler.execute(new RefreshTokenCommand('old-refresh'))).rejects.toMatchObject({ code: ErrorCode.SessionExpired });
     expect(del).toHaveBeenCalledWith('refresh_token:u1');
     expect(set).not.toHaveBeenCalled();
   });
@@ -45,7 +45,7 @@ describe('RefreshTokenHandler', () => {
   it('rechaza un refresh token distinto al almacenado (reutilización)', async () => {
     get.mockResolvedValue('otro-token');
 
-    await expect(handler.execute(new RefreshTokenCommand('old-refresh'))).rejects.toThrow(UnauthorizedException);
+    await expect(handler.execute(new RefreshTokenCommand('old-refresh'))).rejects.toMatchObject({ code: ErrorCode.SessionExpired });
     expect(del).toHaveBeenCalledWith('refresh_token:u1');
   });
 });

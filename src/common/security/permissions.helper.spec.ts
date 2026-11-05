@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { AppException } from '../errors/app.exception';
 import { APP_PERMISSIONS } from '../enums/permissions.enum';
 import { assertValidPermissions } from './permissions.helper';
 
@@ -21,7 +21,7 @@ describe('assertValidPermissions', () => {
   });
 
   it("rechaza el comodín '*' (escalada de privilegios)", () => {
-    expect(() => assertValidPermissions(['*'])).toThrow(BadRequestException);
+    expect(() => assertValidPermissions(['*'])).toThrow(AppException);
   });
 
   it('rechaza permisos desconocidos e indica cuáles son', () => {

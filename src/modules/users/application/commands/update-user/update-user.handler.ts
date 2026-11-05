@@ -1,5 +1,5 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import { HttpStatus, Logger, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { HttpStatus, Logger } from '@nestjs/common';
 import { EntityManager, Not } from 'typeorm';
 import { UpdateUserCommand } from './update-user.command';
 import { User } from '../../../domain/entities/user.entity';
@@ -32,18 +32,18 @@ export class UpdateUserHandler implements ICommandHandler<UpdateUserCommand> {
     });
 
     if (!user) {
-      throw new NotFoundException(`Usuario no encontrado.`);
+      throw new AppException(ErrorCode.UserNotFound, `Usuario no encontrado.`, HttpStatus.NOT_FOUND);
     }
 
     // Seguridad: la cuenta del propietario solo puede ser modificada por el propio propietario
     if (user.isOwner && currentUserId !== userId) {
       this.logger.warn(`User ${currentUserId} attempted to modify owner ${userId} in Tenant: ${tenantId}`);
-      throw new ForbiddenException('Solo el propietario puede modificar su propia cuenta.');
+      throw new AppException(ErrorCode.OwnerOnlyEditsSelf, 'Solo el propietario puede modificar su propia cuenta.', HttpStatus.FORBIDDEN);
     }
 
     // Seguridad: Prevenir que el usuario en sesión se auto-desactive
     if (currentUserId && currentUserId === userId && input.isActive === false) {
-      throw new BadRequestException('No puedes desactivar tu propia cuenta mientras estás en sesión.');
+      throw new AppException(ErrorCode.CannotDeactivateSelf, 'No puedes desactivar tu propia cuenta mientras estás en sesión.', HttpStatus.BAD_REQUEST);
     }
 
     if (input.name !== undefined) {
@@ -53,13 +53,13 @@ export class UpdateUserHandler implements ICommandHandler<UpdateUserCommand> {
     if (input.username !== undefined) {
       const cleanUsername = input.username.toLowerCase().trim();
       if (!cleanUsername) {
-        throw new BadRequestException('El nombre de usuario no puede estar vacío.');
+        throw new AppException(ErrorCode.UsernameRequired, 'El nombre de usuario no puede estar vacío.', HttpStatus.BAD_REQUEST);
       }
       const usernameExists = await userRepo.findOne({
         where: { tenantId, username: cleanUsername, id: Not(userId) },
       });
       if (usernameExists) {
-        throw new BadRequestException(`El nombre de usuario "${cleanUsername}" ya está en uso.`);
+        throw new AppException(ErrorCode.UsernameTaken, `El nombre de usuario "${cleanUsername}" ya está en uso.`, HttpStatus.CONFLICT, { username: cleanUsername });
       }
       user.username = cleanUsername;
     }
@@ -71,7 +71,7 @@ export class UpdateUserHandler implements ICommandHandler<UpdateUserCommand> {
           where: { tenantId, email: cleanEmail, id: Not(userId) },
         });
         if (emailExists) {
-          throw new BadRequestException(`El correo "${cleanEmail}" ya está en uso por otro usuario.`);
+          throw new AppException(ErrorCode.EmailTaken, `El correo "${cleanEmail}" ya está en uso por otro usuario.`, HttpStatus.CONFLICT, { email: cleanEmail });
         }
       }
       user.email = cleanEmail;
@@ -91,11 +91,11 @@ export class UpdateUserHandler implements ICommandHandler<UpdateUserCommand> {
           [input.roleId, tenantId],
         );
         if (roleEntity.length === 0) {
-          throw new BadRequestException('El rol especificado no existe para esta tienda.');
+          throw new AppException(ErrorCode.RoleNotFound, 'El rol especificado no existe para esta tienda.', HttpStatus.NOT_FOUND);
         }
         user.roleId = roleEntity[0].id;
       } else {
-        throw new BadRequestException('Un usuario debe tener un rol asignado.');
+        throw new AppException(ErrorCode.RoleRequired, 'Un usuario debe tener un rol asignado.', HttpStatus.BAD_REQUEST);
       }
     }
 

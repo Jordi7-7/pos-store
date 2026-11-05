@@ -1,5 +1,5 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import { HttpStatus, Logger, NotFoundException } from '@nestjs/common';
+import { HttpStatus, Logger } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { UpdateRoleCommand } from './update-role.command';
 import { Role } from '../../../domain/entities/role.entity';
@@ -22,7 +22,7 @@ export class UpdateRoleHandler implements ICommandHandler<UpdateRoleCommand> {
     const role = await roleRepo.findOne({ where: { id, tenantId } });
     if (!role) {
       this.logger.warn(`Role update failed: ID ${id} not found for Tenant ${tenantId}`);
-      throw new NotFoundException('Rol no encontrado.');
+      throw new AppException(ErrorCode.RoleNotFound, 'Rol no encontrado.', HttpStatus.NOT_FOUND);
     }
 
     if (role.isSystem) {

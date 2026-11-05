@@ -1,14 +1,11 @@
-import {
-  CanActivate,
-  ExecutionContext,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable, HttpStatus } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { ConfigService } from '@nestjs/config';
+import { AppException } from '../../../common/errors/app.exception';
+import { ErrorCode } from '../../../common/errors/error-codes';
 
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -56,7 +53,7 @@ export class AuthGuard implements CanActivate {
     }
 
     if (!token) {
-      throw new UnauthorizedException('Missing authentication token');
+      throw new AppException(ErrorCode.AuthTokenMissing, 'Falta el token de autenticación.', HttpStatus.UNAUTHORIZED);
     }
     try {
       const jwtSecret = this.configService.get<string>('JWT_SECRET') || process.env.JWT_SECRET ;
@@ -65,7 +62,7 @@ export class AuthGuard implements CanActivate {
       });
       request['user'] = payload;
     } catch {
-      throw new UnauthorizedException('Invalid or expired authentication token');
+      throw new AppException(ErrorCode.AuthTokenInvalid, 'El token de autenticación no es válido o expiró.', HttpStatus.UNAUTHORIZED);
     }
     return true;
   }

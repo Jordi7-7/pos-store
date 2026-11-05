@@ -1,6 +1,6 @@
 import { randomInt } from 'crypto';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import { HttpStatus, Logger, NotFoundException } from '@nestjs/common';
+import { HttpStatus, Logger } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { GeneratePinCommand } from './generate-pin.command';
 import { User } from '../../../domain/entities/user.entity';
@@ -28,7 +28,7 @@ export class GeneratePinHandler implements ICommandHandler<GeneratePinCommand> {
     });
 
     if (!user) {
-      throw new NotFoundException(`User with ID ${targetUserId} not found in this tenant`);
+      throw new AppException(ErrorCode.UserNotFound, 'Usuario no encontrado.', HttpStatus.NOT_FOUND, { targetUserId });
     }
 
     // Generate cryptographically random 6-digit PIN

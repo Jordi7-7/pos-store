@@ -1,5 +1,5 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import { HttpStatus, Logger, BadRequestException } from '@nestjs/common';
+import { HttpStatus, Logger } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { CreateUserCommand } from './create-user.command';
 import { User } from '../../../domain/entities/user.entity';
@@ -34,7 +34,7 @@ export class CreateUserHandler implements ICommandHandler<CreateUserCommand> {
     });
     if (usernameExists) {
       this.logger.warn(`User creation failed: username ${cleanUsername} is already in use for tenant ${tenantId}`);
-      throw new BadRequestException(`El nombre de usuario "${cleanUsername}" ya está registrado en esta tienda.`);
+      throw new AppException(ErrorCode.UsernameTaken, `El nombre de usuario "${cleanUsername}" ya está registrado en esta tienda.`, HttpStatus.CONFLICT, { username: cleanUsername });
     }
 
     // 2. Email is optional; if provided, must be unique per tenant
@@ -44,7 +44,7 @@ export class CreateUserHandler implements ICommandHandler<CreateUserCommand> {
       });
       if (emailExists) {
         this.logger.warn(`User creation failed: email ${cleanEmail} is already in use for tenant ${tenantId}`);
-        throw new BadRequestException(`El correo "${cleanEmail}" ya está registrado en esta tienda.`);
+        throw new AppException(ErrorCode.EmailTaken, `El correo "${cleanEmail}" ya está registrado en esta tienda.`, HttpStatus.CONFLICT, { email: cleanEmail });
       }
     }
 
@@ -59,7 +59,7 @@ export class CreateUserHandler implements ICommandHandler<CreateUserCommand> {
         [roleId, tenantId],
       );
       if (roleEntity.length === 0) {
-        throw new BadRequestException('El rol especificado no existe para esta tienda.');
+        throw new AppException(ErrorCode.RoleNotFound, 'El rol especificado no existe para esta tienda.', HttpStatus.NOT_FOUND);
       }
       resolvedRoleId = roleEntity[0].id;
     } else {

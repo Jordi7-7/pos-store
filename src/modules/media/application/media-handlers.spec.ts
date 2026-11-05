@@ -1,4 +1,3 @@
-import { NotFoundException } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { AppException } from '../../../common/errors/app.exception';
 import { ErrorCode } from '../../../common/errors/error-codes';
@@ -57,7 +56,7 @@ describe('Handlers de media', () => {
 
     it('devuelve 404 si la imagen no es del tenant', async () => {
       findOne.mockResolvedValue(null);
-      await expect(handler().execute(new DeleteImageCommand('t1', 'i1'))).rejects.toThrow(NotFoundException);
+      await expect(handler().execute(new DeleteImageCommand('t1', 'i1'))).rejects.toMatchObject({ code: ErrorCode.MediaNotFound });
     });
 
     it('no borra una imagen asignada a un producto (MEDIA_IN_USE) ni toca el bucket', async () => {

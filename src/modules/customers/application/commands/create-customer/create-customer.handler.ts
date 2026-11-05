@@ -1,9 +1,11 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { BadRequestException, Logger } from '@nestjs/common';
+import { Logger, HttpStatus } from '@nestjs/common';
 import { CreateCustomerCommand } from './create-customer.command';
 import { Customer } from '../../../domain/entities/customer.entity';
+import { AppException } from '../../../../../common/errors/app.exception';
+import { ErrorCode } from '../../../../../common/errors/error-codes';
 
 @CommandHandler(CreateCustomerCommand)
 export class CreateCustomerHandler implements ICommandHandler<CreateCustomerCommand> {
@@ -23,7 +25,7 @@ export class CreateCustomerHandler implements ICommandHandler<CreateCustomerComm
     });
     if (existing) {
       this.logger.warn(`Customer creation rejected: duplicate identity number in Tenant ${tenantId}`);
-      throw new BadRequestException(`Customer with identity number ${input.identityNumber} already exists`);
+      throw new AppException(ErrorCode.CustomerIdentityTaken, `Ya existe un cliente con el documento ${input.identityNumber}.`, HttpStatus.CONFLICT, { identityNumber: input.identityNumber });
     }
 
     const customer = new Customer();

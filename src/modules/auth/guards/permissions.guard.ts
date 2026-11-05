@@ -1,7 +1,9 @@
-import { CanActivate, ExecutionContext, Injectable, ForbiddenException } from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable, HttpStatus } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { PERMISSIONS_KEY, REQUIRE_ANY_PERMISSIONS_KEY } from '../decorators/permissions.decorator';
 import { AppPermission } from '../../../common/enums/permissions.enum';
+import { AppException } from '../../../common/errors/app.exception';
+import { ErrorCode } from '../../../common/errors/error-codes';
 
 @Injectable()
 export class PermissionsGuard implements CanActivate {
@@ -27,7 +29,7 @@ export class PermissionsGuard implements CanActivate {
 
     const { user } = context.switchToHttp().getRequest();
     if (!user) {
-      throw new ForbiddenException('Usuario no autenticado.');
+      throw new AppException(ErrorCode.UserNotAuthenticated, 'Usuario no autenticado.', HttpStatus.FORBIDDEN);
     }
 
     // El Propietario (OWNER/isOwner) o roles con comodín '*' tienen acceso total automático
@@ -41,7 +43,7 @@ export class PermissionsGuard implements CanActivate {
     if (requiredPermissions && requiredPermissions.length > 0) {
       const hasAll = requiredPermissions.every((perm) => userPermissions.includes(perm));
       if (!hasAll) {
-        throw new ForbiddenException('No tienes permisos suficientes para realizar esta acción.');
+        throw new AppException(ErrorCode.PermissionDenied, 'No tienes permisos suficientes para realizar esta acción.', HttpStatus.FORBIDDEN);
       }
     }
 
@@ -49,7 +51,7 @@ export class PermissionsGuard implements CanActivate {
     if (requireAnyPermissions && requireAnyPermissions.length > 0) {
       const hasAny = requireAnyPermissions.some((perm) => userPermissions.includes(perm));
       if (!hasAny) {
-        throw new ForbiddenException('No tienes permisos suficientes para realizar esta acción.');
+        throw new AppException(ErrorCode.PermissionDenied, 'No tienes permisos suficientes para realizar esta acción.', HttpStatus.FORBIDDEN);
       }
     }
 

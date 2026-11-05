@@ -1,4 +1,4 @@
-import { Logger, BadRequestException } from '@nestjs/common';
+import { Logger, HttpStatus } from '@nestjs/common';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { EntityManager } from 'typeorm';
 import { OnboardTenantCommand } from './onboard-tenant.command';
@@ -9,6 +9,8 @@ import { HashService } from '../../../services/hash.service';
 import { Supplier } from '../../../../purchases/domain/entities/supplier.entity';
 import { Customer } from '../../../../customers/domain/entities/customer.entity';
 import { APP_PERMISSIONS } from '../../../../../common/enums/permissions.enum';
+import { AppException } from '../../../../../common/errors/app.exception';
+import { ErrorCode } from '../../../../../common/errors/error-codes';
 
 @CommandHandler(OnboardTenantCommand)
 export class OnboardTenantHandler implements ICommandHandler<OnboardTenantCommand> {
@@ -37,7 +39,7 @@ export class OnboardTenantHandler implements ICommandHandler<OnboardTenantComman
 
     const cleanUsername = username.toLowerCase().trim().replace(/[^a-z0-9._-]/g, '');
     if (!cleanUsername) {
-      throw new BadRequestException('El nombre de usuario es obligatorio y debe contener caracteres válidos.');
+      throw new AppException(ErrorCode.UsernameInvalid, 'El nombre de usuario es obligatorio y debe contener caracteres válidos.', HttpStatus.BAD_REQUEST);
     }
     const cleanEmail = email && email.trim() ? email.toLowerCase().trim() : null;
 
@@ -47,7 +49,7 @@ export class OnboardTenantHandler implements ICommandHandler<OnboardTenantComman
     });
     if (tenantExists) {
       this.logger.warn(`Onboarding failed: Tenant RUC ${ruc} already registered`);
-      throw new BadRequestException(`Tenant with RUC ${ruc} already registered`);
+      throw new AppException(ErrorCode.TenantRucTaken, `Ya existe una tienda registrada con el RUC ${ruc}.`, HttpStatus.CONFLICT, { ruc });
     }
 
     return this.entityManager.transaction(async (transactionalManager) => {

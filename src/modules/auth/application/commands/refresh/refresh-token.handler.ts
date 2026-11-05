@@ -1,4 +1,4 @@
-import { Logger, UnauthorizedException } from '@nestjs/common';
+import { Logger, HttpStatus } from '@nestjs/common';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -7,6 +7,8 @@ import { RefreshTokenCommand } from './refresh-token.command';
 import { User } from '../../../../users/domain/entities/user.entity';
 import { RedisService } from '../../../../../common/redis/redis.service';
 import { resolveEffectivePermissions } from '../../../domain/effective-permissions';
+import { AppException } from '../../../../../common/errors/app.exception';
+import { ErrorCode } from '../../../../../common/errors/error-codes';
 
 @CommandHandler(RefreshTokenCommand)
 export class RefreshTokenHandler implements ICommandHandler<RefreshTokenCommand> {
@@ -32,7 +34,7 @@ export class RefreshTokenHandler implements ICommandHandler<RefreshTokenCommand>
       if (!storedToken || storedToken !== refreshToken) {
         this.logger.warn(`Refresh failed: Token mismatch or reuse detected for User ID: ${userId}. Invalidating session.`);
         await this.redisService.del(redisKey);
-        throw new UnauthorizedException('Session expired or invalid refresh token');
+        throw new AppException(ErrorCode.SessionExpired, 'La sesión expiró. Inicia sesión nuevamente.', HttpStatus.UNAUTHORIZED);
       }
 
       const user = await this.entityManager.findOne(User, {
@@ -42,7 +44,7 @@ export class RefreshTokenHandler implements ICommandHandler<RefreshTokenCommand>
       if (!user || !user.isActive) {
         this.logger.warn(`Refresh failed: User ID ${userId} not found or inactive.`);
         await this.redisService.del(redisKey);
-        throw new UnauthorizedException('Session expired or invalid refresh token');
+        throw new AppException(ErrorCode.SessionExpired, 'La sesión expiró. Inicia sesión nuevamente.', HttpStatus.UNAUTHORIZED);
       }
 
       this.logger.log(`Tokens rotated successfully for User ID: ${userId}`);
@@ -84,7 +86,7 @@ export class RefreshTokenHandler implements ICommandHandler<RefreshTokenCommand>
       };
     } catch (err: any) {
       this.logger.warn(`Refresh failed: Token signature/expiry validation error: ${err?.message}`);
-      throw new UnauthorizedException('Session expired or invalid refresh token');
+      throw new AppException(ErrorCode.SessionExpired, 'La sesión expiró. Inicia sesión nuevamente.', HttpStatus.UNAUTHORIZED);
     }
   }
 }

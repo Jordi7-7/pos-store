@@ -1,9 +1,11 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Not } from 'typeorm';
-import { NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import { Logger, HttpStatus } from '@nestjs/common';
 import { UpdateCustomerCommand } from './update-customer.command';
 import { Customer } from '../../../domain/entities/customer.entity';
+import { AppException } from '../../../../../common/errors/app.exception';
+import { ErrorCode } from '../../../../../common/errors/error-codes';
 
 @CommandHandler(UpdateCustomerCommand)
 export class UpdateCustomerHandler implements ICommandHandler<UpdateCustomerCommand> {
@@ -23,7 +25,7 @@ export class UpdateCustomerHandler implements ICommandHandler<UpdateCustomerComm
     });
     if (!customer) {
       this.logger.warn(`Customer update rejected: ${id} not found in Tenant ${tenantId}`);
-      throw new NotFoundException(`Customer with ID ${id} not found`);
+      throw new AppException(ErrorCode.CustomerNotFound, 'Cliente no encontrado.', HttpStatus.NOT_FOUND, { id });
     }
 
     if (input.identityNumber !== undefined) {
@@ -32,7 +34,7 @@ export class UpdateCustomerHandler implements ICommandHandler<UpdateCustomerComm
       });
       if (existing) {
         this.logger.warn(`Customer update rejected: duplicate identity number for ${id} in Tenant ${tenantId}`);
-        throw new BadRequestException(`Customer with identity number ${input.identityNumber} already exists`);
+        throw new AppException(ErrorCode.CustomerIdentityTaken, `Ya existe un cliente con el documento ${input.identityNumber}.`, HttpStatus.CONFLICT, { identityNumber: input.identityNumber });
       }
       customer.identityNumber = input.identityNumber;
     }
