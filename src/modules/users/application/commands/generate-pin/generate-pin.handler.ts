@@ -1,3 +1,4 @@
+import { randomInt } from 'crypto';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
@@ -28,7 +29,7 @@ export class GeneratePinHandler implements ICommandHandler<GeneratePinCommand> {
     }
 
     // Generate cryptographically random 6-digit PIN
-    const pin = Math.floor(100000 + Math.random() * 900000).toString();
+    const pin = randomInt(100000, 1000000).toString();
     const hashedPin = await this.hashService.hash(pin);
 
     user.pin = hashedPin;

@@ -4,6 +4,7 @@ import { EntityManager } from 'typeorm';
 import { CreateUserCommand } from './create-user.command';
 import { User } from '../../../domain/entities/user.entity';
 import { HashService } from '../../../../auth/services/hash.service';
+import { assertValidPermissions } from '../../../../../common/security/permissions.helper';
 
 @CommandHandler(CreateUserCommand)
 export class CreateUserHandler implements ICommandHandler<CreateUserCommand> {
@@ -76,7 +77,7 @@ export class CreateUserHandler implements ICommandHandler<CreateUserCommand> {
     user.password = hashedPassword;
     user.isOwner = false;
     user.roleId = resolvedRoleId;
-    user.customPermissions = customPermissions || null;
+    user.customPermissions = customPermissions ? assertValidPermissions(customPermissions) : null;
     user.isActive = true;
 
     if (pin && pin.trim()) {

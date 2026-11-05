@@ -1,4 +1,4 @@
-import { IsString, IsEmail, MinLength, IsOptional, IsBoolean, Matches } from 'class-validator';
+import { IsString, IsEmail, MinLength, IsOptional, IsBoolean, IsArray, Matches } from 'class-validator';
 
 export class UpdateUserDto {
   @IsString()
@@ -23,6 +23,8 @@ export class UpdateUserDto {
   @IsOptional()
   roleId?: string;
 
+  @IsArray()
+  @IsString({ each: true })
   @IsOptional()
   customPermissions?: string[];
 
@@ -34,6 +36,8 @@ export class UpdateUserDto {
   @IsOptional()
   isActive?: boolean;
 
+  @IsArray()
+  @IsString({ each: true })
   @IsOptional()
   branchIds?: string[];
 }

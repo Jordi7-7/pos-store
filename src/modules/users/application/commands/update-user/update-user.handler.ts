@@ -1,10 +1,11 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import { Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Logger, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { EntityManager, Not } from 'typeorm';
 import { UpdateUserCommand } from './update-user.command';
 import { User } from '../../../domain/entities/user.entity';
 import { HashService } from '../../../../auth/services/hash.service';
 import { RedisService } from '../../../../../common/redis/redis.service';
+import { assertValidPermissions } from '../../../../../common/security/permissions.helper';
 import { invalidateUserBranchesCache } from '../../../../../common/security/branch-access.helper';
 
 @CommandHandler(UpdateUserCommand)
@@ -28,6 +29,12 @@ export class UpdateUserHandler implements ICommandHandler<UpdateUserCommand> {
 
     if (!user) {
       throw new NotFoundException(`Usuario no encontrado.`);
+    }
+
+    // Seguridad: la cuenta del propietario solo puede ser modificada por el propio propietario
+    if (user.isOwner && currentUserId !== userId) {
+      this.logger.warn(`User ${currentUserId} attempted to modify owner ${userId} in Tenant: ${tenantId}`);
+      throw new ForbiddenException('Solo el propietario puede modificar su propia cuenta.');
     }
 
     // Seguridad: Prevenir que el usuario en sesión se auto-desactive
@@ -89,7 +96,7 @@ export class UpdateUserHandler implements ICommandHandler<UpdateUserCommand> {
     }
 
     if (dto.customPermissions !== undefined) {
-      user.customPermissions = dto.customPermissions;
+      user.customPermissions = assertValidPermissions(dto.customPermissions);
     }
 
     if (dto.pin !== undefined) {

@@ -9,6 +9,7 @@ import {
   Header,
   UseGuards,
   ConflictException,
+  ForbiddenException,
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
@@ -18,6 +19,7 @@ import { AuthGuard } from '../../../auth/guards/auth.guard';
 import { PermissionsGuard } from '../../../auth/guards/permissions.guard';
 import { RequirePermissions } from '../../../auth/decorators/permissions.decorator';
 import { APP_PERMISSIONS, PERMISSION_DEFINITIONS, PERMISSION_MODULES } from '../../../../common/enums/permissions.enum';
+import { assertValidPermissions } from '../../../../common/security/permissions.helper';
 import { Role } from '../../domain/entities/role.entity';
 import { User } from '../../../users/domain/entities/user.entity';
 import { CreateRoleDto, UpdateRoleDto } from '../../application/dto/role.dto';
@@ -85,7 +87,7 @@ export class RolesController {
     role.tenantId = tenantId;
     role.name = dto.name.trim();
     role.description = dto.description?.trim() || null;
-    role.permissions = dto.permissions || [];
+    role.permissions = assertValidPermissions(dto.permissions || []);
     role.isSystem = false;
 
     return roleRepo.save(role);
@@ -107,6 +109,10 @@ export class RolesController {
       throw new NotFoundException('Rol no encontrado.');
     }
 
+    if (role.isSystem) {
+      throw new ForbiddenException('Los roles del sistema no se pueden modificar.');
+    }
+
     if (dto.name && dto.name.trim() !== role.name) {
       const duplicate = await roleRepo.findOne({
         where: { tenantId, name: dto.name.trim() },
@@ -122,7 +128,7 @@ export class RolesController {
     }
 
     if (dto.permissions !== undefined) {
-      role.permissions = dto.permissions;
+      role.permissions = assertValidPermissions(dto.permissions);
     }
 
     return roleRepo.save(role);
@@ -142,6 +148,10 @@ export class RolesController {
     });
     if (!role) {
       throw new NotFoundException('Rol no encontrado.');
+    }
+
+    if (role.isSystem) {
+      throw new ForbiddenException('Los roles del sistema no se pueden eliminar.');
     }
 
     // Si el usuario asignado es el Propietario (isOwner: true), desasociamos su roleId legacy automáticamente
