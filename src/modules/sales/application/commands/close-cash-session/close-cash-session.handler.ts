@@ -4,7 +4,8 @@ import { EntityManager } from 'typeorm';
 import { CloseCashSessionCommand } from './close-cash-session.command';
 import { CashSession } from '../../../domain/entities/cash-session.entity';
 import { CashSessionStatus } from '../../../domain/enums/cash-session-status.enum';
-import { SalePayment, PaymentMethod } from '../../../domain/entities/sale-payment.entity';
+import { PaymentMethod } from '../../../domain/entities/sale-payment.entity';
+import { Sale } from '../../../domain/entities/sale.entity';
 import { Expense } from '../../../domain/entities/expense.entity';
 import { Refund } from '../../../domain/entities/refund.entity';
 import { cashDifference, expectedCashBalance } from '../../../domain/services/cash-closing';
@@ -44,14 +45,19 @@ export class CloseCashSessionHandler implements ICommandHandler<CloseCashSession
       }
 
       // 2. Compute expected cash balance in drawer directly from database
+      // Misma regla que el detalle de la sesión (summarizeCashSession): una venta sin pagos registrados
+      // (datos antiguos) cuenta como cobrada en efectivo por su total
       const cashSalesRaw = await transactionalManager
-        .createQueryBuilder(SalePayment, 'sp')
-        .innerJoin('sp.sale', 's')
+        .createQueryBuilder(Sale, 's')
+        .leftJoin('s.payments', 'sp')
         .where('s.cashSessionId = :sessionId', { sessionId: id })
         .andWhere('s.tenantId = :tenantId', { tenantId })
-        .andWhere('sp.paymentMethod = :method', { method: PaymentMethod.EFECTIVO })
-        .select('COALESCE(SUM(sp.amount), 0)', 'total')
-        .getRawOne();
+        .select(
+          `COALESCE(SUM(CASE WHEN sp.id IS NULL THEN s.total WHEN sp.paymentMethod = :method THEN sp.amount ELSE 0 END), 0)`,
+          'total',
+        )
+        .setParameter('method', PaymentMethod.EFECTIVO)
+        .getRawOne<{ total: string }>();
 
       const cashSales = parseFloat(cashSalesRaw?.total || '0');
 

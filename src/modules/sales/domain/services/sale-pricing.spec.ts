@@ -1,7 +1,7 @@
 import { DomainError } from '../../../../common/domain/domain.error';
 import { Money } from '../../../../common/domain/money';
 import { ErrorCode } from '../../../../common/errors/error-codes';
-import { assertPaymentsCoverTotal, priceSale, SaleLineAmounts } from './sale-pricing';
+import { allocatePayments, assertPaymentsCoverTotal, priceSale, SaleLineAmounts } from './sale-pricing';
 
 const line = (overrides: Partial<SaleLineAmounts> = {}): SaleLineAmounts => ({ quantity: 2, price: 10, ...overrides });
 
@@ -117,5 +117,31 @@ describe('assertPaymentsCoverTotal', () => {
     expect(error.code).toBe(ErrorCode.InsufficientPayment);
     expect(error.message).toBe('El monto pagado ($9.99) es menor al total de la venta ($10.00).');
     expect(error.details).toEqual({ paid: 9.99, total: 10 });
+  });
+});
+
+describe('allocatePayments', () => {
+  const cash = (amount: number) => ({ paymentMethod: 'EFECTIVO', amount });
+  const card = (amount: number) => ({ paymentMethod: 'TARJETA', amount });
+
+  it('deja los pagos intactos cuando suman exactamente el total', () => {
+    expect(allocatePayments(30, [cash(10), card(20)])).toEqual([cash(10), card(20)]);
+  });
+
+  it('el vuelto sale del efectivo: pagar 50 en efectivo una venta de 30 registra 30', () => {
+    expect(allocatePayments(30, [cash(50)])).toEqual([cash(30)]);
+  });
+
+  it('con pago mixto la tarjeta se aplica completa y el efectivo absorbe el sobrante', () => {
+    expect(allocatePayments(30, [cash(20), card(25)])).toEqual([cash(5), card(25)]);
+  });
+
+  it('una tarjeta que excede el total no genera vuelto: se recorta al total', () => {
+    expect(allocatePayments(30, [card(40)])).toEqual([card(30)]);
+  });
+
+  it('descarta los pagos que quedan en cero y no pierde centavos', () => {
+    expect(allocatePayments(0.3, [card(0.3), cash(10)])).toEqual([card(0.3)]);
+    expect(allocatePayments(0.3, [cash(0.1), cash(0.2)])).toEqual([cash(0.1), cash(0.2)]);
   });
 });

@@ -101,3 +101,27 @@ export function assertPaymentsCoverTotal(saleTotal: number, paymentAmounts: read
     );
   }
 }
+
+/**
+ * Lo que de cada pago se aplica al total de la venta. Lo que excede el total es vuelto, no ingreso:
+ * se recorta primero del efectivo (lo único que se devuelve en mano). Así lo registrado en
+ * `sale_payments` nunca supera el total y el efectivo esperado en caja no se infla con el vuelto.
+ * Conserva el orden original y descarta los pagos que quedan en cero.
+ */
+export function allocatePayments<T extends { paymentMethod: string; amount: number }>(saleTotal: number, payments: readonly T[]): T[] {
+  let budget = Money.of(saleTotal);
+  const applied = new Map<T, Money>();
+
+  // Primero lo que no es efectivo (no admite vuelto); el efectivo cubre lo que falte
+  const byPriority = [...payments].sort((a, b) => Number(a.paymentMethod === 'EFECTIVO') - Number(b.paymentMethod === 'EFECTIVO'));
+  for (const payment of byPriority) {
+    const amount = Money.of(payment.amount);
+    const part = amount.lessThan(budget) ? amount : budget;
+    applied.set(payment, part);
+    budget = budget.minus(part);
+  }
+
+  return payments
+    .map((payment) => ({ ...payment, amount: (applied.get(payment) ?? Money.ZERO).toNumber() }))
+    .filter((payment) => payment.amount > 0);
+}

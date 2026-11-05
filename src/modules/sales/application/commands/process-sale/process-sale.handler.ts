@@ -1,7 +1,7 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { Logger, HttpStatus } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
-import { ProcessSaleCommand } from './process-sale.command';
+import { ProcessSaleCommand, SalePaymentInput } from './process-sale.command';
 import { Sale } from '../../../domain/entities/sale.entity';
 import { SaleItem } from '../../../domain/entities/sale-item.entity';
 import { SalePayment } from '../../../domain/entities/sale-payment.entity';
@@ -16,7 +16,7 @@ import { InventoryMovementType } from '../../../../../common/enums/inventory-mov
 import { RedisService } from '../../../../../common/redis/redis.service';
 import { assertUserCanOperateInBranch } from '../../../../../common/security/branch-access.helper';
 import { consumeStock } from '../../../../products/application/services/inventory-stock';
-import { assertPaymentsCoverTotal, priceSale, SalePricing } from '../../../domain/services/sale-pricing';
+import { allocatePayments, assertPaymentsCoverTotal, priceSale, SalePricing } from '../../../domain/services/sale-pricing';
 import { lockCashSession } from '../shared/cash-session-lock';
 import { assertUserAssignedToCashRegister } from '../shared/cash-register-access';
 import { SaleStatus } from '../../../../../common/enums/sale-status.enum';
@@ -53,9 +53,11 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
 
     // Importes e invariantes monetarias (sin tocar la base de datos): falla rápido ante datos manipulados
     let pricing: SalePricing;
+    let appliedPayments: SalePaymentInput[];
     try {
       pricing = priceSale(items, discountAmount);
       assertPaymentsCoverTotal(pricing.total, payments.map((payment) => payment.amount));
+      appliedPayments = allocatePayments(pricing.total, payments);
     } catch (error) {
       this.logger.warn(`Sale rejected: invalid amounts for Tenant ${tenantId} (${error instanceof Error ? error.message : 'unknown'})`);
       throw error;
@@ -232,7 +234,7 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
       sale.items = saleItemsToSave;
 
       // 6. Create Payments
-      sale.payments = payments.map((p) => {
+      sale.payments = appliedPayments.map((p) => {
         const payment = new SalePayment();
         payment.paymentMethod = p.paymentMethod;
         payment.amount = p.amount;

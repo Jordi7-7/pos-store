@@ -285,6 +285,52 @@ describe('Flujo de dinero: venta, devolución y cierre de caja', () => {
     }
   });
 
+  describe('efectivo esperado en caja', () => {
+    const details = (sessionId: string) =>
+      new GetCashSessionDetailsHandler(db.getRepository(CashSession), db.getRepository(Sale), db.getRepository(Expense), db.getRepository(Refund)).execute(
+        new GetCashSessionDetailsQuery(tenantId, sessionId),
+      );
+    const sellWith = (sessionId: string, quantity: number, payments: Array<{ paymentMethod: PaymentMethod; amount: number }>) =>
+      new ProcessSaleHandler(db.manager, redis).execute(
+        new ProcessSaleCommand(tenantId, userId, branchId, sessionId, undefined, [{ variantId, quantity, price: 10 }], payments),
+      );
+
+    it('el vuelto no cuenta como ingreso: pagar 50 una venta de 30 registra 30 y el esperado sube 30', async () => {
+      const sessionId = await openSession(100);
+      const sale = await sellWith(sessionId, 3, [{ paymentMethod: PaymentMethod.EFECTIVO, amount: 50 }]);
+
+      expect((await saleById(sale.id)).payments.map((p) => p.amount)).toEqual([30]);
+      expect((await details(sessionId)).session.expectedBalance).toBe(130);
+      const closed = await new CloseCashSessionHandler(db.manager).execute(new CloseCashSessionCommand(tenantId, sessionId, 130));
+      expect(closed).toMatchObject({ expectedBalance: 130, difference: 0 });
+    });
+
+    it('pago mixto: la tarjeta no entra al efectivo y el efectivo solo cubre el resto', async () => {
+      const sessionId = await openSession(0);
+      await sellWith(sessionId, 4, [
+        { paymentMethod: PaymentMethod.TARJETA, amount: 25 },
+        { paymentMethod: PaymentMethod.EFECTIVO, amount: 20 },
+      ]);
+
+      const { kpis, session } = await details(sessionId);
+      expect(kpis).toMatchObject({ grossSales: 40, cashSales: 15, cardSales: 25 });
+      expect(session.expectedBalance).toBe(15);
+      expect(await new CloseCashSessionHandler(db.manager).execute(new CloseCashSessionCommand(tenantId, sessionId, 15))).toMatchObject({ expectedBalance: 15 });
+    });
+
+    it('el cierre y el detalle coinciden también con una venta antigua sin pagos registrados (cuenta como efectivo)', async () => {
+      const sessionId = await openSession(10);
+      const legacy = await sellWith(sessionId, 2, [{ paymentMethod: PaymentMethod.EFECTIVO, amount: 20 }]);
+      await sellWith(sessionId, 1, [{ paymentMethod: PaymentMethod.TARJETA, amount: 10 }]);
+      await db.query(`DELETE FROM sale_payments WHERE sale_id = $1`, [legacy.id]);
+
+      const shown = (await details(sessionId)).session.expectedBalance;
+      const closed = await new CloseCashSessionHandler(db.manager).execute(new CloseCashSessionCommand(tenantId, sessionId, 30));
+      expect(shown).toBe(30); // 10 apertura + 20 de la venta antigua
+      expect(closed.expectedBalance).toBe(shown);
+    });
+  });
+
   it('el detalle de la sesión resume ventas, devoluciones y gastos con el arqueo esperado', async () => {
     const sessionId = await openSession(100);
     try {

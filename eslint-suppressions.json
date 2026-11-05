@@ -271,13 +271,13 @@
   },
   "src/modules/sales/application/commands/close-cash-session/close-cash-session.handler.ts": {
     "@typescript-eslint/no-unsafe-argument": {
-      "count": 3
+      "count": 2
     },
     "@typescript-eslint/no-unsafe-assignment": {
-      "count": 3
+      "count": 2
     },
     "@typescript-eslint/no-unsafe-member-access": {
-      "count": 3
+      "count": 2
     }
   },
   "src/modules/sales/application/commands/open-cash-session/open-cash-session.handler.ts": {

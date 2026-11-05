@@ -14,6 +14,8 @@ describe('CloseCashSessionHandler', () => {
   const save = jest.fn((s: CashSession) => Promise.resolve(s));
   const rawTotal = (total: string) => ({
     innerJoin: () => rawTotal(total),
+    leftJoin: () => rawTotal(total),
+    setParameter: () => rawTotal(total),
     where: () => rawTotal(total),
     andWhere: () => rawTotal(total),
     select: () => rawTotal(total),
