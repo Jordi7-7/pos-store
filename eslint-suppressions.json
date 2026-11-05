@@ -195,11 +195,6 @@
       "count": 1
     }
   },
-  "src/modules/media/infrastructure/controllers/media.controller.ts": {
-    "@typescript-eslint/no-unsafe-assignment": {
-      "count": 2
-    }
-  },
   "src/modules/media/services/s3.service.ts": {
     "@typescript-eslint/no-unused-vars": {
       "count": 1
@@ -438,14 +433,6 @@
   "src/modules/roles/domain/entities/role.entity.ts": {
     "@typescript-eslint/no-unsafe-return": {
       "count": 1
-    }
-  },
-  "src/modules/roles/infrastructure/controllers/roles.controller.ts": {
-    "@typescript-eslint/no-unsafe-argument": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 2
     }
   },
   "src/modules/sales/application/commands/close-cash-session/close-cash-session.handler.spec.ts": {

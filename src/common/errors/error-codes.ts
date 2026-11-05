@@ -31,8 +31,14 @@ export enum ErrorCode {
   InsufficientPayment = 'INSUFFICIENT_PAYMENT',
   InvalidRefund = 'INVALID_REFUND',
 
+  // Roles
+  RoleNameTaken = 'ROLE_NAME_TAKEN',
+  RoleIsSystem = 'ROLE_IS_SYSTEM',
+  RoleInUse = 'ROLE_IN_USE',
+
   // Media
   InvalidMediaUrl = 'INVALID_MEDIA_URL',
   UnsupportedMediaType = 'UNSUPPORTED_MEDIA_TYPE',
   MediaNotOwned = 'MEDIA_NOT_OWNED',
+  MediaInUse = 'MEDIA_IN_USE',
 }

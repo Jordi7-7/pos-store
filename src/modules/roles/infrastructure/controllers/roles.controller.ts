@@ -1,97 +1,44 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Put,
-  Delete,
-  Body,
-  Param,
-  Header,
-  UseGuards,
-  ConflictException,
-  ForbiddenException,
-  NotFoundException,
-  BadRequestException,
-} from '@nestjs/common';
-import { EntityManager } from 'typeorm';
+import { Controller, Get, Post, Put, Delete, Body, Param, Header, UseGuards } from '@nestjs/common';
+import { CommandBus, QueryBus } from '@nestjs/cqrs';
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
 import { AuthGuard } from '../../../auth/guards/auth.guard';
 import { PermissionsGuard } from '../../../auth/guards/permissions.guard';
 import { RequireAnyPermissions, RequirePermissions } from '../../../auth/decorators/permissions.decorator';
 import { APP_PERMISSIONS, PERMISSION_DEFINITIONS, PERMISSION_MODULES } from '../../../../common/enums/permissions.enum';
-import { assertValidPermissions } from '../../../../common/security/permissions.helper';
-import { Role } from '../../domain/entities/role.entity';
-import { User } from '../../../users/domain/entities/user.entity';
 import { CreateRoleDto, UpdateRoleDto } from '../dtos/role.dto';
+import { CreateRoleCommand } from '../../application/commands/create-role/create-role.command';
+import { UpdateRoleCommand } from '../../application/commands/update-role/update-role.command';
+import { DeleteRoleCommand } from '../../application/commands/delete-role/delete-role.command';
+import { Role } from '../../domain/entities/role.entity';
+import { DeleteRoleResult } from '../../application/commands/delete-role/delete-role.handler';
+import { ListRolesQuery } from '../../application/queries/list-roles/list-roles.query';
+import { RoleWithUserCount } from '../../application/queries/list-roles/list-roles.handler';
 
 @Controller('roles')
 @UseGuards(AuthGuard, PermissionsGuard)
 export class RolesController {
-  constructor(private readonly entityManager: EntityManager) {}
+  constructor(
+    private readonly commandBus: CommandBus,
+    private readonly queryBus: QueryBus,
+  ) {}
 
   @Get('permissions-catalog')
   @RequireAnyPermissions(APP_PERMISSIONS.ROLES_GET, APP_PERMISSIONS.ROLES_CREATE, APP_PERMISSIONS.ROLES_EDIT)
   @Header('Cache-Control', 'public, max-age=1800')
   getPermissionsCatalog() {
-    return {
-      modules: PERMISSION_MODULES,
-      permissions: PERMISSION_DEFINITIONS,
-    };
+    return { modules: PERMISSION_MODULES, permissions: PERMISSION_DEFINITIONS };
   }
 
   @Get()
   @RequirePermissions(APP_PERMISSIONS.ROLES_GET)
   async listRoles(@CurrentUser('tenantId') tenantId: string) {
-    const roleRepo = this.entityManager.getRepository(Role);
-    const userRepo = this.entityManager.getRepository(User);
-
-    const roles = await roleRepo.find({
-      where: { tenantId },
-      order: { isSystem: 'DESC', createdAt: 'ASC' },
-    });
-
-    // Conteo de usuarios asignados por rol (excluyendo al propietario que no requiere rol)
-    const counts = await userRepo
-      .createQueryBuilder('user')
-      .select('user.roleId', 'roleId')
-      .addSelect('COUNT(user.id)', 'count')
-      .where('user.tenantId = :tenantId', { tenantId })
-      .andWhere('user.isOwner = false')
-      .groupBy('user.roleId')
-      .getRawMany();
-
-    const countMap = new Map<string, number>();
-    counts.forEach((c) => countMap.set(c.roleId, Number(c.count)));
-
-    return roles.map((r) => ({
-      ...r,
-      userCount: countMap.get(r.id) || 0,
-    }));
+    return this.queryBus.execute<ListRolesQuery, RoleWithUserCount[]>(new ListRolesQuery(tenantId));
   }
 
   @Post()
   @RequirePermissions(APP_PERMISSIONS.ROLES_CREATE)
-  async createRole(
-    @CurrentUser('tenantId') tenantId: string,
-    @Body() dto: CreateRoleDto,
-  ) {
-    const roleRepo = this.entityManager.getRepository(Role);
-
-    const existing = await roleRepo.findOne({
-      where: { tenantId, name: dto.name.trim() },
-    });
-    if (existing) {
-      throw new ConflictException(`Ya existe un rol con el nombre "${dto.name.trim()}".`);
-    }
-
-    const role = new Role();
-    role.tenantId = tenantId;
-    role.name = dto.name.trim();
-    role.description = dto.description?.trim() || null;
-    role.permissions = assertValidPermissions(dto.permissions || []);
-    role.isSystem = false;
-
-    return roleRepo.save(role);
+  async createRole(@CurrentUser('tenantId') tenantId: string, @Body() dto: CreateRoleDto) {
+    return this.commandBus.execute<CreateRoleCommand, Role>(new CreateRoleCommand(tenantId, dto.name, dto.description, dto.permissions ?? []));
   }
 
   @Put(':id')
@@ -101,81 +48,12 @@ export class RolesController {
     @Param('id') id: string,
     @Body() dto: UpdateRoleDto,
   ) {
-    const roleRepo = this.entityManager.getRepository(Role);
-
-    const role = await roleRepo.findOne({
-      where: { id, tenantId },
-    });
-    if (!role) {
-      throw new NotFoundException('Rol no encontrado.');
-    }
-
-    if (role.isSystem) {
-      throw new ForbiddenException('Los roles del sistema no se pueden modificar.');
-    }
-
-    if (dto.name && dto.name.trim() !== role.name) {
-      const duplicate = await roleRepo.findOne({
-        where: { tenantId, name: dto.name.trim() },
-      });
-      if (duplicate && duplicate.id !== role.id) {
-        throw new ConflictException(`Ya existe otro rol con el nombre "${dto.name.trim()}".`);
-      }
-      role.name = dto.name.trim();
-    }
-
-    if (dto.description !== undefined) {
-      role.description = dto.description?.trim() || null;
-    }
-
-    if (dto.permissions !== undefined) {
-      role.permissions = assertValidPermissions(dto.permissions);
-    }
-
-    return roleRepo.save(role);
+    return this.commandBus.execute<UpdateRoleCommand, Role>(new UpdateRoleCommand(tenantId, id, dto.name, dto.description, dto.permissions));
   }
 
   @Delete(':id')
   @RequirePermissions(APP_PERMISSIONS.ROLES_DELETE)
-  async deleteRole(
-    @CurrentUser('tenantId') tenantId: string,
-    @Param('id') id: string,
-  ) {
-    const roleRepo = this.entityManager.getRepository(Role);
-    const userRepo = this.entityManager.getRepository(User);
-
-    const role = await roleRepo.findOne({
-      where: { id, tenantId },
-    });
-    if (!role) {
-      throw new NotFoundException('Rol no encontrado.');
-    }
-
-    if (role.isSystem) {
-      throw new ForbiddenException('Los roles del sistema no se pueden eliminar.');
-    }
-
-    // Si el usuario asignado es el Propietario (isOwner: true), desasociamos su roleId legacy automáticamente
-    await userRepo
-      .createQueryBuilder()
-      .update(User)
-      .set({ roleId: null })
-      .where('tenantId = :tenantId AND roleId = :roleId AND isOwner = true', {
-        tenantId,
-        roleId: role.id,
-      })
-      .execute();
-
-    const assignedUsers = await userRepo.count({
-      where: { tenantId, roleId: role.id },
-    });
-    if (assignedUsers > 0) {
-      throw new BadRequestException(
-        `No puedes eliminar este rol porque tiene ${assignedUsers} usuario(s) asignado(s). Reasigna a los usuarios primero.`,
-      );
-    }
-
-    await roleRepo.remove(role);
-    return { success: true, message: 'Rol eliminado con éxito.' };
+  async deleteRole(@CurrentUser('tenantId') tenantId: string, @Param('id') id: string) {
+    return this.commandBus.execute<DeleteRoleCommand, DeleteRoleResult>(new DeleteRoleCommand(tenantId, id));
   }
 }
