@@ -7,6 +7,8 @@ import { ProductImage } from '../../../domain/entities/product-image.entity';
 import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
 import { translatingSkuConflict } from '../../services/sku-conflict';
+import { Product } from '../../../domain/entities/product.entity';
+import { ProductType } from '../../../domain/enums/product-type.enum';
 
 @CommandHandler(UpdateVariantCommand)
 export class UpdateVariantHandler implements ICommandHandler<UpdateVariantCommand> {
@@ -15,10 +17,10 @@ export class UpdateVariantHandler implements ICommandHandler<UpdateVariantComman
   constructor(private readonly entityManager: EntityManager) {}
 
   execute(command: UpdateVariantCommand): Promise<ProductVariant> {
-    return translatingSkuConflict(() => this.run(command));
+    return translatingSkuConflict(() => this.entityManager.transaction((manager) => this.run(manager, command)));
   }
 
-  private async run(command: UpdateVariantCommand): Promise<ProductVariant> {
+  private async run(manager: EntityManager, command: UpdateVariantCommand): Promise<ProductVariant> {
     const {
       tenantId,
       variantId,
@@ -32,8 +34,8 @@ export class UpdateVariantHandler implements ICommandHandler<UpdateVariantComman
 
     this.logger.log(`Updating variant ID: ${variantId} for Tenant: ${tenantId}`);
 
-    const variantRepo = this.entityManager.getRepository(ProductVariant);
-    const imageRepo = this.entityManager.getRepository(ProductImage);
+    const variantRepo = manager.getRepository(ProductVariant);
+    const imageRepo = manager.getRepository(ProductImage);
 
     const variant = await variantRepo.findOne({
       where: { id: variantId, tenantId },
@@ -45,6 +47,7 @@ export class UpdateVariantHandler implements ICommandHandler<UpdateVariantComman
       throw new AppException(ErrorCode.VariantNotFound, 'Variante no encontrada.', HttpStatus.NOT_FOUND, { variantId });
     }
 
+    let skuChanged = false;
     // Check SKU uniqueness if changed
     if (sku !== undefined && sku !== variant.sku) {
       const existingWithSku = await variantRepo.findOne({
@@ -59,6 +62,7 @@ export class UpdateVariantHandler implements ICommandHandler<UpdateVariantComman
         throw new AppException(ErrorCode.SkuTaken, `El SKU "${sku}" ya está registrado en otra variante.`, HttpStatus.CONFLICT, { sku });
       }
       variant.sku = sku;
+      skuChanged = true;
     }
 
     if (barcode !== undefined) variant.barcode = barcode;
@@ -82,15 +86,12 @@ export class UpdateVariantHandler implements ICommandHandler<UpdateVariantComman
       }
     }
 
-    try {
-      const savedVariant = await variantRepo.save(variant);
-      this.logger.log(`Variant updated successfully: ID ${savedVariant.id}`);
-      return savedVariant;
-    } catch (error: any) {
-      if (error?.code === '23505' || error?.driverError?.code === '23505') {
-        throw new AppException(ErrorCode.SkuTaken, 'El SKU o código ingresado ya está en uso por otra variante.', HttpStatus.CONFLICT);
-      }
-      throw error;
+    const savedVariant = await variantRepo.save(variant);
+    if (skuChanged) {
+      // En un producto simple el SKU base es el SKU de su única variante: se mantienen juntos
+      await manager.getRepository(Product).update({ id: savedVariant.productId, tenantId, type: ProductType.SIMPLE }, { baseSku: savedVariant.sku.trim().toUpperCase() });
     }
+    this.logger.log(`Variant updated successfully: ID ${savedVariant.id}`);
+    return savedVariant;
   }
 }

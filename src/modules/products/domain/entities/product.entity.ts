@@ -6,6 +6,9 @@ import { ProductImage } from './product-image.entity';
 import { Category } from './category.entity';
 import { ProductType } from '../enums/product-type.enum';
 
+/** Índice único del SKU base por tienda, sin distinguir mayúsculas (lo crea la migración; no se declara en el decorador por ser de expresión). */
+export const PRODUCT_BASE_SKU_INDEX = 'UQ_products_tenant_base_sku_ci';
+
 @Entity('products')
 @Index('idx_products_tenant_base_sku', ['tenantId', 'baseSku'], { where: 'deleted_at IS NULL' })
 export class Product extends BaseEntity {

@@ -203,7 +203,11 @@ describe('Venta: comprador por defecto e idempotencia', () => {
       await db.query(`UPDATE customers SET deleted_at = now() WHERE id = $1`, [oldConsumerFinal.id]);
       expect((await db.query(`SELECT customer_id FROM sales WHERE id = $1`, [legacy.id]))[0].customer_id).toBeNull();
 
-      await db.undoLastMigration(); // la del relleno es la última
+      // Se deshacen migraciones desde la última hasta revertir la del relleno (las posteriores no dependen de ella)
+      const backfillApplied = async () => (await db.query(`SELECT 1 FROM migrations WHERE name LIKE 'BackfillConsumerFinalOnSales%'`)).length > 0;
+      for (let undone = 0; undone < 10 && (await backfillApplied()); undone++) {
+        await db.undoLastMigration();
+      }
       await db.runMigrations();
 
       const [row] = await db.query(`SELECT customer_id FROM sales WHERE id = $1`, [legacy.id]);

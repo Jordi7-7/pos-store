@@ -18,10 +18,11 @@ export class UpdateSimpleProductHandler implements ICommandHandler<UpdateSimpleP
   constructor(private readonly entityManager: EntityManager) {}
 
   execute(command: UpdateSimpleProductCommand): Promise<Product> {
-    return translatingSkuConflict(() => this.run(command));
+    // Todo o nada: la variante, el producto y su SKU base se confirman juntos
+    return translatingSkuConflict(() => this.entityManager.transaction((manager) => this.run(manager, command)));
   }
 
-  private async run(command: UpdateSimpleProductCommand): Promise<Product> {
+  private async run(manager: EntityManager, command: UpdateSimpleProductCommand): Promise<Product> {
     const {
       tenantId,
       id,
@@ -38,10 +39,10 @@ export class UpdateSimpleProductHandler implements ICommandHandler<UpdateSimpleP
 
     this.logger.log(`Updating simple product ID: ${id} for Tenant: ${tenantId}`);
 
-    const productRepo = this.entityManager.getRepository(Product);
-    const imageRepo = this.entityManager.getRepository(ProductImage);
-    const categoryRepo = this.entityManager.getRepository(Category);
-    const variantRepo = this.entityManager.getRepository(ProductVariant);
+    const productRepo = manager.getRepository(Product);
+    const imageRepo = manager.getRepository(ProductImage);
+    const categoryRepo = manager.getRepository(Category);
+    const variantRepo = manager.getRepository(ProductVariant);
 
     // 1. Fetch existing product with its images and variants
     const product = await productRepo.findOne({
@@ -116,6 +117,8 @@ export class UpdateSimpleProductHandler implements ICommandHandler<UpdateSimpleP
         throw new AppException(ErrorCode.SkuTaken, `El SKU "${sku}" ya está registrado en otro producto del sistema.`, HttpStatus.CONFLICT, { sku });
       }
       variant.sku = sku;
+      // En un producto simple el SKU base es el SKU de su única variante
+      product.baseSku = sku.trim().toUpperCase();
     }
 
     if (barcode !== undefined) variant.barcode = barcode;
@@ -130,20 +133,13 @@ export class UpdateSimpleProductHandler implements ICommandHandler<UpdateSimpleP
       variant.images = product.images;
     }
 
-    try {
-      const savedVariant = await variantRepo.save(variant);
-      // Preserve existing variants list or keep only this one if simple
-      const existingOtherVariants = (product.variants || []).filter(v => v.id !== savedVariant.id);
-      product.variants = [savedVariant, ...existingOtherVariants];
-      const savedProduct = await productRepo.save(product);
+    const savedVariant = await variantRepo.save(variant);
+    // Preserve existing variants list or keep only this one if simple
+    const existingOtherVariants = (product.variants || []).filter((v) => v.id !== savedVariant.id);
+    product.variants = [savedVariant, ...existingOtherVariants];
+    const savedProduct = await productRepo.save(product);
 
-      this.logger.log(`Simple product updated successfully: ID ${savedProduct.id}`);
-      return savedProduct;
-    } catch (error: any) {
-      if (error?.code === '23505' || error?.driverError?.code === '23505') {
-        throw new AppException(ErrorCode.SkuTaken, 'El SKU o código ingresado ya está en uso por otro producto.', HttpStatus.CONFLICT);
-      }
-      throw error;
-    }
+    this.logger.log(`Simple product updated successfully: ID ${savedProduct.id}`);
+    return savedProduct;
   }
 }

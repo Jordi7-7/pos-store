@@ -146,22 +146,6 @@
       "count": 1
     }
   },
-  "src/modules/products/application/commands/update-simple-product/update-simple-product.handler.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 2
-    }
-  },
-  "src/modules/products/application/commands/update-variant/update-variant.handler.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 2
-    }
-  },
   "src/modules/products/application/queries/get-products-by-name/get-products-by-name.handler.ts": {
     "@typescript-eslint/no-explicit-any": {
       "count": 1

@@ -18,6 +18,7 @@ import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
 import { translatingSkuConflict } from '../../services/sku-conflict';
 import { InventoryMovementType } from '../../../../../common/enums/inventory-movement-type.enum';
+import { assertBaseSkuAvailable } from '../../services/base-sku';
 
 
 @CommandHandler(CreateVariableProductCommand)
@@ -92,6 +93,7 @@ export class CreateVariableProductHandler implements ICommandHandler<CreateVaria
         throw new AppException(ErrorCode.SkuTaken, 'Uno o más SKUs ya están registrados en el sistema para este inquilino.', HttpStatus.CONFLICT);
       }
 
+      await assertBaseSkuAvailable(transactionalManager, tenantId, baseSku);
 
       const product = new Product();
       product.tenantId = tenantId;

@@ -77,6 +77,7 @@ export enum ErrorCode {
   DuplicateVariantCombination = 'DUPLICATE_VARIANT_COMBINATION',
   VariantsRequired = 'VARIANTS_REQUIRED',
   BaseSkuRequired = 'BASE_SKU_REQUIRED',
+  BaseSkuTaken = 'BASE_SKU_TAKEN',
   SkuTaken = 'SKU_TAKEN',
   DuplicateSkuInImport = 'DUPLICATE_SKU_IN_IMPORT',
   SkusNotFound = 'SKUS_NOT_FOUND',

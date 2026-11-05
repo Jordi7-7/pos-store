@@ -37,6 +37,7 @@ Forma de toda respuesta de error:
 | `AUTH_TOKEN_INVALID` | 401 | auth | El token de autenticación no es válido o expiró. | — |
 | `AUTH_TOKEN_MISSING` | 401 | auth | Falta el token de autenticación. | — |
 | `BASE_SKU_REQUIRED` | 400 | products | El SKU base es obligatorio para un producto variable. | — |
+| `BASE_SKU_TAKEN` | 409 | products | El SKU base "{baseSku.trim().toUpperCase()}" ya lo usa otro producto. | `baseSku` |
 | `BRANCH_ACCESS_DENIED` | 403 | common | No tienes permisos para {actionDescription} en la sucursal seleccionada. | `branchId` |
 | `BRANCH_NAME_TAKEN` | 409 | branches | Ya existe otra sucursal con el nombre "{name.trim()}". | `name` |
 | `BRANCH_NOT_FOUND` | 404 | branches, products, purchases, sales | La sucursal destino con ID {branchId} no existe. | `branchId` |
