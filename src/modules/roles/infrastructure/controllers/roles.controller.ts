@@ -37,18 +37,19 @@ export class RolesController {
 
   @Post()
   @RequirePermissions(APP_PERMISSIONS.ROLES_CREATE)
-  async createRole(@CurrentUser('tenantId') tenantId: string, @Body() dto: CreateRoleDto) {
-    return this.commandBus.execute<CreateRoleCommand, Role>(new CreateRoleCommand(tenantId, dto.name, dto.description, dto.permissions ?? []));
+  async createRole(@CurrentUser('tenantId') tenantId: string, @CurrentUser('sub') currentUserId: string, @Body() dto: CreateRoleDto) {
+    return this.commandBus.execute<CreateRoleCommand, Role>(new CreateRoleCommand(tenantId, dto.name, dto.description, dto.permissions ?? [], currentUserId));
   }
 
   @Put(':id')
   @RequirePermissions(APP_PERMISSIONS.ROLES_EDIT)
   async updateRole(
     @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser('sub') currentUserId: string,
     @Param('id') id: string,
     @Body() dto: UpdateRoleDto,
   ) {
-    return this.commandBus.execute<UpdateRoleCommand, Role>(new UpdateRoleCommand(tenantId, id, dto.name, dto.description, dto.permissions));
+    return this.commandBus.execute<UpdateRoleCommand, Role>(new UpdateRoleCommand(tenantId, id, dto.name, dto.description, dto.permissions, currentUserId));
   }
 
   @Delete(':id')

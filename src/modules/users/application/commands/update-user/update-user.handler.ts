@@ -11,6 +11,7 @@ import { ErrorCode } from '../../../../../common/errors/error-codes';
 import { assertBranchesBelongToTenant } from '../../../../../common/security/tenant-ownership';
 import { assertValidPermissions } from '../../../../../common/security/permissions.helper';
 import { invalidateUserBranchesCache } from '../../../../../common/security/branch-access.helper';
+import { assertCanGrant, loadActorPermissions, loadEffectivePermissionsOf } from '../../../../../common/security/privilege-escalation';
 import { normalizeEmail, normalizeUsername } from '../../user-fields';
 import { UserRules, replaceUserBranches } from '../../user-rules';
 
@@ -55,11 +56,18 @@ export class UpdateUserHandler implements ICommandHandler<UpdateUserCommand> {
     const rules = new UserRules(manager, this.hashService, tenantId);
 
     const user = await this.loadEditableUser(manager, command);
+    // Quien edita no puede administrar a alguien con más poder (contraseña, PIN, rol, estado)
+    const actorPermissions = await loadActorPermissions(manager, tenantId, command.currentUserId);
+    assertCanGrant(actorPermissions, await loadEffectivePermissionsOf(manager, user, tenantId));
     const wasActive = user.isActive;
 
     await this.applyIdentity(user, input, rules);
     const passwordChanged = await this.applyCredentials(user, input, rules);
     await this.applyAccess(user, input, rules);
+    if (input.roleId !== undefined || input.customPermissions !== undefined) {
+      // ...ni dejarlo con más poder del que uno tiene
+      assertCanGrant(actorPermissions, await loadEffectivePermissionsOf(manager, user, tenantId));
+    }
     await this.applyActivation(manager, user, input, tenantId);
 
     const saved = await manager.getRepository(User).save(user);

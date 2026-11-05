@@ -5,10 +5,11 @@ export class CreateUserCommand {
     public readonly name: string,
     public readonly username: string,
     public readonly password: string,
-    public readonly email?: string,
-    public readonly pin?: string,
-    public readonly roleId?: string,
-    public readonly customPermissions?: string[],
-    public readonly branchIds?: string[],
+    public readonly email: string | undefined,
+    public readonly pin: string | undefined,
+    public readonly roleId: string | undefined,
+    public readonly customPermissions: string[] | undefined,
+    public readonly branchIds: string[] | undefined,
+    public readonly currentUserId: string,
   ) {}
 }

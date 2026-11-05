@@ -10,6 +10,13 @@ import { UpdateRoleHandler } from './update-role/update-role.handler';
 import { DeleteRoleCommand } from './delete-role/delete-role.command';
 import { DeleteRoleHandler } from './delete-role/delete-role.handler';
 
+// La regla de no-escalada se prueba aparte (privilege-escalation.spec y tests de integración): aquí actúa el propietario
+jest.mock('../../../../common/security/privilege-escalation', () => ({
+  ...jest.requireActual('../../../../common/security/privilege-escalation'),
+  loadActorPermissions: () => Promise.resolve(['*']),
+  loadEffectivePermissionsOf: () => Promise.resolve([]),
+}));
+
 describe('Comandos de roles', () => {
   const findOne = jest.fn();
   const save = jest.fn();
@@ -41,18 +48,18 @@ describe('Comandos de roles', () => {
 
     it("rechaza permisos con '*'", async () => {
       findOne.mockResolvedValue(null);
-      await expect(handler.execute(new CreateRoleCommand('t1', 'Evil', undefined, ['*']))).rejects.toMatchObject({ code: ErrorCode.InvalidPermissions });
+      await expect(handler.execute(new CreateRoleCommand('t1', 'Evil', undefined, ['*'], 'u1'))).rejects.toMatchObject({ code: ErrorCode.InvalidPermissions });
       expect(save).not.toHaveBeenCalled();
     });
 
     it('rechaza un nombre repetido con ROLE_NAME_TAKEN', async () => {
       findOne.mockResolvedValue({ id: 'r1' });
-      expect(await codeOf(handler.execute(new CreateRoleCommand('t1', ' Cajero ', undefined, [])))).toBe(ErrorCode.RoleNameTaken);
+      expect(await codeOf(handler.execute(new CreateRoleCommand('t1', ' Cajero ', undefined, [], 'u1')))).toBe(ErrorCode.RoleNameTaken);
     });
 
     it('crea el rol como no-sistema con permisos válidos y nombre recortado', async () => {
       findOne.mockResolvedValue(null);
-      const role = await handler.execute(new CreateRoleCommand('t1', ' Cajero ', ' ', [APP_PERMISSIONS.VIEW_POS]));
+      const role = await handler.execute(new CreateRoleCommand('t1', ' Cajero ', ' ', [APP_PERMISSIONS.VIEW_POS], 'u1'));
       expect(role).toMatchObject({ tenantId: 't1', name: 'Cajero', description: null, isSystem: false, permissions: [APP_PERMISSIONS.VIEW_POS] });
     });
   });
@@ -62,23 +69,23 @@ describe('Comandos de roles', () => {
 
     it('no permite modificar roles del sistema', async () => {
       findOne.mockResolvedValue({ id: 'r1', tenantId: 't1', isSystem: true, name: 'Admin' });
-      expect(await codeOf(handler.execute(new UpdateRoleCommand('t1', 'r1', undefined, undefined, [])))).toBe(ErrorCode.RoleIsSystem);
+      expect(await codeOf(handler.execute(new UpdateRoleCommand('t1', 'r1', undefined, undefined, [], 'u1')))).toBe(ErrorCode.RoleIsSystem);
       expect(save).not.toHaveBeenCalled();
     });
 
     it("rechaza permisos con '*' al editar", async () => {
       findOne.mockResolvedValue({ id: 'r1', tenantId: 't1', isSystem: false, name: 'Cajero' });
-      await expect(handler.execute(new UpdateRoleCommand('t1', 'r1', undefined, undefined, ['*']))).rejects.toMatchObject({ code: ErrorCode.InvalidPermissions });
+      await expect(handler.execute(new UpdateRoleCommand('t1', 'r1', undefined, undefined, ['*'], 'u1'))).rejects.toMatchObject({ code: ErrorCode.InvalidPermissions });
     });
 
     it('rechaza renombrar a un nombre que ya usa otro rol', async () => {
       findOne.mockResolvedValueOnce({ id: 'r1', tenantId: 't1', isSystem: false, name: 'Cajero' }).mockResolvedValueOnce({ id: 'r2' });
-      expect(await codeOf(handler.execute(new UpdateRoleCommand('t1', 'r1', 'Gerente')))).toBe(ErrorCode.RoleNameTaken);
+      expect(await codeOf(handler.execute(new UpdateRoleCommand('t1', 'r1', 'Gerente', undefined, undefined, 'u1')))).toBe(ErrorCode.RoleNameTaken);
     });
 
     it('devuelve 404 si el rol no existe en el tenant', async () => {
       findOne.mockResolvedValue(null);
-      await expect(handler.execute(new UpdateRoleCommand('t1', 'r1', 'X'))).rejects.toMatchObject({ code: ErrorCode.RoleNotFound });
+      await expect(handler.execute(new UpdateRoleCommand('t1', 'r1', 'X', undefined, undefined, 'u1'))).rejects.toMatchObject({ code: ErrorCode.RoleNotFound });
     });
   });
 

@@ -7,6 +7,7 @@ import { User } from '../../../domain/entities/user.entity';
 import { HashService } from '../../../../auth/services/hash.service';
 import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
+import { assertCanGrant, loadActorPermissions, loadEffectivePermissionsOf } from '../../../../../common/security/privilege-escalation';
 import { isPinInUse } from '../../pin-uniqueness';
 
 @CommandHandler(GeneratePinCommand)
@@ -30,6 +31,12 @@ export class GeneratePinHandler implements ICommandHandler<GeneratePinCommand> {
     if (!user) {
       throw new AppException(ErrorCode.UserNotFound, 'Usuario no encontrado.', HttpStatus.NOT_FOUND, { targetUserId });
     }
+
+    // Con el PIN se inicia sesión como ese usuario: solo quien no tiene menos poder que él puede resetearlo
+    assertCanGrant(
+      await loadActorPermissions(this.entityManager, tenantId, command.currentUserId),
+      await loadEffectivePermissionsOf(this.entityManager, user, tenantId),
+    );
 
     // Generate cryptographically random 6-digit PIN
     const pin = await this.generateAvailablePin(tenantId, targetUserId);

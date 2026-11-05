@@ -56,6 +56,7 @@ export enum ErrorCode {
   RoleIsSystem = 'ROLE_IS_SYSTEM',
   RoleInUse = 'ROLE_IN_USE',
   OwnerOnlyEditsSelf = 'OWNER_ONLY_EDITS_SELF',
+  PermissionEscalation = 'PERMISSION_ESCALATION',
   CannotDeactivateSelf = 'CANNOT_DEACTIVATE_SELF',
 
   // Sucursales y clientes

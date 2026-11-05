@@ -6,6 +6,13 @@ import { User } from '../../../domain/entities/user.entity';
 import { GeneratePinCommand } from './generate-pin.command';
 import { GeneratePinHandler } from './generate-pin.handler';
 
+// La regla de no-escalada se prueba aparte (privilege-escalation.spec y tests de integración): aquí actúa el propietario
+jest.mock('../../../../../common/security/privilege-escalation', () => ({
+  ...jest.requireActual('../../../../../common/security/privilege-escalation'),
+  loadActorPermissions: () => Promise.resolve(['*']),
+  loadEffectivePermissionsOf: () => Promise.resolve([]),
+}));
+
 describe('GeneratePinHandler', () => {
   const findOne = jest.fn();
   const save = jest.fn();
@@ -29,7 +36,7 @@ describe('GeneratePinHandler', () => {
   it('genera un PIN numérico de 6 dígitos, guarda solo el hash y lo devuelve una vez', async () => {
     findOne.mockResolvedValue({ id: 'u1', name: 'Ana', tenantId: 't1' } as User);
 
-    const result = await handler.execute(new GeneratePinCommand('t1', 'u1'));
+    const result = await handler.execute(new GeneratePinCommand('t1', 'u1', 'actor'));
 
     expect(result.userId).toBe('u1');
     expect(result.pin).toMatch(/^\d{6}$/);
@@ -40,7 +47,7 @@ describe('GeneratePinHandler', () => {
   it('consulta el usuario filtrando por tenantId', async () => {
     findOne.mockResolvedValue(null);
 
-    await expect(handler.execute(new GeneratePinCommand('t1', 'u1'))).rejects.toMatchObject({ code: ErrorCode.UserNotFound });
+    await expect(handler.execute(new GeneratePinCommand('t1', 'u1', 'actor'))).rejects.toMatchObject({ code: ErrorCode.UserNotFound });
     expect(findOne).toHaveBeenCalledWith({ where: { id: 'u1', tenantId: 't1' } });
     expect(save).not.toHaveBeenCalled();
   });
@@ -51,7 +58,7 @@ describe('GeneratePinHandler', () => {
     // Las dos primeras comparaciones "colisionan"; la tercera ya no.
     compare.mockResolvedValueOnce(true).mockResolvedValueOnce(true).mockResolvedValue(false);
 
-    const result = await handler.execute(new GeneratePinCommand('t1', 'u1'));
+    const result = await handler.execute(new GeneratePinCommand('t1', 'u1', 'actor'));
 
     expect(result.pin).toMatch(/^\d{6}$/);
     expect(compare).toHaveBeenCalledTimes(3);
@@ -62,7 +69,7 @@ describe('GeneratePinHandler', () => {
     getMany.mockResolvedValue([{ id: 'u2', pin: 'hash-de-otro' } as User]);
     compare.mockResolvedValue(true);
 
-    const error: unknown = await handler.execute(new GeneratePinCommand('t1', 'u1')).catch((e: unknown) => e);
+    const error: unknown = await handler.execute(new GeneratePinCommand('t1', 'u1', 'actor')).catch((e: unknown) => e);
 
     expect(error).toBeInstanceOf(AppException);
     expect((error as AppException).code).toBe(ErrorCode.PinAlreadyInUse);

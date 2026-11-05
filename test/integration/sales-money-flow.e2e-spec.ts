@@ -516,6 +516,7 @@ describe('Flujo de dinero: venta, devolución y cierre de caja', () => {
           overrides.roleId,
           undefined,
           overrides.branchIds ?? [branchId],
+          userId,
         ),
       );
     const exists = (username: string): Promise<boolean> => db.getRepository(User).existsBy({ tenantId, username });

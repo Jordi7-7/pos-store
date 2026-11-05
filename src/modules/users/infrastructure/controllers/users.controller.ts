@@ -22,6 +22,7 @@ export class UsersController {
   @RequirePermissions(APP_PERMISSIONS.USERS_CREATE)
   async create(
     @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser('sub') currentUserId: string,
     @Body() dto: CreateUserDto,
   ) {
     return this.commandBus.execute(
@@ -35,6 +36,7 @@ export class UsersController {
         dto.roleId,
         dto.customPermissions,
         dto.branchIds,
+        currentUserId,
       ),
     );
   }
@@ -56,10 +58,11 @@ export class UsersController {
   @RequirePermissions(APP_PERMISSIONS.USERS_EDIT)
   async generatePin(
     @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser('sub') currentUserId: string,
     @Param('id') targetUserId: string,
   ) {
     return this.commandBus.execute(
-      new GeneratePinCommand(tenantId, targetUserId),
+      new GeneratePinCommand(tenantId, targetUserId, currentUserId),
     );
   }
 

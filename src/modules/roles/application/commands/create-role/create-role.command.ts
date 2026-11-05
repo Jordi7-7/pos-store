@@ -4,5 +4,6 @@ export class CreateRoleCommand {
     public readonly name: string,
     public readonly description: string | undefined,
     public readonly permissions: string[],
+    public readonly currentUserId: string,
   ) {}
 }

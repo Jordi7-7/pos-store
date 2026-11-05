@@ -4,6 +4,7 @@ import { EntityManager } from 'typeorm';
 import { CreateRoleCommand } from './create-role.command';
 import { Role } from '../../../domain/entities/role.entity';
 import { assertValidPermissions } from '../../../../../common/security/permissions.helper';
+import { assertCanGrant, loadActorPermissions } from '../../../../../common/security/privilege-escalation';
 import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
 
@@ -19,6 +20,8 @@ export class CreateRoleHandler implements ICommandHandler<CreateRoleCommand> {
     this.logger.log(`Creating role for Tenant: ${tenantId}`);
 
     const roleRepo = this.entityManager.getRepository(Role);
+    const granted = assertValidPermissions(permissions);
+    assertCanGrant(await loadActorPermissions(this.entityManager, tenantId, command.currentUserId), granted);
 
     const existing = await roleRepo.findOne({ where: { tenantId, name } });
     if (existing) {
@@ -30,7 +33,7 @@ export class CreateRoleHandler implements ICommandHandler<CreateRoleCommand> {
     role.tenantId = tenantId;
     role.name = name;
     role.description = description?.trim() || null;
-    role.permissions = assertValidPermissions(permissions);
+    role.permissions = granted;
     role.isSystem = false;
 
     const saved = await roleRepo.save(role);

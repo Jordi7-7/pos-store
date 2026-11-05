@@ -79,6 +79,7 @@ Forma de toda respuesta de error:
 | `OWNER_ONLY_EDITS_SELF` | 403 | users | Solo el propietario puede modificar su propia cuenta. | — |
 | `PAYLOAD_TOO_LARGE` | 413 | media | La imagen supera el tamaño máximo de {Math.round(maxBytes / 1024 / 1024)} MB. | — |
 | `PERMISSION_DENIED` | 403 | auth | No tienes permisos suficientes para realizar esta acción. | — |
+| `PERMISSION_ESCALATION` | 403 | common | No puedes otorgar ni administrar permisos que tú no tienes. | `missing` |
 | `PIN_ALREADY_IN_USE` | 409 | users | Ese PIN ya está en uso por otro usuario. | — |
 | `PRODUCT_HAS_STOCK` | 409 | products | No se puede eliminar el producto porque tiene existencias activas o saldos negativos en inventario. Todas las cantidades deben estar en 0. | — |
 | `PRODUCT_NOT_FOUND` | 404 | products | Producto o variante no encontrado. | `id`, `productId` |

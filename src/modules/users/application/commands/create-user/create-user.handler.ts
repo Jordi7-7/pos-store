@@ -6,6 +6,7 @@ import { User } from '../../../domain/entities/user.entity';
 import { HashService } from '../../../../auth/services/hash.service';
 import { assertBranchesBelongToTenant } from '../../../../../common/security/tenant-ownership';
 import { assertValidPermissions } from '../../../../../common/security/permissions.helper';
+import { assertCanGrant, loadActorPermissions, loadEffectivePermissionsOf } from '../../../../../common/security/privilege-escalation';
 import { normalizeEmail, normalizeUsername } from '../../user-fields';
 import { UserRules, replaceUserBranches } from '../../user-rules';
 
@@ -46,6 +47,12 @@ export class CreateUserHandler implements ICommandHandler<CreateUserCommand> {
       user.customPermissions = customPermissions ? assertValidPermissions(customPermissions) : null;
       // Sin ninguna sucursal asignada el usuario no puede operar: queda inactivo
       user.isActive = branchIds.length > 0;
+
+      // No se puede crear a alguien con más poder del que uno tiene
+      assertCanGrant(
+        await loadActorPermissions(manager, tenantId, command.currentUserId),
+        await loadEffectivePermissionsOf(manager, user, tenantId),
+      );
 
       const saved = await manager.getRepository(User).save(user);
       await replaceUserBranches(manager, saved.id, branchIds);

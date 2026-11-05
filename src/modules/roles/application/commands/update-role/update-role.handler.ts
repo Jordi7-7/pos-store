@@ -4,6 +4,7 @@ import { EntityManager } from 'typeorm';
 import { UpdateRoleCommand } from './update-role.command';
 import { Role } from '../../../domain/entities/role.entity';
 import { assertValidPermissions } from '../../../../../common/security/permissions.helper';
+import { assertCanGrant, loadActorPermissions } from '../../../../../common/security/privilege-escalation';
 import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
 
@@ -44,7 +45,9 @@ export class UpdateRoleHandler implements ICommandHandler<UpdateRoleCommand> {
     }
 
     if (permissions !== undefined) {
-      role.permissions = assertValidPermissions(permissions);
+      const granted = assertValidPermissions(permissions);
+      assertCanGrant(await loadActorPermissions(this.entityManager, tenantId, command.currentUserId), granted);
+      role.permissions = granted;
     }
 
     return roleRepo.save(role);

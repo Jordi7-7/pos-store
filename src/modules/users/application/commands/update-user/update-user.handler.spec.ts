@@ -9,6 +9,13 @@ import { UpdateUserCommand } from './update-user.command';
 import { UpdateUserDto } from '../../../infrastructure/dtos/update-user.dto';
 import { UpdateUserHandler } from './update-user.handler';
 
+// La regla de no-escalada se prueba aparte (privilege-escalation.spec y tests de integración): aquí actúa el propietario
+jest.mock('../../../../../common/security/privilege-escalation', () => ({
+  ...jest.requireActual('../../../../../common/security/privilege-escalation'),
+  loadActorPermissions: () => Promise.resolve(['*']),
+  loadEffectivePermissionsOf: () => Promise.resolve([]),
+}));
+
 describe('UpdateUserHandler', () => {
   const findOne = jest.fn();
   const save = jest.fn();
@@ -27,7 +34,7 @@ describe('UpdateUserHandler', () => {
   const tokens = { revokeSession } as unknown as AuthTokenService;
   const handler = new UpdateUserHandler(entityManager, hashService, redisService, tokens);
 
-  const run = (userId: string, dto: UpdateUserDto, currentUserId?: string) =>
+  const run = (userId: string, dto: UpdateUserDto, currentUserId = 'manager') =>
     handler.execute(new UpdateUserCommand('t1', userId, dto, currentUserId));
 
   beforeEach(() => {
