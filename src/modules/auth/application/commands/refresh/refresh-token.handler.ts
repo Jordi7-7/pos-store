@@ -38,9 +38,10 @@ export class RefreshTokenHandler implements ICommandHandler<RefreshTokenCommand>
         where: { id: userId },
         relations: { roleEntity: true },
       });
-      if (!user) {
-        this.logger.warn(`Refresh failed: User ID ${userId} not found in database.`);
-        throw new UnauthorizedException('User not found');
+      if (!user || !user.isActive) {
+        this.logger.warn(`Refresh failed: User ID ${userId} not found or inactive.`);
+        await this.redisService.del(redisKey);
+        throw new UnauthorizedException('Session expired or invalid refresh token');
       }
 
       this.logger.log(`Tokens rotated successfully for User ID: ${userId}`);
@@ -70,7 +71,7 @@ export class RefreshTokenHandler implements ICommandHandler<RefreshTokenCommand>
 
       const accessToken = this.jwtService.sign(userPayload, {
         secret: this.configService.get<string>('JWT_SECRET'),
-        expiresIn: this.configService.get<string>('JWT_EXPIRES_IN', '1d') as any,
+        expiresIn: this.configService.get<string>('JWT_EXPIRES_IN', '15m') as any,
       });
 
       const newRefreshToken = this.jwtService.sign(

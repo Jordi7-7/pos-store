@@ -9,6 +9,7 @@ import { RefreshTokenHandler } from './application/commands/refresh/refresh-toke
 import { LogoutHandler } from './application/commands/logout/logout.handler';
 import { PinLoginHandler } from './application/commands/pin-login/pin-login.handler';
 import { HashService } from './services/hash.service';
+import { LoginAttemptsService } from './services/login-attempts.service';
 import { OnboardingSecretGuard } from './guards/onboarding-secret.guard';
 
 @Module({
@@ -16,7 +17,7 @@ import { OnboardingSecretGuard } from './guards/onboarding-secret.guard';
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_SECRET') || 'fallback_secret',
+        secret: configService.getOrThrow<string>('JWT_SECRET'),
         signOptions: { expiresIn: '15m' },
       }),
       inject: [ConfigService],
@@ -26,6 +27,7 @@ import { OnboardingSecretGuard } from './guards/onboarding-secret.guard';
   controllers: [AuthController],
   providers: [
     HashService,
+    LoginAttemptsService,
     OnboardingSecretGuard,
     OnboardTenantHandler,
     LoginHandler,

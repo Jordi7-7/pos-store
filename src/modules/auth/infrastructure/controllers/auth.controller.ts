@@ -1,15 +1,16 @@
-import { Controller, Post, Body, HttpCode, HttpStatus, Get, UnauthorizedException, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body, HttpCode, HttpStatus, Get, Ip, UnauthorizedException, UseGuards } from '@nestjs/common';
 import { CommandBus } from '@nestjs/cqrs';
 import { EntityManager } from 'typeorm';
 import { User } from '../../../users/domain/entities/user.entity';
-import { OnboardTenantDto } from '../../application/commands/onboard/onboard-tenant.dto';
+import { OnboardTenantDto } from '../dtos/onboard-tenant.dto';
 import { OnboardTenantCommand } from '../../application/commands/onboard/onboard-tenant.command';
-import { LoginDto } from '../../application/commands/login/login.dto';
+import { LoginDto } from '../dtos/login.dto';
 import { LoginCommand } from '../../application/commands/login/login.command';
-import { RefreshTokenDto } from '../../application/commands/refresh/refresh-token.dto';
+import { RefreshTokenDto } from '../dtos/refresh-token.dto';
 import { RefreshTokenCommand } from '../../application/commands/refresh/refresh-token.command';
 import { LogoutCommand } from '../../application/commands/logout/logout.command';
 import { PinLoginCommand } from '../../application/commands/pin-login/pin-login.command';
+import { PinLoginDto } from '../dtos/pin-login.dto';
 import { Public } from '../../decorators/public.decorator';
 import { CurrentUser } from '../../decorators/current-user.decorator';
 import { OnboardingSecretGuard } from '../../guards/onboarding-secret.guard';
@@ -69,10 +70,8 @@ export class AuthController {
   @Public()
   @Post('pin-login')
   @HttpCode(HttpStatus.OK)
-  async pinLogin(
-    @Body() body: { pin: string; tenantSlug: string },
-  ) {
-    return this.commandBus.execute(new PinLoginCommand(body.pin, body.tenantSlug));
+  async pinLogin(@Body() dto: PinLoginDto, @Ip() clientIp: string) {
+    return this.commandBus.execute(new PinLoginCommand(dto.pin, dto.tenantSlug, clientIp));
   }
 
   @Get('profile')

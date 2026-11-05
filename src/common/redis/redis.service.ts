@@ -56,6 +56,23 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  /**
+   * Incrementa un contador y fija su TTL la primera vez. Devuelve `null` si Redis no
+   * está disponible para que el llamador use un respaldo en memoria.
+   */
+  async incr(key: string, ttlSeconds: number): Promise<number | null> {
+    try {
+      const value = await this.redisClient.incr(key);
+      if (value === 1) {
+        await this.redisClient.expire(key, ttlSeconds);
+      }
+      return value;
+    } catch (err: any) {
+      this.logger.warn(`Redis INCR error for key ${key}: ${err.message}`);
+      return null;
+    }
+  }
+
   async del(key: string): Promise<void> {
     try {
       await this.redisClient.del(key);

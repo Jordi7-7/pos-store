@@ -1,4 +1,4 @@
-import { Logger, UnauthorizedException } from '@nestjs/common';
+import { HttpStatus, Logger } from '@nestjs/common';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -7,6 +7,9 @@ import { PinLoginCommand } from './pin-login.command';
 import { User } from '../../../../users/domain/entities/user.entity';
 import { HashService } from '../../../services/hash.service';
 import { RedisService } from '../../../../../common/redis/redis.service';
+import { AppException } from '../../../../../common/errors/app.exception';
+import { ErrorCode } from '../../../../../common/errors/error-codes';
+import { AttemptPolicy, LoginAttemptsService } from '../../../services/login-attempts.service';
 
 import { Tenant } from '../../../../tenants/domain/entities/tenant.entity';
 
@@ -20,22 +23,30 @@ export class PinLoginHandler implements ICommandHandler<PinLoginCommand> {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly redisService: RedisService,
+    private readonly loginAttempts: LoginAttemptsService,
   ) {}
 
   async execute(command: PinLoginCommand) {
-    const { tenantSlug, pin } = command;
-
-    if (!tenantSlug || !tenantSlug.trim()) {
-      throw new UnauthorizedException('El identificador de la tienda (tenantSlug) es requerido para inicio con PIN');
-    }
+    const { tenantSlug, pin, clientIp } = command;
 
     const cleanSlug = tenantSlug.toLowerCase().trim();
     const tenant = await this.entityManager.findOne(Tenant, {
       where: { slug: cleanSlug },
     });
     if (!tenant) {
-      this.logger.warn(`PIN login failed: tenant with slug ${tenantSlug} not found`);
-      throw new UnauthorizedException('Tienda no encontrada');
+      this.logger.warn(`PIN login failed: tenant with slug ${cleanSlug} not found (ip: ${clientIp})`);
+      throw this.invalidPin();
+    }
+
+    const perIp = this.ipPolicy(tenant.id, clientIp);
+    const perTenant = this.tenantPolicy(tenant.id);
+    if ((await this.loginAttempts.isLocked(perIp)) || (await this.loginAttempts.isLocked(perTenant))) {
+      this.logger.warn(`PIN login blocked (too many attempts) for Tenant ${tenant.id} from ip ${clientIp}`);
+      throw new AppException(
+        ErrorCode.TooManyAttempts,
+        'Demasiados intentos fallidos. Inténtalo de nuevo más tarde.',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
     }
 
     this.logger.log(`PIN login attempt for Tenant: ${tenant.id} (@${tenant.slug})`);
@@ -54,23 +65,24 @@ export class PinLoginHandler implements ICommandHandler<PinLoginCommand> {
       .andWhere('user.pin IS NOT NULL')
       .getMany();
 
-    if (!users.length) {
-      throw new UnauthorizedException('No se encontraron cajeros con PIN configurado en esta tienda.');
-    }
-
     // Find the user whose hashed PIN matches the provided PIN
     let matchedUser: User | null = null;
     for (const user of users) {
-      if (user.pin && await this.hashService.compare(pin, user.pin)) {
+      if (user.pin && (await this.hashService.compare(pin, user.pin))) {
         matchedUser = user;
         break;
       }
     }
 
     if (!matchedUser) {
-      this.logger.warn(`PIN login failed: incorrect PIN for Tenant ${tenant.id} (@${tenant.slug})`);
-      throw new UnauthorizedException('Invalid PIN');
+      await this.loginAttempts.registerFailure(perIp);
+      await this.loginAttempts.registerFailure(perTenant);
+      this.logger.warn(`PIN login failed: incorrect PIN for Tenant ${tenant.id} (@${tenant.slug}) from ip ${clientIp}`);
+      // Misma respuesta que "tienda inexistente" o "sin PINs": no revela qué falló.
+      throw this.invalidPin();
     }
+
+    await this.loginAttempts.reset(perIp.key);
 
     // Resolving effective permissions
     let effectivePermissions: string[] = [];
@@ -97,7 +109,7 @@ export class PinLoginHandler implements ICommandHandler<PinLoginCommand> {
 
     const accessToken = this.jwtService.sign(payload, {
       secret: this.configService.get<string>('JWT_SECRET'),
-      expiresIn: this.configService.get<string>('JWT_EXPIRES_IN', '1d') as any,
+      expiresIn: this.configService.get<string>('JWT_EXPIRES_IN', '15m') as any,
     });
 
     const refreshToken = this.jwtService.sign(
@@ -117,5 +129,17 @@ export class PinLoginHandler implements ICommandHandler<PinLoginCommand> {
       accessToken,
       refreshToken,
     };
+  }
+
+  private invalidPin(): AppException {
+    return new AppException(ErrorCode.InvalidPin, 'PIN o tienda inválidos.', HttpStatus.UNAUTHORIZED);
+  }
+
+  private ipPolicy(tenantId: string, clientIp: string): AttemptPolicy {
+    return { key: `pin_attempts:${tenantId}:${clientIp}`, maxAttempts: 5, windowSeconds: 15 * 60 };
+  }
+
+  private tenantPolicy(tenantId: string): AttemptPolicy {
+    return { key: `pin_attempts:${tenantId}`, maxAttempts: 50, windowSeconds: 15 * 60 };
   }
 }
