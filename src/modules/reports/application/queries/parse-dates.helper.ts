@@ -1,5 +1,6 @@
 import { EntityManager } from 'typeorm';
 import { DateTime } from 'luxon';
+import { resolveTimezone } from '../../../../common/utils/timezone';
 import { Tenant } from '../../../tenants/domain/entities/tenant.entity';
 
 export async function parseReportDates(
@@ -11,7 +12,7 @@ export async function parseReportDates(
   const tenant = await entityManager.findOne(Tenant, {
     where: { id: tenantId }
   });
-  const timezone = tenant?.timezone || 'America/Guayaquil';
+  const timezone = resolveTimezone(tenant?.timezone);
 
   const start = startDate 
     ? DateTime.fromISO(startDate, { zone: timezone }).startOf('day').toJSDate()

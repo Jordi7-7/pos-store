@@ -32,6 +32,8 @@ import { GetCashSessionDetailsHandler } from '../../src/modules/sales/applicatio
 import { GetCashSessionDetailsQuery } from '../../src/modules/sales/application/queries/get-cash-session-details/get-cash-session-details.query';
 import { Expense } from '../../src/modules/sales/domain/entities/expense.entity';
 import { Refund } from '../../src/modules/sales/domain/entities/refund.entity';
+import { GetProductSalesReportHandler } from '../../src/modules/reports/application/queries/get-product-sales-report/get-product-sales-report.handler';
+import { GetProductSalesReportQuery } from '../../src/modules/reports/application/queries/get-product-sales-report/get-product-sales-report.query';
 import { Tenant } from '../../src/modules/tenants/domain/entities/tenant.entity';
 import { User } from '../../src/modules/users/domain/entities/user.entity';
 
@@ -311,6 +313,32 @@ describe('Flujo de dinero: venta, devolución y cierre de caja', () => {
       expect(details.expenses[0]).toMatchObject({ amount: 5, description: 'Bolsas' });
     } finally {
       await new CloseCashSessionHandler(db.manager).execute(new CloseCashSessionCommand(tenantId, sessionId, 115));
+    }
+  });
+
+  it('el reporte de ventas por producto trae solo lo vendido, con su stock y precio efectivo', async () => {
+    const product = await db.getRepository(Product).save(
+      db.getRepository(Product).create({ tenantId, name: 'Gorra', description: 'Gorra' }),
+    );
+    const variant = await db.getRepository(ProductVariant).save(
+      db.getRepository(ProductVariant).create({ productId: product.id, tenantId, sku: 'REP-1', barcode: 'REP-1', purchasePrice: 4, salePrice: 10 }),
+    );
+    await db.getRepository(ProductStock).save(db.getRepository(ProductStock).create({ branchId, variantId: variant.id, quantity: 10 }));
+
+    const sessionId = await openSession(0);
+    try {
+      await sell(sessionId, [{ variantId: variant.id, quantity: 4, price: 10 }], 38, 2);
+
+      const rows = await new GetProductSalesReportHandler(db.manager, redis).execute(
+        new GetProductSalesReportQuery(tenantId, undefined, undefined, branchId, userId, true),
+      );
+      const mine = rows.filter((row) => row.sku === 'REP-1');
+
+      expect(mine).toHaveLength(1);
+      expect(mine[0]).toMatchObject({ name: 'Gorra', soldQuantity: 4, currentStock: 6, salePrice: 9.5, totalRevenue: 38 });
+      expect(rows.every((row) => row.soldQuantity > 0)).toBe(true);
+    } finally {
+      await new CloseCashSessionHandler(db.manager).execute(new CloseCashSessionCommand(tenantId, sessionId, 38));
     }
   });
 

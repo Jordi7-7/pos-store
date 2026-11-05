@@ -4,7 +4,8 @@ import { DateTime } from 'luxon';
 import { GetDashboardMetricsQuery } from './get-dashboard-metrics.query';
 import { Tenant } from '../../../../tenants/domain/entities/tenant.entity';
 import { DashboardMetricsDto } from './dashboard-metrics.read-model';
-import { dashboardPeriods, resolveTimezone } from './dashboard-periods';
+import { resolveTimezone } from '../../../../../common/utils/timezone';
+import { dashboardPeriods } from './dashboard-periods';
 import { DashboardReadQueries, DashboardScope } from './dashboard-read-queries';
 import {
   buildLowStockProducts,

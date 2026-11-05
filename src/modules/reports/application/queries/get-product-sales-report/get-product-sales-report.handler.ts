@@ -4,6 +4,7 @@ import { GetProductSalesReportQuery } from './get-product-sales-report.query';
 import { parseReportDates } from '../parse-dates.helper';
 import { SaleStatus } from '../../../../../common/enums/sale-status.enum';
 
+import { SqlParams } from '../../../../../common/utils/sql-params';
 import { RedisService } from '../../../../../common/redis/redis.service';
 import { assertUserCanAccessBranch } from '../../../../../common/security/branch-access.helper';
 
@@ -17,6 +18,19 @@ export interface ProductSaleRow {
   totalRevenue: number;
   createdAt: string;
   invoiceNumber?: string;
+}
+
+/** Fila tal como la devuelve Postgres: numeric llega como texto. */
+interface ProductSaleSqlRow {
+  variantId: string;
+  sku: string | null;
+  name: string | null;
+  soldQuantity: string | number | null;
+  currentStock: string | number | null;
+  salePrice: string | number | null;
+  totalRevenue: string | number | null;
+  createdAt: Date | string | null;
+  invoiceNumber: string | null;
 }
 
 @QueryHandler(GetProductSalesReportQuery)
@@ -41,26 +55,19 @@ export class GetProductSalesReportHandler implements IQueryHandler<GetProductSal
       query.endDateStr,
     );
 
-    const queryParams: any[] = [
-      query.tenantId,
-      start,
-      end,
-      SaleStatus.COMPLETED,
-      SaleStatus.PARTIALLY_REFUNDED,
-    ];
-
-    let branchSalesFilter = '';
-    let branchStockFilter = '';
-    if (query.branchId) {
-      queryParams.push(query.branchId);
-      const branchParamIndex = `$${queryParams.length}`;
-      branchSalesFilter = `AND s.branch_id = ${branchParamIndex}`;
-      branchStockFilter = `WHERE branch_id = ${branchParamIndex}`;
-    }
+    const params = new SqlParams();
+    const tenant = params.add(query.tenantId);
+    const from = params.add(start);
+    const to = params.add(end);
+    const completed = params.add(SaleStatus.COMPLETED);
+    const partiallyRefunded = params.add(SaleStatus.PARTIALLY_REFUNDED);
+    const branch = query.branchId ? params.add(query.branchId) : null;
+    const branchSalesFilter = branch ? `AND s.branch_id = ${branch}` : '';
+    const branchStockFilter = branch ? `AND branch_id = ${branch}` : '';
 
     // Consulta SQL:
     // Agrupa por variante, precio efectivo vendido y fecha/hora exacta de la venta (o ticket)
-    const rawData = await this.entityManager.query(
+    const rawData = await this.entityManager.query<ProductSaleSqlRow[]>(
       `
       WITH item_level_sales AS (
         SELECT 
@@ -85,9 +92,9 @@ export class GetProductSalesReportHandler implements IQueryHandler<GetProductSal
           ) AS line_revenue
         FROM sale_items si
         INNER JOIN sales s ON s.id = si.sale_id
-        WHERE s.tenant_id = $1
-          AND s.created_at BETWEEN $2 AND $3
-          AND s.status IN ($4, $5)
+        WHERE s.tenant_id = ${tenant}
+          AND s.created_at BETWEEN ${from} AND ${to}
+          AND s.status IN (${completed}, ${partiallyRefunded})
           ${branchSalesFilter}
       ),
       sales_aggregated AS (
@@ -107,7 +114,8 @@ export class GetProductSalesReportHandler implements IQueryHandler<GetProductSal
           variant_id, 
           COALESCE(SUM(quantity), 0) AS total_stock
         FROM product_stocks
-        ${branchStockFilter}
+        WHERE variant_id IN (SELECT variant_id FROM sales_aggregated)
+          ${branchStockFilter}
         GROUP BY variant_id
       ),
       variant_attributes AS (
@@ -116,6 +124,7 @@ export class GetProductSalesReportHandler implements IQueryHandler<GetProductSal
           STRING_AGG(av.value, ' / ' ORDER BY av.value) AS attr_values
         FROM variant_attribute_values vav
         INNER JOIN attribute_values av ON av.id = vav.attribute_value_id
+        WHERE vav.variant_id IN (SELECT variant_id FROM sales_aggregated)
         GROUP BY vav.variant_id
       )
       SELECT 
@@ -139,10 +148,10 @@ export class GetProductSalesReportHandler implements IQueryHandler<GetProductSal
       LEFT JOIN variant_attributes va ON va.variant_id = sa.variant_id
       ORDER BY pv.sku ASC, sa.sale_date DESC, sa.unit_sold_price DESC;
       `,
-      queryParams,
+      params.values,
     );
 
-    return rawData.map((row: any) => ({
+    return rawData.map((row) => ({
       variantId: row.variantId,
       sku: row.sku || '',
       name: row.name || 'Producto',
