@@ -1,15 +1,12 @@
 import { Logger, HttpStatus } from '@nestjs/common';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import { JwtService } from '@nestjs/jwt';
-import { ConfigService } from '@nestjs/config';
 import { EntityManager } from 'typeorm';
 import { LoginCommand } from './login.command';
 import { User } from '../../../../users/domain/entities/user.entity';
 import { HashService } from '../../../services/hash.service';
-import { RedisService } from '../../../../../common/redis/redis.service';
 
 import { Tenant } from '../../../../tenants/domain/entities/tenant.entity';
-import { resolveEffectivePermissions } from '../../../domain/effective-permissions';
+import { AuthTokenService } from '../../../services/auth-token.service';
 import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
 
@@ -20,9 +17,7 @@ export class LoginHandler implements ICommandHandler<LoginCommand> {
   constructor(
     private readonly entityManager: EntityManager,
     private readonly hashService: HashService,
-    private readonly jwtService: JwtService,
-    private readonly configService: ConfigService,
-    private readonly redisService: RedisService,
+    private readonly tokens: AuthTokenService,
   ) {}
 
   async execute(command: LoginCommand) {
@@ -73,43 +68,10 @@ export class LoginHandler implements ICommandHandler<LoginCommand> {
       throw new AppException(ErrorCode.InvalidCredentials, 'Correo, usuario o contraseña incorrectos.', HttpStatus.UNAUTHORIZED);
     }
 
-    const effectivePermissions = resolveEffectivePermissions(user);
-
-    const payload = {
-      sub: user.id,
-      tenantId: user.tenantId,
-      username: user.username,
-      email: user.email,
-      isOwner: user.isOwner,
-      role: user.isOwner ? 'OWNER' : (user.roleEntity?.name || 'USER'),
-      roleId: user.roleId || null,
-      roleName: user.isOwner ? 'Propietario' : (user.roleEntity?.name || 'Usuario'),
-      permissions: effectivePermissions,
-      name: user.name,
-    };
-
-    const accessToken = this.jwtService.sign(payload, {
-      secret: this.configService.get<string>('JWT_SECRET'),
-      expiresIn: this.configService.get<string>('JWT_EXPIRES_IN', '15m') as any,
-    });
-
-    const refreshToken = this.jwtService.sign(
-      { sub: user.id },
-      {
-        secret: this.configService.get<string>('REFRESH_TOKEN_SECRET'),
-        expiresIn: this.configService.get<string>('REFRESH_TOKEN_EXPIRES_IN', '7d') as any,
-      },
-    );
-
-    const redisKey = `refresh_token:${user.id}`;
-    const ttlSeconds = 7 * 24 * 60 * 60; // 7 days
-    await this.redisService.set(redisKey, refreshToken, ttlSeconds);
+    const tokens = await this.tokens.issueSession(user);
 
     this.logger.log(`Login successful for user: ${user.email} (ID: ${user.id})`);
 
-    return {
-      accessToken,
-      refreshToken,
-    };
+    return tokens;
   }
 }

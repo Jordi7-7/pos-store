@@ -1,18 +1,15 @@
 import { HttpStatus, Logger } from '@nestjs/common';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import { JwtService } from '@nestjs/jwt';
-import { ConfigService } from '@nestjs/config';
 import { EntityManager } from 'typeorm';
 import { PinLoginCommand } from './pin-login.command';
 import { User } from '../../../../users/domain/entities/user.entity';
 import { HashService } from '../../../services/hash.service';
-import { RedisService } from '../../../../../common/redis/redis.service';
 import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
 import { AttemptPolicy, LoginAttemptsService } from '../../../services/login-attempts.service';
 
 import { Tenant } from '../../../../tenants/domain/entities/tenant.entity';
-import { resolveEffectivePermissions } from '../../../domain/effective-permissions';
+import { AuthTokenService } from '../../../services/auth-token.service';
 
 @CommandHandler(PinLoginCommand)
 export class PinLoginHandler implements ICommandHandler<PinLoginCommand> {
@@ -21,9 +18,7 @@ export class PinLoginHandler implements ICommandHandler<PinLoginCommand> {
   constructor(
     private readonly entityManager: EntityManager,
     private readonly hashService: HashService,
-    private readonly jwtService: JwtService,
-    private readonly configService: ConfigService,
-    private readonly redisService: RedisService,
+    private readonly tokens: AuthTokenService,
     private readonly loginAttempts: LoginAttemptsService,
   ) {}
 
@@ -85,43 +80,11 @@ export class PinLoginHandler implements ICommandHandler<PinLoginCommand> {
 
     await this.loginAttempts.reset(perIp.key);
 
-    const effectivePermissions = resolveEffectivePermissions(matchedUser);
-
-    const payload = {
-      sub: matchedUser.id,
-      tenantId: matchedUser.tenantId,
-      username: matchedUser.username,
-      email: matchedUser.email,
-      isOwner: matchedUser.isOwner,
-      role: matchedUser.isOwner ? 'OWNER' : (matchedUser.roleEntity?.name || 'USER'),
-      roleId: matchedUser.roleId || null,
-      roleName: matchedUser.isOwner ? 'Propietario' : (matchedUser.roleEntity?.name || 'Usuario'),
-      permissions: effectivePermissions,
-      name: matchedUser.name,
-    };
-
-    const accessToken = this.jwtService.sign(payload, {
-      secret: this.configService.get<string>('JWT_SECRET'),
-      expiresIn: this.configService.get<string>('JWT_EXPIRES_IN', '15m') as any,
-    });
-
-    const refreshToken = this.jwtService.sign(
-      { sub: matchedUser.id },
-      {
-        secret: this.configService.get<string>('REFRESH_TOKEN_SECRET'),
-        expiresIn: this.configService.get<string>('REFRESH_TOKEN_EXPIRES_IN', '7d') as any,
-      },
-    );
-
-    const redisKey = `refresh_token:${matchedUser.id}`;
-    await this.redisService.set(redisKey, refreshToken, 7 * 24 * 60 * 60);
+    const tokens = await this.tokens.issueSession(matchedUser);
 
     this.logger.log(`PIN login successful: ${matchedUser.name} (ID: ${matchedUser.id})`);
 
-    return {
-      accessToken,
-      refreshToken,
-    };
+    return tokens;
   }
 
   private invalidPin(): AppException {

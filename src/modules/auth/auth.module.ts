@@ -9,6 +9,7 @@ import { RefreshTokenHandler } from './application/commands/refresh/refresh-toke
 import { LogoutHandler } from './application/commands/logout/logout.handler';
 import { PinLoginHandler } from './application/commands/pin-login/pin-login.handler';
 import { GetProfileHandler } from './application/queries/get-profile/get-profile.handler';
+import { AuthTokenService } from './services/auth-token.service';
 import { HashService } from './services/hash.service';
 import { LoginAttemptsService } from './services/login-attempts.service';
 import { OnboardingSecretGuard } from './guards/onboarding-secret.guard';
@@ -28,6 +29,7 @@ import { OnboardingSecretGuard } from './guards/onboarding-secret.guard';
   controllers: [AuthController],
   providers: [
     HashService,
+    AuthTokenService,
     LoginAttemptsService,
     OnboardingSecretGuard,
     OnboardTenantHandler,

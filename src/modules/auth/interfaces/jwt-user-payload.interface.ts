@@ -1,7 +1,8 @@
 export interface JwtUserPayload {
   sub: string;
   tenantId: string;
-  email: string;
+  username?: string | null;
+  email?: string | null;
   isOwner: boolean;
   role: string;
   roleId: string | null;

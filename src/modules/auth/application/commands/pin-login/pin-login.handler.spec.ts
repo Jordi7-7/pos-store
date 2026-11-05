@@ -1,9 +1,7 @@
-import { ConfigService } from '@nestjs/config';
-import { JwtService } from '@nestjs/jwt';
 import { EntityManager } from 'typeorm';
 import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
-import { RedisService } from '../../../../../common/redis/redis.service';
+import { AuthTokenService } from '../../../services/auth-token.service';
 import { HashService } from '../../../services/hash.service';
 import { LoginAttemptsService } from '../../../services/login-attempts.service';
 import { User } from '../../../../users/domain/entities/user.entity';
@@ -27,16 +25,15 @@ describe('PinLoginHandler', () => {
 
   const compare = jest.fn<Promise<boolean>, [string, string]>();
   const hashService = { compare } as unknown as HashService;
-  const jwtService = { sign: jest.fn().mockReturnValue('signed') } as unknown as JwtService;
-  const configService = { get: jest.fn((_k: string, d?: string) => d ?? 'secret') } as unknown as ConfigService;
-  const redisService = { set: jest.fn() } as unknown as RedisService;
+  const issueSession = jest.fn().mockResolvedValue({ accessToken: 'signed', refreshToken: 'signed' });
+  const tokens = { issueSession } as unknown as AuthTokenService;
 
   const isLocked = jest.fn<Promise<boolean>, []>();
   const registerFailure = jest.fn();
   const reset = jest.fn();
   const loginAttempts = { isLocked, registerFailure, reset } as unknown as LoginAttemptsService;
 
-  const handler = new PinLoginHandler(entityManager, hashService, jwtService, configService, redisService, loginAttempts);
+  const handler = new PinLoginHandler(entityManager, hashService, tokens, loginAttempts);
   const run = (pin = '123456', slug = 'tienda', ip = '1.1.1.1') => handler.execute(new PinLoginCommand(pin, slug, ip));
   const cashier = { id: 'u1', tenantId: 't1', name: 'Ana', pin: 'hash', isOwner: false, roleEntity: null } as unknown as User;
 
@@ -59,6 +56,7 @@ describe('PinLoginHandler', () => {
     const result = await run();
 
     expect(result).toEqual({ accessToken: 'signed', refreshToken: 'signed' });
+    expect(issueSession).toHaveBeenCalledWith(cashier);
     expect(reset).toHaveBeenCalledWith('pin_attempts:t1:1.1.1.1');
   });
 

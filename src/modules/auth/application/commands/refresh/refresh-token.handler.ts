@@ -1,14 +1,9 @@
-import { Logger, HttpStatus } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import { JwtService } from '@nestjs/jwt';
-import { ConfigService } from '@nestjs/config';
 import { EntityManager } from 'typeorm';
 import { RefreshTokenCommand } from './refresh-token.command';
 import { User } from '../../../../users/domain/entities/user.entity';
-import { RedisService } from '../../../../../common/redis/redis.service';
-import { resolveEffectivePermissions } from '../../../domain/effective-permissions';
-import { AppException } from '../../../../../common/errors/app.exception';
-import { ErrorCode } from '../../../../../common/errors/error-codes';
+import { AuthTokens, AuthTokenService } from '../../../services/auth-token.service';
 
 @CommandHandler(RefreshTokenCommand)
 export class RefreshTokenHandler implements ICommandHandler<RefreshTokenCommand> {
@@ -16,77 +11,32 @@ export class RefreshTokenHandler implements ICommandHandler<RefreshTokenCommand>
 
   constructor(
     private readonly entityManager: EntityManager,
-    private readonly jwtService: JwtService,
-    private readonly configService: ConfigService,
-    private readonly redisService: RedisService,
+    private readonly tokens: AuthTokenService,
   ) {}
 
-  async execute(command: RefreshTokenCommand) {
-    const { refreshToken } = command;
+  async execute(command: RefreshTokenCommand): Promise<AuthTokens> {
+    const userId = await this.tokens.verifyRefreshToken(command.refreshToken);
+
     try {
-      const payload = await this.jwtService.verifyAsync(refreshToken, {
-        secret: this.configService.get<string>('REFRESH_TOKEN_SECRET'),
-      });
-      const userId = payload.sub;
-
-      const redisKey = `refresh_token:${userId}`;
-      const storedToken = await this.redisService.get(redisKey);
-      if (!storedToken || storedToken !== refreshToken) {
-        this.logger.warn(`Refresh failed: Token mismatch or reuse detected for User ID: ${userId}. Invalidating session.`);
-        await this.redisService.del(redisKey);
-        throw new AppException(ErrorCode.SessionExpired, 'La sesión expiró. Inicia sesión nuevamente.', HttpStatus.UNAUTHORIZED);
-      }
-
-      const user = await this.entityManager.findOne(User, {
-        where: { id: userId },
-        relations: { roleEntity: true },
-      });
-      if (!user || !user.isActive) {
-        this.logger.warn(`Refresh failed: User ID ${userId} not found or inactive.`);
-        await this.redisService.del(redisKey);
-        throw new AppException(ErrorCode.SessionExpired, 'La sesión expiró. Inicia sesión nuevamente.', HttpStatus.UNAUTHORIZED);
-      }
-
-      this.logger.log(`Tokens rotated successfully for User ID: ${userId}`);
-
-      const effectivePermissions = resolveEffectivePermissions(user);
-
-      const userPayload = {
-        sub: user.id,
-        tenantId: user.tenantId,
-        username: user.username,
-        email: user.email,
-        isOwner: user.isOwner,
-        role: user.isOwner ? 'OWNER' : (user.roleEntity?.name || 'USER'),
-        roleId: user.roleId || null,
-        roleName: user.isOwner ? 'Propietario' : (user.roleEntity?.name || 'Usuario'),
-        permissions: effectivePermissions,
-        name: user.name,
-      };
-
-      const accessToken = this.jwtService.sign(userPayload, {
-        secret: this.configService.get<string>('JWT_SECRET'),
-        expiresIn: this.configService.get<string>('JWT_EXPIRES_IN', '15m') as any,
-      });
-
-      const newRefreshToken = this.jwtService.sign(
-        { sub: user.id },
-        {
-          secret: this.configService.get<string>('REFRESH_TOKEN_SECRET'),
-          expiresIn: this.configService.get<string>('REFRESH_TOKEN_EXPIRES_IN', '7d') as any,
-        },
-      );
-
-      const ttlSeconds = 7 * 24 * 60 * 60; // 7 days
-      await this.redisService.set(redisKey, newRefreshToken, ttlSeconds);
-
-      return {
-        accessToken,
-        refreshToken: newRefreshToken,
-      };
-    } catch (err: any) {
-      this.logger.warn(`Refresh failed: Token signature/expiry validation error: ${err?.message}`);
-      throw new AppException(ErrorCode.SessionExpired, 'La sesión expiró. Inicia sesión nuevamente.', HttpStatus.UNAUTHORIZED);
+      await this.tokens.assertIsCurrentRefreshToken(userId, command.refreshToken);
+    } catch (error) {
+      this.logger.warn(`Refresh failed: token mismatch or reuse detected for User ID: ${userId}. Session revoked.`);
+      throw error;
     }
+
+    // Un fallo de base de datos o de Redis aquí NO es una sesión caducada: se propaga como error del servidor
+    const user = await this.entityManager.findOne(User, {
+      where: { id: userId },
+      relations: { roleEntity: true },
+    });
+    if (!user || !user.isActive) {
+      this.logger.warn(`Refresh failed: User ID ${userId} not found or inactive. Session revoked.`);
+      await this.tokens.revokeSession(userId);
+      throw this.tokens.sessionExpired();
+    }
+
+    const session = await this.tokens.issueSession(user);
+    this.logger.log(`Tokens rotated successfully for User ID: ${userId}`);
+    return session;
   }
 }

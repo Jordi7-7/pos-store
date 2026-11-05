@@ -45,36 +45,9 @@
       "count": 1
     }
   },
-  "src/modules/auth/application/commands/login/login.handler.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 2
-    },
-    "@typescript-eslint/no-unsafe-assignment": {
-      "count": 2
-    }
-  },
-  "src/modules/auth/application/commands/pin-login/pin-login.handler.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 2
-    },
-    "@typescript-eslint/no-unsafe-assignment": {
-      "count": 2
-    }
-  },
   "src/modules/auth/application/commands/refresh/refresh-token.handler.spec.ts": {
     "@typescript-eslint/no-unnecessary-type-assertion": {
-      "count": 2
-    }
-  },
-  "src/modules/auth/application/commands/refresh/refresh-token.handler.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 3
-    },
-    "@typescript-eslint/no-unsafe-assignment": {
-      "count": 5
-    },
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 2
+      "count": 1
     }
   },
   "src/modules/auth/auth.module.ts": {
