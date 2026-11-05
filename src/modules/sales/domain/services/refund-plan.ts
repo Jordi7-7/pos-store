@@ -1,5 +1,6 @@
 import { DomainError } from '../../../../common/domain/domain.error';
 import { Money } from '../../../../common/domain/money';
+import { addQuantities, subtractQuantities } from '../../../../common/domain/quantity';
 import { ErrorCode } from '../../../../common/errors/error-codes';
 
 export interface RefundableLine {
@@ -55,15 +56,6 @@ function refundAmount(line: RefundableLine, alreadyRefunded: number, quantity: n
   const paid = paidForLine(line);
   const refundedAfter = addQuantities(alreadyRefunded, quantity);
   return paid.fraction(refundedAfter, line.quantity).minus(paid.fraction(alreadyRefunded, line.quantity));
-}
-
-/** Las cantidades tienen 2 decimales, como el dinero: se suman y restan sin error de coma flotante. */
-function addQuantities(a: number, b: number): number {
-  return Money.of(a).plus(Money.of(b)).toNumber();
-}
-
-function subtractQuantities(a: number, b: number): number {
-  return Money.of(a).minus(Money.of(b)).toNumber();
 }
 
 /** Validación que no necesita la venta: permite rechazar la petición antes de abrir una transacción. */

@@ -1,4 +1,7 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
+import { Money } from '../../../../../common/domain/money';
+import { receiveStock } from '../../../../products/application/services/inventory-stock';
+import { weightedAverageCost } from '../../../../products/domain/services/stock-rules';
 import { Logger, BadRequestException, NotFoundException } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { RedisService } from '../../../../../common/redis/redis.service';
@@ -11,7 +14,6 @@ import { Branch } from '../../../../branches/domain/entities/branch.entity';
 import { ProductVariant } from '../../../../products/domain/entities/product-variant.entity';
 import { ProductStock } from '../../../../products/domain/entities/product-stock.entity';
 import { InventoryMovement } from '../../../../products/domain/entities/inventory-movement.entity';
-import { ProductBatch } from '../../../../products/domain/entities/product-batch.entity';
 import { Batch, BatchOriginType } from '../../../../batches/domain/entities/batch.entity';
 import { InventoryMovementReason } from '../../../../../common/enums/inventory-movement-reason.enum';
 
@@ -43,7 +45,6 @@ export class RegisterPurchaseHandler implements ICommandHandler<RegisterPurchase
       const variantRepo = transactionalManager.getRepository(ProductVariant);
       const stockRepo = transactionalManager.getRepository(ProductStock);
       const inventoryRepo = transactionalManager.getRepository(InventoryMovement);
-      const batchRepo = transactionalManager.getRepository(ProductBatch);
       const batchHeaderRepo = transactionalManager.getRepository(Batch);
       const purchaseOrderItemRepo = transactionalManager.getRepository(PurchaseOrderItem);
 
@@ -83,10 +84,7 @@ export class RegisterPurchaseHandler implements ICommandHandler<RegisterPurchase
       }
 
       // 4. Calculate total amount
-      let totalAmount = 0;
-      for (const itemDto of items) {
-        totalAmount += itemDto.quantity * itemDto.purchasePrice;
-      }
+      const totalAmount = Money.sum(items.map((item) => Money.ofLine(item.purchasePrice, item.quantity))).toNumber();
 
       // 5. Create Purchase Order (Stock Input)
       const purchaseOrder = new PurchaseOrder();
@@ -130,49 +128,26 @@ export class RegisterPurchaseHandler implements ICommandHandler<RegisterPurchase
         });
         const currentTotalStock = stocks.reduce((sum, s) => sum + Number(s.quantity), 0);
 
-        // Recalculate Weighted Average Cost (PMP)
-        const currentStock = currentTotalStock > 0 ? currentTotalStock : 0;
-        const currentCost = Number(variant.purchasePrice);
         const newQty = itemDto.quantity;
         const newPrice = itemDto.purchasePrice;
 
-        const totalQty = currentStock + newQty;
-        const newCost = totalQty > 0 ? (currentStock * currentCost + newQty * newPrice) / totalQty : newPrice;
-        
-        // Update variant purchase price
-        variant.purchasePrice = Number(newCost.toFixed(2));
+        // Recalculate Weighted Average Cost (PMP)
+        variant.purchasePrice = weightedAverageCost({
+          currentStock: currentTotalStock,
+          currentCost: variant.purchasePrice,
+          incomingQuantity: newQty,
+          incomingCost: newPrice,
+        });
         await variantRepo.save(variant);
 
-        // Find or create product stock in the target branch (locked for concurrent updates)
-        let branchStock = await stockRepo.findOne({
-          where: { branchId, variantId: itemDto.variantId },
-          lock: { mode: 'pessimistic_write' },
+        await receiveStock(transactionalManager, {
+          tenantId,
+          branchId,
+          variantId: itemDto.variantId,
+          batchId: savedBatchHeader.id,
+          quantity: newQty,
+          unitCost: newPrice,
         });
-
-        if (!branchStock) {
-          branchStock = new ProductStock();
-          branchStock.branchId = branchId;
-          branchStock.variantId = itemDto.variantId;
-          branchStock.quantity = 0;
-        }
-
-        const previousStock = Number(branchStock.quantity);
-        const negativeDebt = previousStock < 0 ? Math.abs(previousStock) : 0;
-        const remainingForFutureSales = Math.max(0, newQty - negativeDebt);
-
-        branchStock.quantity = previousStock + newQty;
-        await stockRepo.save(branchStock);
-
-        // Create Product Batch for FIFO tracking linked to the Batch header
-        const batch = new ProductBatch();
-        batch.tenantId = tenantId;
-        batch.branchId = branchId;
-        batch.batchId = savedBatchHeader.id;
-        batch.variantId = itemDto.variantId;
-        batch.initialQuantity = newQty;
-        batch.remainingQuantity = remainingForFutureSales;
-        batch.unitCost = newPrice;
-        await batchRepo.save(batch);
 
         // Save Purchase Order Item
         const purchaseOrderItem = new PurchaseOrderItem();

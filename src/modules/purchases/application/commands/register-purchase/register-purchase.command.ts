@@ -1,3 +1,9 @@
+export interface RegisterPurchaseItemInput {
+  variantId: string;
+  quantity: number;
+  purchasePrice: number;
+}
+
 export class RegisterPurchaseCommand {
   constructor(
     public readonly tenantId: string,
@@ -5,6 +11,6 @@ export class RegisterPurchaseCommand {
     public readonly supplierId: string,
     public readonly branchId: string,
     public readonly invoiceNumber: string | null,
-    public readonly items: any[],
+    public readonly items: RegisterPurchaseItemInput[],
   ) {}
 }

@@ -3,6 +3,8 @@ import * as path from 'path';
 import { DataSource } from 'typeorm';
 import { RedisService } from '../../src/common/redis/redis.service';
 import { databaseConnectionOptions } from '../../src/config/database.options';
+import { AdjustStockCommand } from '../../src/modules/products/application/commands/adjust-stock/adjust-stock.command';
+import { AdjustStockHandler } from '../../src/modules/products/application/commands/adjust-stock/adjust-stock.handler';
 import { Batch } from '../../src/modules/batches/domain/entities/batch.entity';
 import { Branch } from '../../src/modules/branches/domain/entities/branch.entity';
 import { InventoryMovement } from '../../src/modules/products/domain/entities/inventory-movement.entity';
@@ -236,5 +238,96 @@ describe('Flujo de dinero: venta, devolución y cierre de caja', () => {
     expect((await db.getRepository(CashRegister).findOneByOrFail({ id: cashRegisterId })).nextInvoiceNumber).toBe(
       registerBefore.nextInvoiceNumber,
     );
+
+    await new CloseCashSessionHandler(db.manager).execute(new CloseCashSessionCommand(tenantId, sessionId, 0));
+  });
+
+  describe('stock', () => {
+    const newVariant = async (sku: string): Promise<string> => {
+      const product = await db.getRepository(Product).save(
+        db.getRepository(Product).create({ tenantId, name: sku, description: sku }),
+      );
+      const variant = await db.getRepository(ProductVariant).save(
+        db.getRepository(ProductVariant).create({
+          productId: product.id,
+          tenantId,
+          sku,
+          barcode: sku,
+          purchasePrice: 4,
+          salePrice: 10,
+        }),
+      );
+      return variant.id;
+    };
+
+    const adjust = (id: string, quantity: number, type: 'IN' | 'OUT') =>
+      new AdjustStockHandler(db.manager, redis).execute(new AdjustStockCommand(tenantId, userId, branchId, id, quantity, type));
+
+    const quantityOf = async (id: string): Promise<number> =>
+      (await db.getRepository(ProductStock).findOneByOrFail({ branchId, variantId: id })).quantity;
+
+    it('entradas simultáneas sobre una variante sin stock no chocan ni pierden unidades', async () => {
+      const id = await newVariant('SIN-STOCK');
+
+      await Promise.all([1, 2, 3, 4, 5].map(() => adjust(id, 2, 'IN')));
+
+      expect(await quantityOf(id)).toBe(10);
+    });
+
+    it('ventas simultáneas descuentan todas las unidades y numeran sin repetir', async () => {
+      const id = await newVariant('CONCURRENTE');
+      await adjust(id, 10, 'IN');
+      const sessionId = await openSession(0);
+
+      const sales = await Promise.all([1, 2, 3, 4].map(() => sell(sessionId, [{ variantId: id, quantity: 2, price: 10 }], 20)));
+
+      expect(await quantityOf(id)).toBe(2);
+      expect(new Set(sales.map((sale) => sale.invoiceNumber)).size).toBe(4);
+      await new CloseCashSessionHandler(db.manager).execute(new CloseCashSessionCommand(tenantId, sessionId, 80));
+    });
+
+    it('vender sin stock lo deja negativo y la siguiente entrada salda la deuda', async () => {
+      const id = await newVariant('NEGATIVO');
+      const sessionId = await openSession(0);
+
+      const sale = await sell(sessionId, [{ variantId: id, quantity: 3, price: 10 }], 30);
+
+      expect(await quantityOf(id)).toBe(-3);
+      expect(sale.items[0].cost).toBe(4); // sin lotes: costo de ficha
+
+      await adjust(id, 5, 'IN');
+
+      expect(await quantityOf(id)).toBe(2);
+      const batches = await db.getRepository(ProductBatch).findBy({ variantId: id });
+      expect(batches.map((batch) => batch.remainingQuantity)).toEqual([2]);
+      await new CloseCashSessionHandler(db.manager).execute(new CloseCashSessionCommand(tenantId, sessionId, 30));
+    });
+
+    it('un ajuste de salida no puede dejar el stock en negativo', async () => {
+      const id = await newVariant('AJUSTE');
+      await adjust(id, 1, 'IN');
+
+      await expect(adjust(id, 2, 'OUT')).rejects.toThrow(/Stock insuficiente/);
+
+      expect(await quantityOf(id)).toBe(1);
+    });
+
+    it('el costo de la venta sigue el orden FIFO de los lotes', async () => {
+      const id = await newVariant('FIFO');
+      const batchRepo = db.getRepository(ProductBatch);
+      await adjust(id, 2, 'IN');
+      await db.getRepository(ProductVariant).update(id, { purchasePrice: 8 });
+      await adjust(id, 2, 'IN');
+      const sessionId = await openSession(0);
+
+      const sale = await sell(sessionId, [{ variantId: id, quantity: 3, price: 10 }], 30);
+
+      expect(sale.items[0].cost).toBe(5.33); // (2 x 4 + 1 x 8) / 3
+      const remaining = (await batchRepo.find({ where: { variantId: id }, order: { createdAt: 'ASC' } })).map(
+        (batch) => batch.remainingQuantity,
+      );
+      expect(remaining).toEqual([0, 1]);
+      await new CloseCashSessionHandler(db.manager).execute(new CloseCashSessionCommand(tenantId, sessionId, 30));
+    });
   });
 });

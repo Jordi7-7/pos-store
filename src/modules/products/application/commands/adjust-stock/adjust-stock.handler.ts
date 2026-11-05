@@ -1,17 +1,22 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { Logger, BadRequestException, NotFoundException } from '@nestjs/common';
-import { EntityManager, MoreThan } from 'typeorm';
+import { EntityManager } from 'typeorm';
 import { RedisService } from '../../../../../common/redis/redis.service';
 import { assertUserCanOperateInBranch } from '../../../../../common/security/branch-access.helper';
 import { AdjustStockCommand } from './adjust-stock.command';
+import { consumeStock, lockBranchStock, receiveStock } from '../../services/inventory-stock';
 import { ProductVariant } from '../../../domain/entities/product-variant.entity';
-import { ProductStock } from '../../../domain/entities/product-stock.entity';
-import { ProductBatch } from '../../../domain/entities/product-batch.entity';
 import { Batch, BatchOriginType } from '../../../../batches/domain/entities/batch.entity';
 import { InventoryMovement } from '../../../domain/entities/inventory-movement.entity';
 import { Branch } from '../../../../branches/domain/entities/branch.entity';
 import { InventoryMovementReason } from '../../../../../common/enums/inventory-movement-reason.enum';
 import { InventoryMovementType } from '../../../../../common/enums/inventory-movement-type.enum';
+
+export interface AdjustStockResult {
+  success: boolean;
+  newQuantity: number;
+  movementId: string;
+}
 
 @CommandHandler(AdjustStockCommand)
 export class AdjustStockHandler implements ICommandHandler<AdjustStockCommand> {
@@ -22,7 +27,7 @@ export class AdjustStockHandler implements ICommandHandler<AdjustStockCommand> {
     private readonly redisService: RedisService,
   ) {}
 
-  async execute(command: AdjustStockCommand): Promise<any> {
+  async execute(command: AdjustStockCommand): Promise<AdjustStockResult> {
     const { tenantId, userId, branchId, variantId, quantity, type, comment } = command;
     this.logger.log(
       `Executing stock adjustment: Type ${type}, Qty ${quantity} for Variant ${variantId} on Branch ${branchId}`,
@@ -41,8 +46,6 @@ export class AdjustStockHandler implements ICommandHandler<AdjustStockCommand> {
       });
 
       const variantRepo = transactionalManager.getRepository(ProductVariant);
-      const stockRepo = transactionalManager.getRepository(ProductStock);
-      const batchRepo = transactionalManager.getRepository(ProductBatch);
       const movementRepo = transactionalManager.getRepository(InventoryMovement);
       const branchRepo = transactionalManager.getRepository(Branch);
 
@@ -63,57 +66,26 @@ export class AdjustStockHandler implements ICommandHandler<AdjustStockCommand> {
         throw new NotFoundException(`La variante del producto con ID ${variantId} no existe.`);
       }
 
-      // Get or create product stock record
-      let branchStock = await stockRepo.findOne({
-        where: { branchId, variantId },
-        lock: { mode: 'pessimistic_write' },
-      });
+      let newQuantity: number;
 
-      if (!branchStock) {
-        branchStock = new ProductStock();
-        branchStock.branchId = branchId;
-        branchStock.variantId = variantId;
-        branchStock.quantity = 0;
-      }
-
-      // Adjust stock quantity & batches
       if (type === InventoryMovementType.OUT) {
-        const currentStock = Number(branchStock.quantity);
-        if (currentStock < quantity) {
+        // Un ajuste de salida, a diferencia de una venta, no puede dejar el stock en negativo
+        const branchStock = await lockBranchStock(transactionalManager, branchId, variantId);
+        if (branchStock.quantity < quantity) {
+          this.logger.warn(`Stock adjustment rejected: insufficient stock for Variant ${variantId} on Branch ${branchId}`);
           throw new BadRequestException(
-            `Stock insuficiente en la sucursal ${branch.name}. Stock actual: ${currentStock}, solicitado: ${quantity}.`,
+            `Stock insuficiente en la sucursal ${branch.name}. Stock actual: ${branchStock.quantity}, solicitado: ${quantity}.`,
           );
         }
-        branchStock.quantity = currentStock - quantity;
 
-        // Consumir lotes FIFO activos de esta variante y sucursal
-        let remainingToDeduct = quantity;
-        const activeBatches = await batchRepo.find({
-          where: {
-            tenantId,
-            branchId,
-            variantId,
-            remainingQuantity: MoreThan(0),
-          },
-          order: { createdAt: 'ASC' },
-          lock: { mode: 'pessimistic_write' },
+        const consumed = await consumeStock(transactionalManager, {
+          branchId,
+          variantId,
+          quantity,
+          fallbackUnitCost: variant.purchasePrice,
         });
-
-        for (const batch of activeBatches) {
-          const toDeduct = Math.min(remainingToDeduct, Number(batch.remainingQuantity));
-          batch.remainingQuantity = Number(batch.remainingQuantity) - toDeduct;
-          await batchRepo.save(batch);
-          remainingToDeduct -= toDeduct;
-
-          if (remainingToDeduct === 0) break;
-        }
+        newQuantity = consumed.newStock;
       } else {
-        const previousStock = Number(branchStock.quantity);
-        const negativeDebt = previousStock < 0 ? Math.abs(previousStock) : 0;
-        const remainingForFutureSales = Math.max(0, quantity - negativeDebt);
-
-        branchStock.quantity = previousStock + quantity;
-
         // Crear cabecera de lote para el ajuste de entrada
         const batchHeaderRepo = transactionalManager.getRepository(Batch);
         const batchHeader = new Batch();
@@ -125,19 +97,15 @@ export class AdjustStockHandler implements ICommandHandler<AdjustStockCommand> {
         batchHeader.notes = comment || null;
         const savedBatchHeader = await batchHeaderRepo.save(batchHeader);
 
-        // Crear un nuevo lote de entrada con el costo unitario de la ficha vinculado al batch header
-        const newBatch = new ProductBatch();
-        newBatch.tenantId = tenantId;
-        newBatch.branchId = branchId;
-        newBatch.batchId = savedBatchHeader.id;
-        newBatch.variantId = variantId;
-        newBatch.initialQuantity = quantity;
-        newBatch.remainingQuantity = remainingForFutureSales;
-        newBatch.unitCost = Number(variant.purchasePrice) || 0;
-        await batchRepo.save(newBatch);
+        newQuantity = await receiveStock(transactionalManager, {
+          tenantId,
+          branchId,
+          variantId,
+          batchId: savedBatchHeader.id,
+          quantity,
+          unitCost: variant.purchasePrice || 0,
+        });
       }
-
-      await stockRepo.save(branchStock);
 
       // Create Inventory Movement (Kardex)
       const movement = new InventoryMovement();
@@ -161,7 +129,7 @@ export class AdjustStockHandler implements ICommandHandler<AdjustStockCommand> {
 
       return {
         success: true,
-        newQuantity: branchStock.quantity,
+        newQuantity,
         movementId: movement.id,
       };
     });

@@ -1,14 +1,12 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { Logger, BadRequestException, NotFoundException } from '@nestjs/common';
-import { EntityManager, MoreThan } from 'typeorm';
+import { EntityManager } from 'typeorm';
 import { ProcessSaleCommand } from './process-sale.command';
 import { Sale } from '../../../domain/entities/sale.entity';
 import { SaleItem } from '../../../domain/entities/sale-item.entity';
 import { SalePayment } from '../../../domain/entities/sale-payment.entity';
-import { ProductStock } from '../../../../products/domain/entities/product-stock.entity';
 import { ProductVariant } from '../../../../products/domain/entities/product-variant.entity';
 import { InventoryMovement } from '../../../../products/domain/entities/inventory-movement.entity';
-import { ProductBatch } from '../../../../products/domain/entities/product-batch.entity';
 import { CashSession } from '../../../domain/entities/cash-session.entity';
 import { CashSessionStatus } from '../../../domain/enums/cash-session-status.enum';
 import { CashRegister } from '../../../domain/entities/cash-register.entity';
@@ -17,6 +15,7 @@ import { InventoryMovementReason } from '../../../../../common/enums/inventory-m
 import { InventoryMovementType } from '../../../../../common/enums/inventory-movement-type.enum';
 import { RedisService } from '../../../../../common/redis/redis.service';
 import { assertUserCanOperateInBranch } from '../../../../../common/security/branch-access.helper';
+import { consumeStock } from '../../../../products/application/services/inventory-stock';
 import { assertPaymentsCoverTotal, priceSale, SalePricing } from '../../../domain/services/sale-pricing';
 import { lockCashSession } from '../shared/cash-session-lock';
 import { assertUserAssignedToCashRegister } from '../shared/cash-register-access';
@@ -72,10 +71,8 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
       const cashSessionRepo = transactionalManager.getRepository(CashSession);
       const customerRepo = transactionalManager.getRepository(Customer);
       const variantRepo = transactionalManager.getRepository(ProductVariant);
-      const stockRepo = transactionalManager.getRepository(ProductStock);
       const saleRepo = transactionalManager.getRepository(Sale);
       const inventoryRepo = transactionalManager.getRepository(InventoryMovement);
-      const batchRepo = transactionalManager.getRepository(ProductBatch);
 
       // Evita que el cierre de caja calcule el arqueo mientras esta venta está en curso
       await lockCashSession(transactionalManager, cashSessionId, 'share');
@@ -166,58 +163,13 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
           throw new NotFoundException(`Product Variant with ID ${itemDto.variantId} not found`);
         }
 
-        let stock = await stockRepo.findOne({
-          where: {
-            branchId: branchId,
-            variantId: itemDto.variantId,
-            branch: { tenantId },
-          },
-          relations: { branch: true },
-          lock: { mode: 'pessimistic_write' },
+        // Descuenta stock (puede quedar en negativo) y lotes FIFO
+        const { averageUnitCost } = await consumeStock(transactionalManager, {
+          branchId,
+          variantId: itemDto.variantId,
+          quantity: itemDto.quantity,
+          fallbackUnitCost: variant.purchasePrice,
         });
-
-        if (!stock) {
-          stock = new ProductStock();
-          stock.branchId = branchId;
-          stock.variantId = itemDto.variantId;
-          stock.quantity = 0;
-        }
-
-        // Subtract stock (can become negative)
-        stock.quantity = Number(stock.quantity) - itemDto.quantity;
-        await stockRepo.save(stock);
-
-        // FIFO Batch consumption
-        let remainingToConsume = itemDto.quantity;
-        let totalCost = 0;
-
-        const activeBatches = await batchRepo.find({
-          where: {
-            branchId: branchId,
-            variantId: itemDto.variantId,
-            remainingQuantity: MoreThan(0),
-          },
-          order: { createdAt: 'ASC' },
-          lock: { mode: 'pessimistic_write' },
-        });
-
-        for (const batch of activeBatches) {
-          const toConsume = Math.min(remainingToConsume, Number(batch.remainingQuantity));
-          batch.remainingQuantity = Number(batch.remainingQuantity) - toConsume;
-          await batchRepo.save(batch);
-
-          totalCost += toConsume * Number(batch.unitCost);
-          remainingToConsume -= toConsume;
-
-          if (remainingToConsume === 0) break;
-        }
-
-        // Fallback in case of mismatch/empty batches
-        if (remainingToConsume > 0) {
-          totalCost += remainingToConsume * Number(variant.purchasePrice);
-        }
-
-        const averageUnitCost = Number((totalCost / itemDto.quantity).toFixed(2));
 
         // Build Sale Item
         const pricedLine = pricing.lines[index];

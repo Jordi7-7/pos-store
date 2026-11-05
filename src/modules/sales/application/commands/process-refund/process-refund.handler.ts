@@ -10,14 +10,13 @@ import { Sale } from '../../../domain/entities/sale.entity';
 import { CashSession } from '../../../domain/entities/cash-session.entity';
 import { CashSessionStatus } from '../../../domain/enums/cash-session-status.enum';
 import { Branch } from '../../../../branches/domain/entities/branch.entity';
-import { ProductStock } from '../../../../products/domain/entities/product-stock.entity';
 import { InventoryMovement } from '../../../../products/domain/entities/inventory-movement.entity';
-import { ProductBatch } from '../../../../products/domain/entities/product-batch.entity';
 import { Batch, BatchOriginType } from '../../../../batches/domain/entities/batch.entity';
 
 import { SaleItem } from '../../../domain/entities/sale-item.entity';
 import { RedisService } from '../../../../../common/redis/redis.service';
 import { assertUserCanOperateInBranch } from '../../../../../common/security/branch-access.helper';
+import { receiveStock } from '../../../../products/application/services/inventory-stock';
 import { assertValidRefundRequests, planRefund, RefundPlan } from '../../../domain/services/refund-plan';
 import { lockCashSession } from '../shared/cash-session-lock';
 import { assertUserAssignedToCashRegister } from '../shared/cash-register-access';
@@ -55,10 +54,8 @@ export class ProcessRefundHandler implements ICommandHandler<ProcessRefundComman
       const cashSessionRepo = transactionalManager.getRepository(CashSession);
       const saleRepo = transactionalManager.getRepository(Sale);
       const saleItemRepo = transactionalManager.getRepository(SaleItem);
-      const stockRepo = transactionalManager.getRepository(ProductStock);
       const refundRepo = transactionalManager.getRepository(Refund);
       const inventoryRepo = transactionalManager.getRepository(InventoryMovement);
-      const batchRepo = transactionalManager.getRepository(ProductBatch);
 
       // 2. Validate Branch belongs to Tenant
       const branch = await branchRepo.findOne({
@@ -137,25 +134,6 @@ export class ProcessRefundHandler implements ICommandHandler<ProcessRefundComman
         saleItem.refundedQuantity = refundedQuantityAfter;
         await saleItemRepo.save(saleItem);
 
-        // Restore branch inventory stock (locked for concurrent updates)
-        let stock = await stockRepo.findOne({
-          where: { branchId, variantId },
-          lock: { mode: 'pessimistic_write' },
-        });
-        if (!stock) {
-          stock = new ProductStock();
-          stock.branchId = branchId;
-          stock.variantId = variantId;
-          stock.quantity = 0;
-        }
-
-        const previousStock = Number(stock.quantity);
-        const negativeDebt = previousStock < 0 ? Math.abs(previousStock) : 0;
-        const remainingForFutureSales = Math.max(0, quantity - negativeDebt);
-
-        stock.quantity = previousStock + quantity;
-        await stockRepo.save(stock);
-
         // Create Batch header for the returned merchandise
         const batchHeaderRepo = transactionalManager.getRepository(Batch);
         const batchHeader = new Batch();
@@ -167,16 +145,15 @@ export class ProcessRefundHandler implements ICommandHandler<ProcessRefundComman
         batchHeader.notes = reason || 'Devolución de cliente';
         const savedBatchHeader = await batchHeaderRepo.save(batchHeader);
 
-        // Create a new Product Batch representing the returned inventory (using historical cost)
-        const batch = new ProductBatch();
-        batch.tenantId = tenantId;
-        batch.branchId = branchId;
-        batch.batchId = savedBatchHeader.id;
-        batch.variantId = variantId;
-        batch.initialQuantity = quantity;
-        batch.remainingQuantity = remainingForFutureSales;
-        batch.unitCost = Number(saleItem.cost) || 0;
-        await batchRepo.save(batch);
+        // La mercadería devuelta entra como lote nuevo al costo histórico de la venta
+        await receiveStock(transactionalManager, {
+          tenantId,
+          branchId,
+          variantId,
+          batchId: savedBatchHeader.id,
+          quantity,
+          unitCost: saleItem.cost || 0,
+        });
 
         // Build Kardex entry
         const movement = new InventoryMovement();

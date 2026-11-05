@@ -1,4 +1,6 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
+import { Money } from '../../../../../common/domain/money';
+import { receiveStock } from '../../../../products/application/services/inventory-stock';
 import { Logger, BadRequestException, NotFoundException } from '@nestjs/common';
 import { EntityManager, In } from 'typeorm';
 import { RedisService } from '../../../../../common/redis/redis.service';
@@ -9,8 +11,6 @@ import { PurchaseOrderItem } from '../../../domain/entities/purchase-order-item.
 import { Supplier } from '../../../domain/entities/supplier.entity';
 import { Branch } from '../../../../branches/domain/entities/branch.entity';
 import { ProductVariant } from '../../../../products/domain/entities/product-variant.entity';
-import { ProductStock } from '../../../../products/domain/entities/product-stock.entity';
-import { ProductBatch } from '../../../../products/domain/entities/product-batch.entity';
 import { Batch, BatchOriginType } from '../../../../batches/domain/entities/batch.entity';
 import { InventoryMovement } from '../../../../products/domain/entities/inventory-movement.entity';
 import { InventoryMovementReason } from '../../../../../common/enums/inventory-movement-reason.enum';
@@ -52,8 +52,6 @@ export class ImportPurchasesHandler implements ICommandHandler<ImportPurchasesCo
       const supplierRepo = tm.getRepository(Supplier);
       const branchRepo = tm.getRepository(Branch);
       const variantRepo = tm.getRepository(ProductVariant);
-      const stockRepo = tm.getRepository(ProductStock);
-      const batchRepo = tm.getRepository(ProductBatch);
       const batchHeaderRepo = tm.getRepository(Batch);
       const movementRepo = tm.getRepository(InventoryMovement);
 
@@ -108,11 +106,9 @@ export class ImportPurchasesHandler implements ICommandHandler<ImportPurchasesCo
       }
 
       // Calculate total purchase amount
-      let totalAmount = 0;
-      for (const itemDto of items) {
-        const variant = variantMap.get(itemDto.sku.toLowerCase())!;
-        totalAmount += itemDto.quantity * Number(variant.purchasePrice || 0);
-      }
+      const totalAmount = Money.sum(
+        items.map((item) => Money.ofLine(variantMap.get(item.sku.toLowerCase())!.purchasePrice || 0, item.quantity)),
+      ).toNumber();
 
       // Create main PurchaseOrder
       const purchaseOrder = new PurchaseOrder();
@@ -148,35 +144,14 @@ export class ImportPurchasesHandler implements ICommandHandler<ImportPurchasesCo
         orderItem.purchasePrice = cost;
         await itemRepo.save(orderItem);
 
-        // Update branch stock (pessimistic lock to prevent race conditions)
-        let branchStock = await stockRepo.findOne({
-          where: { branchId, variantId: variant.id },
-          lock: { mode: 'pessimistic_write' },
+        await receiveStock(tm, {
+          tenantId,
+          branchId,
+          variantId: variant.id,
+          batchId: savedBatchHeader.id,
+          quantity: qty,
+          unitCost: cost,
         });
-
-        if (!branchStock) {
-          branchStock = new ProductStock();
-          branchStock.branchId = branchId;
-          branchStock.variantId = variant.id;
-          branchStock.quantity = 0;
-        }
-        const previousStock = Number(branchStock.quantity);
-        const negativeDebt = previousStock < 0 ? Math.abs(previousStock) : 0;
-        const remainingForFutureSales = Math.max(0, qty - negativeDebt);
-
-        branchStock.quantity = previousStock + qty;
-        await stockRepo.save(branchStock);
-
-        // Create ProductBatch linked to the Batch header
-        const batch = new ProductBatch();
-        batch.tenantId = tenantId;
-        batch.branchId = branchId;
-        batch.batchId = savedBatchHeader.id;
-        batch.variantId = variant.id;
-        batch.initialQuantity = qty;
-        batch.remainingQuantity = remainingForFutureSales;
-        batch.unitCost = cost;
-        await batchRepo.save(batch);
 
         // Create Kardex movement
         const movement = new InventoryMovement();
