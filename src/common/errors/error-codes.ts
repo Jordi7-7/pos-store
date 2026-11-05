@@ -41,6 +41,7 @@ export enum ErrorCode {
   // Tiendas
   TenantNotFound = 'TENANT_NOT_FOUND',
   TenantSlugTaken = 'TENANT_SLUG_TAKEN',
+  TenantSlugInvalid = 'TENANT_SLUG_INVALID',
   TenantRucTaken = 'TENANT_RUC_TAKEN',
 
   // Usuarios y roles

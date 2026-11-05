@@ -55,7 +55,7 @@ Forma de toda respuesta de error:
 | `DEFAULT_SUPPLIER_NOT_FOUND` | 404 | purchases | No se encontró un proveedor configurado para este tenant. | — |
 | `DUPLICATE_SKU_IN_IMPORT` | 400 | products | El archivo repite estos SKUs: {repeated.slice(0, 10).join(', ')} | `skus` |
 | `DUPLICATE_VARIANT_COMBINATION` | 409 | products | No se permiten múltiples variantes con la misma combinación de atributos en un mismo producto. | — |
-| `EMAIL_TAKEN` | 409 | users | El correo "{email}" ya está en uso por otro usuario. | `email` |
+| `EMAIL_TAKEN` | 409 | auth, users | Ese correo ya está registrado en otra cuenta. | `email` |
 | `EMPTY_PURCHASE` | 400 | purchases | La compra debe tener al menos un producto. | — |
 | `IMAGES_NOT_FOUND` | 404 | products | Una o más imágenes de la variante no existen. | — |
 | `IMPORT_EMPTY` | 400 | products, purchases | No se proporcionaron registros para importar. | — |
@@ -103,14 +103,15 @@ Forma de toda respuesta de error:
 | `SUPPLIER_IDENTITY_TAKEN` | 409 | purchases | Ya existe un proveedor con el documento "{input.identityNumber}". | `identityNumber` |
 | `SUPPLIER_NOT_FOUND` | 404 | purchases | El proveedor seleccionado con ID {command.supplierId} no existe. | `id`, `supplierId` |
 | `TENANT_NOT_FOUND` | 404 | tenants | Tienda con identificador "{query.slug}" no encontrada | `id`, `slug` |
-| `TENANT_RUC_TAKEN` | 409 | auth | Ya existe una tienda registrada con el RUC {ruc}. | `ruc` |
+| `TENANT_RUC_TAKEN` | 409 | auth | Ya existe una tienda registrada con el RUC {command.ruc}. | `ruc` |
+| `TENANT_SLUG_INVALID` | 400 | tenants | El identificador de la tienda debe tener letras o números. | — |
 | `TENANT_SLUG_REQUIRED` | 401 | auth | El identificador de la tienda es obligatorio para iniciar sesión | — |
-| `TENANT_SLUG_TAKEN` | 409 | tenants | El identificador "{cleanSlug}" ya está en uso por otra tienda | `slug` |
+| `TENANT_SLUG_TAKEN` | 409 | auth, tenants | Ese identificador de tienda acaba de ser tomado. Inténtalo de nuevo. | `slug` |
 | `TOO_MANY_ATTEMPTS` | 429 | auth | Demasiados intentos fallidos. Inténtalo de nuevo más tarde. | — |
 | `UNSUPPORTED_MEDIA_TYPE` | HttpStatus.UNSUPPORTED_MEDIA_TYPE | media | Tipo de archivo no permitido. Solo se aceptan imágenes JPEG, PNG, WebP, GIF o AVIF. | — |
 | `USERNAME_INVALID` | 400 | auth | El nombre de usuario es obligatorio y debe contener caracteres válidos. | — |
 | `USERNAME_REQUIRED` | 400 | users | El nombre de usuario no puede estar vacío. | — |
-| `USERNAME_TAKEN` | 409 | users | El nombre de usuario "{username}" ya está en uso. | `username` |
+| `USERNAME_TAKEN` | 409 | auth, users | Ese nombre de usuario ya está en uso. | `username` |
 | `USER_DISABLED` | 401 | auth | Usuario deshabilitado. Contacta a un administrador. | — |
 | `USER_NOT_AUTHENTICATED` | 403 | auth, common | Usuario no autenticado o no válido para {actionDescription}. | — |
 | `USER_NOT_FOUND` | 401, 404 | auth, sales, users | Usuario no encontrado | `targetUserId` |

@@ -1,8 +1,9 @@
-import { IsString, IsNotEmpty, IsOptional, IsTimeZone } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsTimeZone, IsISO4217CurrencyCode, MaxLength } from 'class-validator';
 
 export class UpdateTenantDto {
   @IsString()
   @IsNotEmpty()
+  @MaxLength(150)
   @IsOptional()
   name?: string;
 
@@ -11,8 +12,7 @@ export class UpdateTenantDto {
   @IsOptional()
   country?: string;
 
-  @IsString()
-  @IsNotEmpty()
+  @IsISO4217CurrencyCode({ message: 'El código de moneda no es válido (ej. USD).' })
   @IsOptional()
   currencyCode?: string;
 
@@ -22,10 +22,12 @@ export class UpdateTenantDto {
 
   @IsString()
   @IsNotEmpty()
+  @MaxLength(60)
   @IsOptional()
   slug?: string;
 
   @IsString()
+  @MaxLength(2048)
   @IsOptional()
   logoUrl?: string;
 }

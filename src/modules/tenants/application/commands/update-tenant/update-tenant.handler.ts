@@ -7,6 +7,8 @@ import { S3Service } from '../../../../media/services/s3.service';
 import getSymbolFromCurrency from 'currency-symbol-map';
 import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
+import { isUniqueViolation } from '../../../../../common/errors/database-errors';
+import { slugify } from '../../../../auth/domain/slugify';
 
 @CommandHandler(UpdateTenantCommand)
 export class UpdateTenantHandler implements ICommandHandler<UpdateTenantCommand> {
@@ -24,11 +26,16 @@ export class UpdateTenantHandler implements ICommandHandler<UpdateTenantCommand>
       throw new AppException(ErrorCode.TenantNotFound, 'Tienda no encontrada.', HttpStatus.NOT_FOUND, { id });
     }
 
+    let previousLogoToDelete: string | null = null;
+
     if (input.name !== undefined) {
       tenant.name = input.name;
     }
     if (input.slug !== undefined) {
-      const cleanSlug = input.slug.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+      const cleanSlug = slugify(input.slug);
+      if (!cleanSlug) {
+        throw new AppException(ErrorCode.TenantSlugInvalid, 'El identificador de la tienda debe tener letras o números.', HttpStatus.BAD_REQUEST);
+      }
       const existingSlugTenant = await this.entityManager.findOne(Tenant, {
         where: { slug: cleanSlug, id: Not(id) },
       });
@@ -43,14 +50,8 @@ export class UpdateTenantHandler implements ICommandHandler<UpdateTenantCommand>
         // El logo debe vivir en el espacio de almacenamiento del propio tenant
         this.s3Service.assertBelongsToTenant(id, newLogoUrl);
       }
-      // If logo changed and there was an old logo in the bucket, delete the previous file
-      if (tenant.logoUrl && tenant.logoUrl !== newLogoUrl && this.s3Service.belongsToTenant(id, tenant.logoUrl)) {
-        try {
-          this.logger.log(`Deleting previous tenant logo from S3/bucket: ${tenant.logoUrl}`);
-          await this.s3Service.deleteFile(tenant.logoUrl);
-        } catch (err) {
-          this.logger.warn(`Failed to delete previous logo from S3 bucket: ${err}`);
-        }
+      if (tenant.logoUrl !== newLogoUrl && tenant.logoUrl && this.s3Service.belongsToTenant(id, tenant.logoUrl)) {
+        previousLogoToDelete = tenant.logoUrl;
       }
       tenant.logoUrl = newLogoUrl;
     }
@@ -66,6 +67,23 @@ export class UpdateTenantHandler implements ICommandHandler<UpdateTenantCommand>
       tenant.timezone = input.timezone;
     }
 
-    return this.entityManager.save(Tenant, tenant);
+    const saved = await this.entityManager.save(Tenant, tenant).catch((error: unknown) => {
+      // Dos cambios de slug simultáneos pasan la comprobación previa a la vez
+      if (isUniqueViolation(error)) {
+        throw new AppException(ErrorCode.TenantSlugTaken, `El identificador "${tenant.slug}" ya está en uso por otra tienda`, HttpStatus.CONFLICT, { slug: tenant.slug });
+      }
+      throw error;
+    });
+
+    // El archivo anterior se borra solo cuando el cambio ya quedó guardado: si falla el guardado, el logo vigente sigue existiendo
+    if (previousLogoToDelete) {
+      try {
+        this.logger.log(`Deleting previous tenant logo from S3/bucket: ${previousLogoToDelete}`);
+        await this.s3Service.deleteFile(previousLogoToDelete);
+      } catch (err) {
+        this.logger.warn(`Failed to delete previous logo from S3 bucket: ${err}`);
+      }
+    }
+    return saved;
   }
 }
