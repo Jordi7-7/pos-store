@@ -7,28 +7,112 @@ import { CashSession } from '../../../domain/entities/cash-session.entity';
 import { Sale } from '../../../domain/entities/sale.entity';
 import { Expense } from '../../../domain/entities/expense.entity';
 import { Refund } from '../../../domain/entities/refund.entity';
-import { PaymentMethod } from '../../../domain/entities/sale-payment.entity';
-import { cashDifference, expectedCashBalance } from '../../../domain/services/cash-closing';
+import { cashDifference, expectedCashBalance, summarizeCashSession } from '../../../domain/services/cash-closing';
 import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
+import {
+  EXPENSE_RELATIONS,
+  EXPENSE_SELECT,
+  REFUND_RELATIONS,
+  REFUND_SELECT,
+  SALE_RELATIONS,
+  SALE_SELECT,
+} from './cash-session-details.loaders';
+import {
+  toAmount,
+  toExpenseDetail,
+  toNullableAmount,
+  toRefundDetail,
+  toSaleDetail,
+  toSessionHeader,
+} from './cash-session-details.mapper';
 
 @QueryHandler(GetCashSessionDetailsQuery)
 export class GetCashSessionDetailsHandler implements IQueryHandler<GetCashSessionDetailsQuery> {
   constructor(
     @InjectRepository(CashSession)
-    private readonly cashSessionRepository: Repository<CashSession>,
+    private readonly cashSessions: Repository<CashSession>,
     @InjectRepository(Sale)
-    private readonly saleRepository: Repository<Sale>,
+    private readonly sales: Repository<Sale>,
     @InjectRepository(Expense)
-    private readonly expenseRepository: Repository<Expense>,
+    private readonly expenses: Repository<Expense>,
     @InjectRepository(Refund)
-    private readonly refundRepository: Repository<Refund>,
+    private readonly refunds: Repository<Refund>,
   ) {}
 
   async execute(query: GetCashSessionDetailsQuery) {
     const { tenantId, sessionId } = query;
 
-    const session = await this.cashSessionRepository
+    const session = await this.findSession(tenantId, sessionId);
+
+    const [sales, expenses, refunds] = await Promise.all([
+      this.sales.find({
+        where: { cashSessionId: sessionId, tenantId },
+        withDeleted: true,
+        select: SALE_SELECT,
+        relations: SALE_RELATIONS,
+        order: { createdAt: 'DESC' },
+      }),
+      this.expenses.find({
+        where: { cashSessionId: sessionId, tenantId },
+        select: EXPENSE_SELECT,
+        relations: EXPENSE_RELATIONS,
+        order: { createdAt: 'DESC' },
+      }),
+      this.refunds.find({
+        where: { cashSessionId: sessionId, tenantId },
+        withDeleted: true,
+        select: REFUND_SELECT,
+        relations: REFUND_RELATIONS,
+        order: { createdAt: 'DESC' },
+      }),
+    ]);
+
+    const totals = summarizeCashSession({
+      sales: sales.map((sale) => ({
+        total: sale.total,
+        payments: (sale.payments ?? []).map((payment) => ({ paymentMethod: payment.paymentMethod, amount: payment.amount })),
+      })),
+      expenseAmounts: expenses.map((expense) => expense.amount),
+      refundAmounts: refunds.map((refund) => refund.totalRefunded),
+    });
+
+    // Una sesión cerrada conserva el arqueo guardado; una abierta lo calcula con lo registrado hasta ahora
+    const openingBalance = toAmount(session.openingBalance);
+    const closingBalance = toNullableAmount(session.closingBalance);
+    const expectedBalance =
+      toNullableAmount(session.expectedBalance) ??
+      expectedCashBalance({
+        openingBalance,
+        cashSales: totals.cashSales,
+        expenses: totals.totalExpenses,
+        refunds: totals.totalRefunds,
+      });
+    const difference =
+      toNullableAmount(session.difference) ??
+      (closingBalance !== null ? cashDifference(closingBalance, expectedBalance) : null);
+
+    return {
+      session: { ...toSessionHeader(session), openingBalance, closingBalance, expectedBalance, difference },
+      kpis: {
+        grossSales: totals.grossSales,
+        netSales: totals.netSales,
+        cashSales: totals.cashSales,
+        cardSales: totals.cardSales,
+        totalExpenses: totals.totalExpenses,
+        totalRefunds: totals.totalRefunds,
+        salesCount: sales.length,
+        expensesCount: expenses.length,
+        refundsCount: refunds.length,
+      },
+      sales: sales.map(toSaleDetail),
+      expenses: expenses.map(toExpenseDetail),
+      refunds: refunds.map(toRefundDetail),
+    };
+  }
+
+  private async findSession(tenantId: string, sessionId: string): Promise<CashSession> {
+    const session = await this.cashSessions
       .createQueryBuilder('cs')
       .innerJoinAndSelect('cs.branch', 'branch')
       .leftJoinAndSelect('cs.user', 'user')
@@ -40,257 +124,6 @@ export class GetCashSessionDetailsHandler implements IQueryHandler<GetCashSessio
     if (!session) {
       throw new AppException(ErrorCode.CashSessionNotFound, 'Sesión de caja no encontrada.', HttpStatus.NOT_FOUND, { sessionId });
     }
-
-    // Ventas de esta sesión (solo datos esenciales para la UI)
-    const rawSales = await this.saleRepository.find({
-      where: { cashSessionId: sessionId, tenantId },
-      withDeleted: true,
-      select: {
-        id: true,
-        invoiceNumber: true,
-        subtotal: true,
-        total: true,
-        discountAmount: true,
-        itemsDiscountAmount: true,
-        globalDiscountAmount: true,
-        discountType: true,
-        discountRate: true,
-        status: true,
-        createdAt: true,
-        customer: {
-          id: true,
-          name: true,
-          identityNumber: true,
-        },
-        user: {
-          id: true,
-          name: true,
-        },
-        payments: {
-          id: true,
-          paymentMethod: true,
-          amount: true,
-        },
-        items: {
-          id: true,
-          variantId: true,
-          quantity: true,
-          price: true,
-          subtotal: true,
-          total: true,
-          discountAmount: true,
-          discountType: true,
-          discountRate: true,
-          globalDiscountAmount: true,
-          variant: {
-            id: true,
-            sku: true,
-            product: {
-              id: true,
-              name: true,
-            },
-            attributeValues: {
-              id: true,
-              value: true,
-            },
-          },
-        },
-      },
-      relations: {
-        customer: true,
-        user: true,
-        payments: true,
-        items: {
-          variant: {
-            product: true,
-            attributeValues: true,
-          },
-        },
-      },
-      order: { createdAt: 'DESC' },
-    });
-
-    // Gastos de esta sesión
-    const expenses = await this.expenseRepository.find({
-      where: { cashSessionId: sessionId, tenantId },
-      select: {
-        id: true,
-        description: true,
-        amount: true,
-        category: true,
-        createdAt: true,
-        user: {
-          id: true,
-          name: true,
-        },
-      },
-      relations: {
-        user: true,
-      },
-      order: { createdAt: 'DESC' },
-    });
-
-    // Devoluciones procesadas durante esta sesión (solo datos esenciales)
-    const rawRefunds = await this.refundRepository.find({
-      where: { cashSessionId: sessionId, tenantId },
-      withDeleted: true,
-      select: {
-        id: true,
-        reason: true,
-        totalRefunded: true,
-        createdAt: true,
-        user: {
-          id: true,
-          name: true,
-        },
-        sale: {
-          id: true,
-          invoiceNumber: true,
-        },
-        items: {
-          id: true,
-          quantity: true,
-          priceRefunded: true,
-          variant: {
-            id: true,
-            sku: true,
-            product: {
-              id: true,
-              name: true,
-            },
-          },
-        },
-      },
-      relations: {
-        user: true,
-        sale: true,
-        items: {
-          variant: {
-            product: true,
-          },
-        },
-      },
-      order: { createdAt: 'DESC' },
-    });
-
-    // Cálculos de resumen en Backend
-    let grossSales = 0;
-    let cashSales = 0;
-    let cardSales = 0;
-
-    const sales = rawSales.map((s) => {
-      const saleTotal = Number(s.total || 0);
-      grossSales += saleTotal;
-
-      const payments = s.payments || [];
-      if (payments.length > 0) {
-        payments.forEach((p) => {
-          const amt = Number(p.amount || 0);
-          if (p.paymentMethod === PaymentMethod.TARJETA) cardSales += amt;
-          else if (p.paymentMethod === PaymentMethod.EFECTIVO) cashSales += amt;
-        });
-      } else {
-        cashSales += saleTotal;
-      }
-
-      const totalItems = (s.items || []).reduce((acc, it) => acc + Number(it.quantity || 0), 0);
-
-      return {
-        id: s.id,
-        invoiceNumber: s.invoiceNumber,
-        subtotal: Number(s.subtotal || 0),
-        total: saleTotal,
-        discountAmount: Number(s.discountAmount || 0),
-        itemsDiscountAmount: Number(s.itemsDiscountAmount || 0),
-        globalDiscountAmount: Number(s.globalDiscountAmount || 0),
-        discountType: s.discountType,
-        discountRate: s.discountRate !== null ? Number(s.discountRate) : null,
-        status: s.status,
-        createdAt: s.createdAt,
-        customerName: s.customer?.name || 'CONSUMIDOR FINAL',
-        userName: s.user?.name || 'Sin especificar',
-        totalItems,
-        paymentMethod: s.payments?.[0]?.paymentMethod || PaymentMethod.EFECTIVO,
-        payments: s.payments,
-        items: s.items,
-        user: s.user ? { id: s.user.id, name: s.user.name } : undefined,
-        customer: s.customer ? { id: s.customer.id, name: s.customer.name, identityNumber: s.customer.identityNumber } : undefined,
-      };
-    });
-
-    const mappedExpenses = expenses.map((e) => ({
-      id: e.id,
-      description: e.description,
-      amount: Number(e.amount || 0),
-      category: e.category,
-      createdAt: e.createdAt,
-      userName: e.user?.name || 'Sin especificar',
-    }));
-
-    const refunds = rawRefunds.map((r) => ({
-      id: r.id,
-      reason: r.reason,
-      totalRefunded: Number(r.totalRefunded || 0),
-      createdAt: r.createdAt,
-      userName: r.user?.name || 'Sin especificar',
-      sale: r.sale ? { id: r.sale.id, invoiceNumber: r.sale.invoiceNumber } : undefined,
-      items: r.items,
-    }));
-
-    const totalExpenses = mappedExpenses.reduce((acc, e) => acc + Number(e.amount || 0), 0);
-    const totalRefunds = refunds.reduce((acc, r) => acc + Number(r.totalRefunded || 0), 0);
-
-    const netSales = Math.max(grossSales - totalRefunds, 0);
-
-    const openingBalance = Number(session.openingBalance || 0);
-    const closingBalance = session.closingBalance !== null ? Number(session.closingBalance) : null;
-    const expectedBalance = session.expectedBalance !== null 
-      ? Number(session.expectedBalance)
-      : expectedCashBalance({ openingBalance, cashSales, expenses: totalExpenses, refunds: totalRefunds });
-
-    const difference = session.difference !== null 
-      ? Number(session.difference)
-      : (closingBalance !== null ? cashDifference(closingBalance, expectedBalance) : null);
-
-    return {
-      session: {
-        id: session.id,
-        status: session.status,
-        openedAt: session.openedAt,
-        closedAt: session.closedAt,
-        branch: {
-          id: session.branch.id,
-          name: session.branch.name,
-          address: session.branch.address || '',
-        },
-        cashRegister: {
-          id: session.cashRegister.id,
-          name: session.cashRegister.name,
-          code: session.cashRegister.code,
-        },
-        user: {
-          id: session.user.id,
-          name: session.user.name,
-        },
-        openingBalance,
-        closingBalance,
-        expectedBalance,
-        difference,
-      },
-      kpis: {
-        grossSales: Number(grossSales.toFixed(2)),
-        netSales: Number(netSales.toFixed(2)),
-        cashSales: Number(cashSales.toFixed(2)),
-        cardSales: Number(cardSales.toFixed(2)),
-        totalExpenses: Number(totalExpenses.toFixed(2)),
-        totalRefunds: Number(totalRefunds.toFixed(2)),
-        salesCount: sales.length,
-        expensesCount: expenses.length,
-        refundsCount: refunds.length,
-      },
-      sales,
-      expenses: mappedExpenses,
-      refunds,
-    };
+    return session;
   }
 }

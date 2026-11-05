@@ -28,6 +28,10 @@ import { GetDashboardMetricsHandler } from '../../src/modules/dashboard/applicat
 import { GetDashboardMetricsQuery } from '../../src/modules/dashboard/application/queries/get-dashboard-metrics/get-dashboard-metrics.query';
 import { GetCashSessionsHandler } from '../../src/modules/sales/application/queries/get-cash-sessions/get-cash-sessions.handler';
 import { GetCashSessionsQuery } from '../../src/modules/sales/application/queries/get-cash-sessions/get-cash-sessions.query';
+import { GetCashSessionDetailsHandler } from '../../src/modules/sales/application/queries/get-cash-session-details/get-cash-session-details.handler';
+import { GetCashSessionDetailsQuery } from '../../src/modules/sales/application/queries/get-cash-session-details/get-cash-session-details.query';
+import { Expense } from '../../src/modules/sales/domain/entities/expense.entity';
+import { Refund } from '../../src/modules/sales/domain/entities/refund.entity';
 import { Tenant } from '../../src/modules/tenants/domain/entities/tenant.entity';
 import { User } from '../../src/modules/users/domain/entities/user.entity';
 
@@ -269,6 +273,44 @@ describe('Flujo de dinero: venta, devolución y cierre de caja', () => {
       expect(list.length).toBeLessThanOrEqual(100);
     } finally {
       await new CloseCashSessionHandler(db.manager).execute(new CloseCashSessionCommand(tenantId, sessionId, 20));
+    }
+  });
+
+  it('el detalle de la sesión resume ventas, devoluciones y gastos con el arqueo esperado', async () => {
+    const sessionId = await openSession(100);
+    try {
+      const sale = await sell(sessionId, [{ variantId, quantity: 3, price: 10 }], 30);
+      await refund(sale.id, sessionId, 1);
+      await db.getRepository(Expense).save(
+        db.getRepository(Expense).create({ tenantId, branchId, cashSessionId: sessionId, userId, description: 'Bolsas', amount: 5, category: 'OTROS' }),
+      );
+
+      const handler = new GetCashSessionDetailsHandler(
+        db.getRepository(CashSession),
+        db.getRepository(Sale),
+        db.getRepository(Expense),
+        db.getRepository(Refund),
+      );
+      const details = await handler.execute(new GetCashSessionDetailsQuery(tenantId, sessionId));
+
+      expect(details.kpis).toEqual({
+        grossSales: 30,
+        netSales: 20,
+        cashSales: 30,
+        cardSales: 0,
+        totalExpenses: 5,
+        totalRefunds: 10,
+        salesCount: 1,
+        expensesCount: 1,
+        refundsCount: 1,
+      });
+      // 100 apertura + 30 ventas en efectivo - 5 gastos - 10 devolución
+      expect(details.session).toMatchObject({ openingBalance: 100, closingBalance: null, expectedBalance: 115, difference: null });
+      expect(details.sales[0]).toMatchObject({ id: sale.id, total: 30, customerName: 'CONSUMIDOR FINAL', totalItems: 3 });
+      expect(details.refunds[0]).toMatchObject({ totalRefunded: 10, sale: { id: sale.id } });
+      expect(details.expenses[0]).toMatchObject({ amount: 5, description: 'Bolsas' });
+    } finally {
+      await new CloseCashSessionHandler(db.manager).execute(new CloseCashSessionCommand(tenantId, sessionId, 115));
     }
   });
 
