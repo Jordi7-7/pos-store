@@ -52,3 +52,25 @@ describe('Reglas de capas', () => {
     expect(misplaced).toEqual([]);
   });
 });
+
+describe('Contrato de errores', () => {
+  const SRC_DIR = __dirname;
+  const GENERIC_HTTP_EXCEPTION = /new (BadRequest|NotFound|Unauthorized|Forbidden|Conflict)Exception\(/;
+
+  it('el código de producción no lanza excepciones HTTP sin código: usa AppException con ErrorCode', () => {
+    const found = sourceFiles(SRC_DIR)
+      .filter((file) => GENERIC_HTTP_EXCEPTION.test(fs.readFileSync(file, 'utf8')))
+      .map((file) => path.relative(SRC_DIR, file));
+    expect(found).toEqual([]);
+  });
+
+  it('cada AppException declara un ErrorCode del catálogo, no un texto suelto', () => {
+    const found = sourceFiles(SRC_DIR).flatMap((file) => {
+      const source = fs.readFileSync(file, 'utf8');
+      return [...source.matchAll(/new AppException\(\s*([^,\s]+)/g)]
+        .filter((match) => !match[1].startsWith('ErrorCode.') && match[1] !== 'code')
+        .map((match) => `${path.relative(SRC_DIR, file)}: ${match[1]}`);
+    });
+    expect(found).toEqual([]);
+  });
+});

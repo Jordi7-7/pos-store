@@ -85,7 +85,7 @@ describe('AllExceptionsFilter', () => {
     const { status, body } = run(new Error('password=hunter2 connection refused'));
 
     expect(status).toBe(500);
-    expect(body?.code).toBe(ErrorCode.Internal);
+    expect(body?.code).toBe(ErrorCode.InternalError);
     expect(body?.message).toBe('Error interno del servidor.');
     expect(JSON.stringify(body)).not.toContain('hunter2');
   });

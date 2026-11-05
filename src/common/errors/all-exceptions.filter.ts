@@ -60,7 +60,7 @@ function normalize(exception: unknown): NormalizedError {
   if (exception instanceof DomainError) return normalizeDomainError(exception);
   return {
     status: HttpStatus.INTERNAL_SERVER_ERROR,
-    code: ErrorCode.Internal,
+    code: ErrorCode.InternalError,
     // Nunca filtrar detalles internos al cliente.
     message: 'Error interno del servidor.',
   };
