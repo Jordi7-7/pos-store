@@ -3,6 +3,7 @@ import { HttpStatus } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { GetVariantBySkuQuery } from './get-variant-by-sku.query';
 import { ProductVariant } from '../../../domain/entities/product-variant.entity';
+import { VariantLookupResponse } from '../../read-models/pos-variant-response';
 import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
 
@@ -10,7 +11,7 @@ import { ErrorCode } from '../../../../../common/errors/error-codes';
 export class GetVariantBySkuHandler implements IQueryHandler<GetVariantBySkuQuery> {
   constructor(private readonly entityManager: EntityManager) {}
 
-  async execute(query: GetVariantBySkuQuery): Promise<any> {
+  async execute(query: GetVariantBySkuQuery): Promise<VariantLookupResponse> {
     const { tenantId, sku } = query;
     const repo = this.entityManager.getRepository(ProductVariant);
 

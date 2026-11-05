@@ -2,12 +2,13 @@ import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
 import { EntityManager } from 'typeorm';
 import { GetPosVariantsQuery } from './get-pos-variants.query';
 import { ProductVariant } from '../../../domain/entities/product-variant.entity';
+import { PosVariantListItem } from '../../read-models/pos-variant-response';
 
 @QueryHandler(GetPosVariantsQuery)
 export class GetPosVariantsHandler implements IQueryHandler<GetPosVariantsQuery> {
   constructor(private readonly entityManager: EntityManager) {}
 
-  async execute(query: GetPosVariantsQuery): Promise<any[]> {
+  async execute(query: GetPosVariantsQuery): Promise<PosVariantListItem[]> {
     const { tenantId, branchId } = query;
     const repo = this.entityManager.getRepository(ProductVariant);
 

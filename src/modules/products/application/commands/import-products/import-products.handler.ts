@@ -17,6 +17,10 @@ import { ProductType } from '../../../domain/enums/product-type.enum';
 import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
 
+export interface ImportProductsResult {
+  importedCount: number;
+}
+
 @CommandHandler(ImportProductsCommand)
 
 export class ImportProductsHandler implements ICommandHandler<ImportProductsCommand> {
@@ -27,7 +31,7 @@ export class ImportProductsHandler implements ICommandHandler<ImportProductsComm
     private readonly redisService: RedisService,
   ) {}
 
-  async execute(command: ImportProductsCommand): Promise<{ importedCount: number }> {
+  async execute(command: ImportProductsCommand): Promise<ImportProductsResult> {
     const { tenantId, userId, branchId, items } = command;
     this.logger.log(`Executing bulk product import: ${items.length} items for Tenant: ${tenantId}`);
 

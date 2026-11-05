@@ -6,11 +6,15 @@ import { ProductVariant } from '../../../domain/entities/product-variant.entity'
 import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
 
+export interface ImportValidationResult {
+  errors: Record<string, string>;
+}
+
 @QueryHandler(ValidateImportProductsQuery)
 export class ValidateImportProductsHandler implements IQueryHandler<ValidateImportProductsQuery> {
   constructor(private readonly entityManager: EntityManager) {}
 
-  async execute(query: ValidateImportProductsQuery): Promise<{ errors: Record<string, string> }> {
+  async execute(query: ValidateImportProductsQuery): Promise<ImportValidationResult> {
     const { tenantId, items } = query;
     const variantRepo = this.entityManager.getRepository(ProductVariant);
     const skus = items.map((it) => it.sku.trim());

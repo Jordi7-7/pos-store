@@ -34,6 +34,7 @@ import { GetInventoryMovementsByVariantHandler } from './application/queries/get
 import { GetTagsHandler } from './application/queries/get-tags/get-tags.handler';
 import { CreateTagHandler } from './application/commands/create-tag/create-tag.handler';
 import { UpdateVariantTagsHandler } from './application/commands/update-variant-tags/update-variant-tags.handler';
+import { FindPosVariantsBySkuHandler } from './application/queries/find-pos-variants-by-sku/find-pos-variants-by-sku.handler';
 import { GetPosVariantBySkuHandler } from './application/queries/get-pos-variant-by-sku/get-pos-variant-by-sku.handler';
 import { GetPosVariantsByBaseSkuHandler } from './application/queries/get-pos-variants-by-base-sku/get-pos-variants-by-base-sku.handler';
 import { GetPosVariantsHandler } from './application/queries/get-pos-variants/get-pos-variants.handler';
@@ -80,6 +81,7 @@ import { ProductsController } from './infrastructure/controllers/products.contro
     GetAttributesHandler,
     GetInventoryMovementsByVariantHandler,
     GetTagsHandler,
+    FindPosVariantsBySkuHandler,
     CreateTagHandler,
     UpdateVariantTagsHandler,
     GetPosVariantBySkuHandler,

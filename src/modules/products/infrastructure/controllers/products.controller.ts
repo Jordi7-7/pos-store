@@ -14,8 +14,6 @@ import { GetCategoriesQuery } from '../../application/queries/get-categories/get
 import { GetProductsQuery } from '../../application/queries/get-products/get-products.query';
 import { GetProductByIdQuery } from '../../application/queries/get-product-by-id/get-product-by-id.query';
 import { GetVariantBySkuQuery } from '../../application/queries/get-variant-by-sku/get-variant-by-sku.query';
-import { GetPosVariantBySkuQuery } from '../../application/queries/get-pos-variant-by-sku/get-pos-variant-by-sku.query';
-import { GetPosVariantsByBaseSkuQuery } from '../../application/queries/get-pos-variants-by-base-sku/get-pos-variants-by-base-sku.query';
 import { GetPosVariantsQuery } from '../../application/queries/get-pos-variants/get-pos-variants.query';
 import { UpdateProductDto } from '../dtos/update-product.dto';
 import { UpdateProductCommand } from '../../application/commands/update-product/update-product.command';
@@ -36,6 +34,22 @@ import { GetInventoryMovementsByVariantQuery } from '../../application/queries/g
 import { GetTagsQuery } from '../../application/queries/get-tags/get-tags.query';
 import { CreateTagCommand } from '../../application/commands/create-tag/create-tag.command';
 import { UpdateVariantTagsCommand } from '../../application/commands/update-variant-tags/update-variant-tags.command';
+import { Product } from '../../domain/entities/product.entity';
+import { ProductVariant } from '../../domain/entities/product-variant.entity';
+import { Category } from '../../domain/entities/category.entity';
+import { Attribute } from '../../domain/entities/attribute.entity';
+import { AttributeValue } from '../../domain/entities/attribute-value.entity';
+import { Tag } from '../../domain/entities/tag.entity';
+import { PaginatedProductsResponseDto } from '../../application/read-models/product-response';
+import { PosVariantListItem, VariantLookupResponse } from '../../application/read-models/pos-variant-response';
+import { FindPosVariantsBySkuQuery } from '../../application/queries/find-pos-variants-by-sku/find-pos-variants-by-sku.query';
+import { PosSkuSearchResult } from '../../application/queries/find-pos-variants-by-sku/find-pos-variants-by-sku.handler';
+import { InventoryMovementsPage } from '../../application/queries/get-inventory-movements-by-variant/get-inventory-movements-by-variant.handler';
+import { AdjustStockResult } from '../../application/commands/adjust-stock/adjust-stock.handler';
+import { ImportValidationResult } from '../../application/queries/validate-import-products/validate-import-products.handler';
+import { ImportProductsResult } from '../../application/commands/import-products/import-products.handler';
+import { CreateTagDto, UpdateVariantTagsDto } from '../dtos/tag.dto';
+import { parseLimit, parsePage } from '../../../../common/utils/pagination';
 import { RequirePermissions, RequireAnyPermissions } from '../../../auth/decorators/permissions.decorator';
 import { APP_PERMISSIONS } from '../../../../common/enums/permissions.enum';
 
@@ -52,7 +66,7 @@ export class ProductsController {
     @CurrentUser('tenantId') tenantId: string,
     @Body() dto: CreateSimpleProductDto,
   ) {
-    return this.commandBus.execute(
+    return this.commandBus.execute<CreateSimpleProductCommand, Product>(
       new CreateSimpleProductCommand(
         tenantId,
         dto.name,
@@ -75,7 +89,7 @@ export class ProductsController {
     @CurrentUser('tenantId') tenantId: string,
     @Body() dto: CreateVariableProductDto,
   ) {
-    return this.commandBus.execute(
+    return this.commandBus.execute<CreateVariableProductCommand, Product>(
       new CreateVariableProductCommand(
         tenantId,
         dto.name,
@@ -98,7 +112,7 @@ export class ProductsController {
     @Param('productId') productId: string,
     @Body() dto: ProductVariantDto,
   ) {
-    return this.commandBus.execute(
+    return this.commandBus.execute<CreateVariantCommand, ProductVariant>(
       new CreateVariantCommand(tenantId, productId, dto),
     );
   }
@@ -109,7 +123,7 @@ export class ProductsController {
     @CurrentUser('tenantId') tenantId: string,
     @Body() dto: CreateCategoryDto,
   ) {
-    return this.commandBus.execute(
+    return this.commandBus.execute<CreateCategoryCommand, Category>(
       new CreateCategoryCommand(tenantId, dto.name),
     );
   }
@@ -117,7 +131,7 @@ export class ProductsController {
   @Get('categories')
   @RequirePermissions(APP_PERMISSIONS.CATEGORIES_GET)
   async findCategories(@CurrentUser('tenantId') tenantId: string) {
-    return this.queryBus.execute(new GetCategoriesQuery(tenantId));
+    return this.queryBus.execute<GetCategoriesQuery, Category[]>(new GetCategoriesQuery(tenantId));
   }
 
   @Post('attributes')
@@ -126,7 +140,7 @@ export class ProductsController {
     @CurrentUser('tenantId') tenantId: string,
     @Body() dto: CreateAttributeDto,
   ) {
-    return this.commandBus.execute(
+    return this.commandBus.execute<CreateAttributeCommand, Attribute>(
       new CreateAttributeCommand(tenantId, dto.name),
     );
   }
@@ -137,7 +151,7 @@ export class ProductsController {
     @CurrentUser('tenantId') tenantId: string,
     @Body() dto: CreateAttributeValueDto,
   ) {
-    return this.commandBus.execute(
+    return this.commandBus.execute<CreateAttributeValueCommand, AttributeValue>(
       new CreateAttributeValueCommand(tenantId, dto.attributeId, dto.value),
     );
   }
@@ -145,7 +159,7 @@ export class ProductsController {
   @Get('attributes')
   @RequirePermissions(APP_PERMISSIONS.ATTRIBUTES_GET)
   async findAttributes(@CurrentUser('tenantId') tenantId: string) {
-    return this.queryBus.execute(new GetAttributesQuery(tenantId));
+    return this.queryBus.execute<GetAttributesQuery, Attribute[]>(new GetAttributesQuery(tenantId));
   }
 
   @Get()
@@ -164,7 +178,7 @@ export class ProductsController {
     const b = branchId || undefined;
     const inStock = inStockOnly === 'true' || inStockOnly === true;
 
-    return this.queryBus.execute(
+    return this.queryBus.execute<GetProductsQuery, PaginatedProductsResponseDto>(
       new GetProductsQuery(tenantId, p, l, search, type, b, inStock),
     );
   }
@@ -180,11 +194,11 @@ export class ProductsController {
     @Query('limit') limit?: number,
     @Query('branchId') branchId?: string,
   ) {
-    return this.queryBus.execute(new GetInventoryMovementsByVariantQuery(
+    return this.queryBus.execute<GetInventoryMovementsByVariantQuery, InventoryMovementsPage>(new GetInventoryMovementsByVariantQuery(
       tenantId,
       variantId,
-      page ? Number(page) : 1,
-      limit ? Number(limit) : 10,
+      parsePage(page),
+      parseLimit(limit),
       branchId || undefined,
       userId,
       isOwner,
@@ -198,7 +212,7 @@ export class ProductsController {
     @CurrentUser('sub') userId: string,
     @Body() dto: AdjustStockDto,
   ) {
-    return this.commandBus.execute(
+    return this.commandBus.execute<AdjustStockCommand, AdjustStockResult>(
       new AdjustStockCommand(
         tenantId,
         userId,
@@ -216,16 +230,16 @@ export class ProductsController {
   @Get('tags')
   @RequirePermissions(APP_PERMISSIONS.PRODUCTS_GET)
   async findTags(@CurrentUser('tenantId') tenantId: string) {
-    return this.queryBus.execute(new GetTagsQuery(tenantId));
+    return this.queryBus.execute<GetTagsQuery, Tag[]>(new GetTagsQuery(tenantId));
   }
 
   @Post('tags')
   @RequirePermissions(APP_PERMISSIONS.PRODUCTS_CREATE)
   async createTag(
     @CurrentUser('tenantId') tenantId: string,
-    @Body() body: { name: string },
+    @Body() dto: CreateTagDto,
   ) {
-    return this.commandBus.execute(new CreateTagCommand(tenantId, body.name));
+    return this.commandBus.execute<CreateTagCommand, Tag>(new CreateTagCommand(tenantId, dto.name));
   }
 
   @Get('variant/sku/:sku')
@@ -238,7 +252,7 @@ export class ProductsController {
     @CurrentUser('tenantId') tenantId: string,
     @Param('sku') sku: string,
   ) {
-    return this.queryBus.execute(new GetVariantBySkuQuery(tenantId, sku));
+    return this.queryBus.execute<GetVariantBySkuQuery, VariantLookupResponse>(new GetVariantBySkuQuery(tenantId, sku));
   }
 
   @Get('pos/variant/sku/:sku')
@@ -248,18 +262,9 @@ export class ProductsController {
     @Param('sku') sku: string,
     @Query('branchId') branchId: string,
   ) {
-    const directVariants = await this.queryBus.execute(new GetPosVariantBySkuQuery(tenantId, sku, branchId));
-    if (directVariants && directVariants.length > 0) {
-      return directVariants;
-    }
-
-    // Fallback: If not found by variant SKU/Barcode, search by baseSku in VARIABLE products
-    const variableProduct = await this.queryBus.execute(new GetPosVariantsByBaseSkuQuery(tenantId, sku, branchId));
-    if (variableProduct) {
-      return variableProduct;
-    }
-
-    return [];
+    return this.queryBus.execute<FindPosVariantsBySkuQuery, PosSkuSearchResult>(
+      new FindPosVariantsBySkuQuery(tenantId, sku, branchId),
+    );
   }
 
   @Get('pos/variants')
@@ -268,7 +273,7 @@ export class ProductsController {
     @CurrentUser('tenantId') tenantId: string,
     @Query('branchId') branchId: string,
   ) {
-    return this.queryBus.execute(new GetPosVariantsQuery(tenantId, branchId));
+    return this.queryBus.execute<GetPosVariantsQuery, PosVariantListItem[]>(new GetPosVariantsQuery(tenantId, branchId));
   }
 
   @Get(':id')
@@ -277,7 +282,7 @@ export class ProductsController {
     @CurrentUser('tenantId') tenantId: string,
     @Param('id') id: string,
   ) {
-    return this.queryBus.execute(new GetProductByIdQuery(tenantId, id));
+    return this.queryBus.execute<GetProductByIdQuery, Product>(new GetProductByIdQuery(tenantId, id));
   }
 
   @Put(':id/simple')
@@ -287,7 +292,7 @@ export class ProductsController {
     @Param('id') id: string,
     @Body() dto: UpdateSimpleProductDto,
   ) {
-    return this.commandBus.execute(
+    return this.commandBus.execute<UpdateSimpleProductCommand, Product>(
       new UpdateSimpleProductCommand(
         tenantId,
         id,
@@ -311,7 +316,7 @@ export class ProductsController {
     @Param('id') id: string,
     @Body() dto: UpdateProductDto,
   ) {
-    return this.commandBus.execute(
+    return this.commandBus.execute<UpdateProductCommand, Product>(
       new UpdateProductCommand(tenantId, id, dto.name, dto.description, dto.imageIds, dto.categoryId, dto.baseSku),
     );
   }
@@ -324,7 +329,7 @@ export class ProductsController {
     @Param('variantId') variantId: string,
     @Body() dto: UpdateVariantDto,
   ) {
-    return this.commandBus.execute(
+    return this.commandBus.execute<UpdateVariantCommand, ProductVariant>(
       new UpdateVariantCommand(
         tenantId,
         variantId,
@@ -344,7 +349,7 @@ export class ProductsController {
     @CurrentUser('tenantId') tenantId: string,
     @Param('id') id: string,
   ) {
-    await this.commandBus.execute(new DeleteProductCommand(tenantId, id));
+    await this.commandBus.execute<DeleteProductCommand, void>(new DeleteProductCommand(tenantId, id));
     return { success: true, message: 'Producto eliminado correctamente' };
   }
 
@@ -354,7 +359,7 @@ export class ProductsController {
     @CurrentUser('tenantId') tenantId: string,
     @Param('variantId') variantId: string,
   ) {
-    await this.commandBus.execute(new DeleteVariantCommand(tenantId, variantId));
+    await this.commandBus.execute<DeleteVariantCommand, void>(new DeleteVariantCommand(tenantId, variantId));
     return { success: true, message: 'Variante eliminada correctamente' };
   }
 
@@ -363,10 +368,10 @@ export class ProductsController {
   async updateVariantTags(
     @CurrentUser('tenantId') tenantId: string,
     @Param('variantId') variantId: string,
-    @Body() body: { tagIds: string[] },
+    @Body() dto: UpdateVariantTagsDto,
   ) {
-    return this.commandBus.execute(
-      new UpdateVariantTagsCommand(tenantId, variantId, body.tagIds),
+    return this.commandBus.execute<UpdateVariantTagsCommand, ProductVariant>(
+      new UpdateVariantTagsCommand(tenantId, variantId, dto.tagIds),
     );
   }
 
@@ -376,7 +381,7 @@ export class ProductsController {
     @CurrentUser('tenantId') tenantId: string,
     @Body() dto: ValidateImportProductsDto,
   ) {
-    return this.queryBus.execute(
+    return this.queryBus.execute<ValidateImportProductsQuery, ImportValidationResult>(
       new ValidateImportProductsQuery(tenantId, dto.items),
     );
   }
@@ -388,7 +393,7 @@ export class ProductsController {
     @CurrentUser('sub') userId: string,
     @Body() dto: ImportProductsDto,
   ) {
-    return this.commandBus.execute(
+    return this.commandBus.execute<ImportProductsCommand, ImportProductsResult>(
       new ImportProductsCommand(tenantId, userId, dto.branchId, dto.items),
     );
   }

@@ -5,6 +5,11 @@ import { InventoryMovement } from '../../../domain/entities/inventory-movement.e
 import { RedisService } from '../../../../../common/redis/redis.service';
 import { assertUserCanAccessBranch } from '../../../../../common/security/branch-access.helper';
 
+export interface InventoryMovementsPage {
+  data: InventoryMovement[];
+  meta: { total: number; page: number; limit: number; totalPages: number };
+}
+
 @QueryHandler(GetInventoryMovementsByVariantQuery)
 export class GetInventoryMovementsByVariantHandler
   implements IQueryHandler<GetInventoryMovementsByVariantQuery> {
@@ -13,7 +18,7 @@ export class GetInventoryMovementsByVariantHandler
     private readonly redisService: RedisService,
   ) {}
 
-  async execute(query: GetInventoryMovementsByVariantQuery) {
+  async execute(query: GetInventoryMovementsByVariantQuery): Promise<InventoryMovementsPage> {
     const { tenantId, variantId, page, limit, branchId, userId, isOwner } = query;
     const repo = this.entityManager.getRepository(InventoryMovement);
 
