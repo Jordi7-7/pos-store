@@ -1,35 +1,15 @@
-import { Module, NestModule, MiddlewareConsumer, RequestMethod } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { validateEnv } from './config/env.validation';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { APP_GUARD } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { TenantMiddleware } from './common/tenant/tenant.middleware';
+import { databaseConnectionOptions } from './config/database.options';
 
 // Import Guards
 import { AuthGuard } from './modules/auth/guards/auth.guard';
 import { RolesGuard } from './modules/auth/guards/roles.guard';
-
-// Import Entities
-import { Tenant } from './modules/tenants/domain/entities/tenant.entity';
-import { User } from './modules/users/domain/entities/user.entity';
-import { Branch } from './modules/branches/domain/entities/branch.entity';
-import { Customer } from './modules/customers/domain/entities/customer.entity';
-import { Product } from './modules/products/domain/entities/product.entity';
-import { ProductVariant } from './modules/products/domain/entities/product-variant.entity';
-import { Attribute } from './modules/products/domain/entities/attribute.entity';
-import { AttributeValue } from './modules/products/domain/entities/attribute-value.entity';
-import { ProductStock } from './modules/products/domain/entities/product-stock.entity';
-import { InventoryMovement } from './modules/products/domain/entities/inventory-movement.entity';
-import { Tag } from './modules/products/domain/entities/tag.entity';
-import { CashSession } from './modules/sales/domain/entities/cash-session.entity';
-import { CashRegister } from './modules/sales/domain/entities/cash-register.entity';
-import { Sale } from './modules/sales/domain/entities/sale.entity';
-import { SaleItem } from './modules/sales/domain/entities/sale-item.entity';
-import { SalePayment } from './modules/sales/domain/entities/sale-payment.entity';
-import { Expense } from './modules/sales/domain/entities/expense.entity';
-import { Refund } from './modules/sales/domain/entities/refund.entity';
-import { RefundItem } from './modules/sales/domain/entities/refund-item.entity';
 
 // Import Feature Modules
 import { RedisModule } from './common/redis/redis.module';
@@ -37,22 +17,14 @@ import { AuthModule } from './modules/auth/auth.module';
 import { ProductsModule } from './modules/products/products.module';
 import { SalesModule } from './modules/sales/sales.module';
 import { UsersModule } from './modules/users/users.module';
-import { Supplier } from './modules/purchases/domain/entities/supplier.entity';
-import { PurchaseOrder } from './modules/purchases/domain/entities/purchase-order.entity';
 import { PurchasesModule } from './modules/purchases/purchases.module';
-import { ProductImage } from './modules/products/domain/entities/product-image.entity';
 import { MediaModule } from './modules/media/media.module';
 import { BranchesModule } from './modules/branches/branches.module';
 import { CustomersModule } from './modules/customers/customers.module';
-import { Category } from './modules/products/domain/entities/category.entity';
-import { ProductBatch } from './modules/products/domain/entities/product-batch.entity';
-import { Batch } from './modules/batches/domain/entities/batch.entity';
 import { BatchesModule } from './modules/batches/batches.module';
-import { PurchaseOrderItem } from './modules/purchases/domain/entities/purchase-order-item.entity';
 import { TenantsModule } from './modules/tenants/tenants.module';
 import { ReportsModule } from './modules/reports/reports.module';
 
-import { Role } from './modules/roles/domain/entities/role.entity';
 import { RolesModule } from './modules/roles/roles.module';
 import { PermissionsGuard } from './modules/auth/guards/permissions.guard';
 
@@ -60,44 +32,9 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({ isGlobal: true, validate: validateEnv }),
     TypeOrmModule.forRoot({
-      type: 'postgres',
-      host: process.env.DB_HOST || 'localhost',
-      port: parseInt(process.env.DB_PORT || '5432', 10),
-      username: process.env.DB_USERNAME || 'postgres',
-      password: process.env.DB_PASSWORD || 'postgres',
-      database: process.env.DB_DATABASE || 'pos_store',
-      entities: [
-        Tenant,
-        User,
-        Role,
-        Branch,
-        Customer,
-        Product,
-        ProductVariant,
-        Attribute,
-        AttributeValue,
-        ProductStock,
-        InventoryMovement,
-        CashSession,
-        CashRegister,
-        Sale,
-        SaleItem,
-        SalePayment,
-        Expense,
-        Refund,
-        RefundItem,
-        Supplier,
-        PurchaseOrder,
-        ProductImage,
-        Category,
-        ProductBatch,
-        Batch,
-        PurchaseOrderItem,
-        Tag,
-      ],
-      synchronize: false,
+      ...databaseConnectionOptions(),
       logging: process.env.DB_LOGGING === 'all' ? true : process.env.DB_LOGGING === 'true' ? ['error', 'warn', 'migration'] : false,
     }),
     RedisModule,
@@ -132,19 +69,4 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
     },
   ],
 })
-export class AppModule implements NestModule {
-  configure(consumer: MiddlewareConsumer) {
-    consumer
-      .apply(TenantMiddleware)
-      .exclude(
-        { path: '/', method: RequestMethod.GET },
-        { path: '/health', method: RequestMethod.GET },
-        { path: '/auth/onboard', method: RequestMethod.POST },
-        { path: '/auth/login', method: RequestMethod.POST },
-        { path: '/auth/pin-login', method: RequestMethod.POST },
-        { path: '/auth/logout', method: RequestMethod.POST },
-        { path: '/auth/refresh', method: RequestMethod.POST },
-      )
-      .forRoutes('*');
-  }
-}
+export class AppModule {}
