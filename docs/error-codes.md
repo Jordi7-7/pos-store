@@ -52,6 +52,7 @@ Forma de toda respuesta de error:
 | `CASH_SESSION_REQUIRED` | 400 | sales | Debes tener una sesión de caja abierta para registrar una venta. | — |
 | `CATEGORY_NAME_TAKEN` | 409 | products | La categoría "{name}" ya existe. | `name` |
 | `CATEGORY_NOT_FOUND` | 404 | products | Categoría no encontrada. | `categoryId` |
+| `CONSUMER_FINAL_PROTECTED` | 409 | customers | El CONSUMIDOR FINAL es el comprador por defecto de las ventas y no se puede eliminar. | — |
 | `CUSTOMER_IDENTITY_TAKEN` | 409 | customers | Ya existe un cliente con el documento {input.identityNumber}. | `identityNumber` |
 | `CUSTOMER_NOT_FOUND` | 404 | customers, sales | Cliente no encontrado. | `customerId`, `id` |
 | `DEFAULT_SUPPLIER_NOT_FOUND` | 404 | purchases | No se encontró un proveedor configurado para este tenant. | — |
@@ -59,6 +60,7 @@ Forma de toda respuesta de error:
 | `DUPLICATE_VARIANT_COMBINATION` | 409 | products | No se permiten múltiples variantes con la misma combinación de atributos en un mismo producto. | — |
 | `EMAIL_TAKEN` | 409 | auth, users | Ese correo ya está registrado en otra cuenta. | `email` |
 | `EMPTY_PURCHASE` | 400 | purchases | La compra debe tener al menos un producto. | — |
+| `IDEMPOTENCY_KEY_REUSED` | 409 | sales | Ese identificador ya se usó en otra venta distinta. | — |
 | `IMAGES_NOT_FOUND` | 404 | products | Una o más imágenes de la variante no existen. | — |
 | `IMPORT_EMPTY` | 400 | products, purchases | No se proporcionaron registros para importar. | — |
 | `IMPORT_LIMIT_EXCEEDED` | 400 | products, purchases | El archivo contiene {items.length} filas. El límite máximo permitido por importación es de 3,000 registros. | `max`, `received` |

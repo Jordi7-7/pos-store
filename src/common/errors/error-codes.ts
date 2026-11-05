@@ -63,6 +63,8 @@ export enum ErrorCode {
   BranchNotFound = 'BRANCH_NOT_FOUND',
   BranchNameTaken = 'BRANCH_NAME_TAKEN',
   CustomerNotFound = 'CUSTOMER_NOT_FOUND',
+  ConsumerFinalProtected = 'CONSUMER_FINAL_PROTECTED',
+  IdempotencyKeyReused = 'IDEMPOTENCY_KEY_REUSED',
   CustomerIdentityTaken = 'CUSTOMER_IDENTITY_TAKEN',
 
   // Catálogo

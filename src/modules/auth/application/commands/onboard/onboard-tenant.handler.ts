@@ -13,6 +13,7 @@ import { slugify } from '../../../domain/slugify';
 import { isUniqueViolation } from '../../../../../common/errors/database-errors';
 import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
+import { CONSUMER_FINAL_EMAIL, CONSUMER_FINAL_IDENTITY, CONSUMER_FINAL_NAME, CONSUMER_FINAL_PHONE } from '../../../../customers/domain/consumer-final';
 
 @CommandHandler(OnboardTenantCommand)
 export class OnboardTenantHandler implements ICommandHandler<OnboardTenantCommand> {
@@ -151,10 +152,10 @@ export class OnboardTenantHandler implements ICommandHandler<OnboardTenantComman
       // E. Create Default Customer (Consumidor Final)
       const customer = new Customer();
       customer.tenantId = savedTenant.id;
-      customer.identityNumber = '9999999999999';
-      customer.name = 'CONSUMIDOR FINAL';
-      customer.email = 'consumidorfinal@example.com';
-      customer.phone = '9999999999';
+      customer.identityNumber = CONSUMER_FINAL_IDENTITY;
+      customer.name = CONSUMER_FINAL_NAME;
+      customer.email = CONSUMER_FINAL_EMAIL;
+      customer.phone = CONSUMER_FINAL_PHONE;
       await transactionalManager.save(customer);
 
       this.logger.log(`Onboarding successful. Created Tenant: ${savedTenant.name} (ID: ${savedTenant.id}), owner user ID: ${savedUser.id}`);

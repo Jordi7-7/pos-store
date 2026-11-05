@@ -4,8 +4,9 @@ import { Expense } from '../../../domain/entities/expense.entity';
 import { Refund } from '../../../domain/entities/refund.entity';
 import { PaymentMethod } from '../../../domain/entities/sale-payment.entity';
 import { Sale } from '../../../domain/entities/sale.entity';
+import { CONSUMER_FINAL_NAME } from '../../../../customers/domain/consumer-final';
 
-const DEFAULT_CUSTOMER_NAME = 'CONSUMIDOR FINAL';
+const DEFAULT_CUSTOMER_NAME = CONSUMER_FINAL_NAME;
 const UNSPECIFIED_USER = 'Sin especificar';
 
 type Numeric = number | string | null | undefined;

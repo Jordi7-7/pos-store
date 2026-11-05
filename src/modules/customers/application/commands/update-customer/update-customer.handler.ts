@@ -7,6 +7,7 @@ import { Customer } from '../../../domain/entities/customer.entity';
 import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
 import { isUniqueViolation } from '../../../../../common/errors/database-errors';
+import { isConsumerFinal } from '../../../domain/consumer-final';
 
 @CommandHandler(UpdateCustomerCommand)
 export class UpdateCustomerHandler implements ICommandHandler<UpdateCustomerCommand> {
@@ -27,6 +28,10 @@ export class UpdateCustomerHandler implements ICommandHandler<UpdateCustomerComm
     if (!customer) {
       this.logger.warn(`Customer update rejected: ${id} not found in Tenant ${tenantId}`);
       throw new AppException(ErrorCode.CustomerNotFound, 'Cliente no encontrado.', HttpStatus.NOT_FOUND, { id });
+    }
+
+    if (input.identityNumber !== undefined && isConsumerFinal(customer) && input.identityNumber !== customer.identityNumber) {
+      throw new AppException(ErrorCode.ConsumerFinalProtected, 'No se puede cambiar el documento del CONSUMIDOR FINAL: es el comprador por defecto de las ventas.', HttpStatus.CONFLICT);
     }
 
     if (input.identityNumber !== undefined) {
