@@ -206,6 +206,37 @@ describe('Catálogo: editar producto, consulta por id, categorías, atributos y 
     });
   });
 
+  describe('crear producto con variantes', () => {
+    it('la respuesta se puede serializar (sin referencias circulares) y trae variantes con su stock', async () => {
+      const product = await new CreateVariableProductHandler(db.manager).execute(
+        new CreateVariableProductCommand(shop.tenantId, 'Serializable', 'd', [{ sku: 'SER-1', purchasePrice: 2, salePrice: 5, stocks: [{ branchId: shop.branchId, quantity: 3 }] }], undefined, undefined, 'SER'),
+      );
+      const json = JSON.parse(JSON.stringify(product)) as { variants: Array<{ sku: string; stocks: Array<{ quantity: number }> }> };
+      expect(json.variants).toMatchObject([{ sku: 'SER-1', stocks: [{ quantity: 3 }] }]);
+    });
+
+    it('una imagen de variante que no existe se rechaza y no se crea nada', async () => {
+      const before = await db.getRepository(Product).countBy({ tenantId: shop.tenantId });
+      const foreign = await image(other, 'https://cdn/c.png');
+      await expect(
+        new CreateVariableProductHandler(db.manager).execute(
+          new CreateVariableProductCommand(shop.tenantId, 'Con foto ajena', 'd', [{ sku: 'FOTO-1', purchasePrice: 1, salePrice: 2, imageIds: [foreign.id] }], undefined, undefined, 'FOTO'),
+        ),
+      ).rejects.toMatchObject({ code: 'IMAGES_NOT_FOUND' });
+      expect(await db.getRepository(Product).countBy({ tenantId: shop.tenantId })).toBe(before);
+    });
+
+    it('con muchas variantes y sucursales el stock inicial queda en un lote y un movimiento por cada una', async () => {
+      const variants = Array.from({ length: 12 }, (_, i) => ({ sku: `MUCHAS-${i}`, purchasePrice: 2, salePrice: 5, stocks: [{ branchId: shop.branchId, quantity: i + 1 }] }));
+      const product = await new CreateVariableProductHandler(db.manager).execute(new CreateVariableProductCommand(shop.tenantId, 'Muchas', 'd', variants, undefined, undefined, 'MUCHAS'));
+
+      const [batches] = await db.query(`SELECT COUNT(*)::int AS total, SUM(initial_quantity)::int AS units FROM product_batches WHERE variant_id IN (SELECT id FROM product_variants WHERE product_id = $1)`, [product.id]);
+      const [movements] = await db.query(`SELECT COUNT(*)::int AS total FROM inventory_movements WHERE variant_id IN (SELECT id FROM product_variants WHERE product_id = $1)`, [product.id]);
+      expect(batches).toEqual({ total: 12, units: 78 });
+      expect(movements.total).toBe(12);
+    });
+  });
+
   describe('SKU base único por tienda', () => {
     const editSku = (productId: string, sku: string) => new UpdateSimpleProductHandler(db.manager).execute(new UpdateSimpleProductCommand(shop.tenantId, productId, undefined, undefined, undefined, undefined, sku));
 

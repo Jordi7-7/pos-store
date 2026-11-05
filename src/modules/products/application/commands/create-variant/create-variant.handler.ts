@@ -7,14 +7,10 @@ import { ProductVariant } from '../../../domain/entities/product-variant.entity'
 import { AttributeValue } from '../../../domain/entities/attribute-value.entity';
 import { ProductStock } from '../../../domain/entities/product-stock.entity';
 import { ProductImage } from '../../../domain/entities/product-image.entity';
-import { ProductBatch } from '../../../domain/entities/product-batch.entity';
-import { Batch, BatchOriginType } from '../../../../batches/domain/entities/batch.entity';
-import { InventoryMovement } from '../../../domain/entities/inventory-movement.entity';
-import { InventoryMovementReason } from '../../../../../common/enums/inventory-movement-reason.enum';
 import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
+import { recordInitialStock } from '../../services/initial-stock';
 import { translatingSkuConflict } from '../../services/sku-conflict';
-import { InventoryMovementType } from '../../../../../common/enums/inventory-movement-type.enum';
 import { assertSkusDoNotShadowBaseSku } from '../../services/base-sku';
 import { normalizeSku } from '../../../domain/sku';
 
@@ -38,7 +34,6 @@ export class CreateVariantHandler implements ICommandHandler<CreateVariantComman
       const variantRepo = transactionalManager.getRepository(ProductVariant);
       const attributeValueRepo = transactionalManager.getRepository(AttributeValue);
       const imageRepo = transactionalManager.getRepository(ProductImage);
-      const batchRepo = transactionalManager.getRepository(ProductBatch);
 
       // Validate product exists
       const product = await productRepo.findOne({
@@ -128,44 +123,17 @@ export class CreateVariantHandler implements ICommandHandler<CreateVariantComman
 
       const savedVariant = await variantRepo.save(variant);
 
-      // Save initial batches and movements
-      if (savedVariant.stocks && savedVariant.stocks.length > 0) {
-        const movementRepo = transactionalManager.getRepository(InventoryMovement);
-        const batchHeaderRepo = transactionalManager.getRepository(Batch);
-
-        for (const stock of savedVariant.stocks) {
-          if (Number(stock.quantity) > 0) {
-            const batchHeader = new Batch();
-            batchHeader.tenantId = tenantId;
-            batchHeader.branchId = stock.branchId;
-            batchHeader.purchaseOrderId = null;
-            batchHeader.code = `LOT-INIT-${savedVariant.sku || savedVariant.id.slice(0, 6)}`;
-            batchHeader.originType = BatchOriginType.INITIAL_STOCK;
-            const savedBatchHeader = await batchHeaderRepo.save(batchHeader);
-
-            const batch = new ProductBatch();
-            batch.tenantId = tenantId;
-            batch.branchId = stock.branchId;
-            batch.batchId = savedBatchHeader.id;
-            batch.variantId = savedVariant.id;
-            batch.initialQuantity = Number(stock.quantity);
-            batch.remainingQuantity = Number(stock.quantity);
-            batch.unitCost = Number(savedVariant.purchasePrice);
-            await batchRepo.save(batch);
-
-            const movement = new InventoryMovement();
-            movement.tenantId = tenantId;
-            movement.originBranchId = null;
-            movement.destinationBranchId = stock.branchId;
-            movement.variantId = savedVariant.id;
-            movement.purchaseOrderId = null;
-            movement.quantity = Number(stock.quantity);
-            movement.type = InventoryMovementType.IN;
-            movement.reason = InventoryMovementReason.INITIAL_STOCK;
-            await movementRepo.save(movement);
-          }
-        }
-      }
+      await recordInitialStock(
+        transactionalManager,
+        tenantId,
+        (savedVariant.stocks ?? []).map((stock) => ({
+          branchId: stock.branchId,
+          variantId: savedVariant.id,
+          sku: savedVariant.sku,
+          quantity: Number(stock.quantity),
+          unitCost: Number(savedVariant.purchasePrice),
+        })),
+      );
 
       delete (savedVariant as any).product;
       if (savedVariant.stocks) {
