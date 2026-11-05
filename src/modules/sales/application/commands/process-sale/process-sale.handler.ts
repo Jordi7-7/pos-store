@@ -15,12 +15,20 @@ import { CashRegister } from '../../../domain/entities/cash-register.entity';
 import { Customer } from '../../../../customers/domain/entities/customer.entity';
 import { InventoryMovementReason } from '../../../../../common/enums/inventory-movement-reason.enum';
 import { InventoryMovementType } from '../../../../../common/enums/inventory-movement-type.enum';
+import { RedisService } from '../../../../../common/redis/redis.service';
+import { assertUserCanOperateInBranch } from '../../../../../common/security/branch-access.helper';
+import { assertPaymentsCoverTotal, priceSale, SalePricing } from '../../../domain/services/sale-pricing';
+import { lockCashSession } from '../shared/cash-session-lock';
+import { assertUserAssignedToCashRegister } from '../shared/cash-register-access';
 
 @CommandHandler(ProcessSaleCommand)
 export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
   private readonly logger = new Logger(ProcessSaleHandler.name);
 
-  constructor(private readonly entityManager: EntityManager) {}
+  constructor(
+    private readonly entityManager: EntityManager,
+    private readonly redisService: RedisService,
+  ) {}
 
   async execute(command: ProcessSaleCommand): Promise<Sale> {
     const { 
@@ -41,7 +49,25 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
       throw new BadRequestException('Debes tener una sesión de caja abierta para registrar una venta.');
     }
 
+    // Importes e invariantes monetarias (sin tocar la base de datos): falla rápido ante datos manipulados
+    let pricing: SalePricing;
+    try {
+      pricing = priceSale(items, discountAmount);
+      assertPaymentsCoverTotal(pricing.total, payments.map((payment) => payment.amount));
+    } catch (error) {
+      this.logger.warn(`Sale rejected: invalid amounts for Tenant ${tenantId} (${error instanceof Error ? error.message : 'unknown'})`);
+      throw error;
+    }
+
     return this.entityManager.transaction(async (transactionalManager) => {
+      // El usuario solo puede vender en sucursales que tiene asignadas
+      await assertUserCanOperateInBranch(transactionalManager, this.redisService, {
+        tenantId,
+        userId,
+        branchId,
+        actionDescription: 'registrar ventas',
+      });
+
       // 1. Grouped Repository Initialization (Pattern 3)
       const cashSessionRepo = transactionalManager.getRepository(CashSession);
       const customerRepo = transactionalManager.getRepository(Customer);
@@ -50,6 +76,9 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
       const saleRepo = transactionalManager.getRepository(Sale);
       const inventoryRepo = transactionalManager.getRepository(InventoryMovement);
       const batchRepo = transactionalManager.getRepository(ProductBatch);
+
+      // Evita que el cierre de caja calcule el arqueo mientras esta venta está en curso
+      await lockCashSession(transactionalManager, cashSessionId, 'share');
 
       // 2. Verify Cash Session exists, matches branch and tenant, and is open
       const cashSession = await cashSessionRepo.findOne({
@@ -64,6 +93,14 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
         this.logger.warn(`Sale failed: active cash session ${cashSessionId} not found or closed for branch ${branchId} under tenant ${tenantId}`);
         throw new BadRequestException('Active cash session not found for this branch');
       }
+
+      // Cualquier cajero asignado a la caja puede vender en su sesión abierta (no solo quien la abrió)
+      await assertUserAssignedToCashRegister(transactionalManager, {
+        tenantId,
+        userId,
+        cashRegisterId: cashSession.cashRegisterId,
+        actionDescription: 'registrar ventas',
+      });
 
       // Lock cash register and generate invoice number
       const registerRepo = transactionalManager.getRepository(CashRegister);
@@ -112,12 +149,11 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
         }
       }
 
-      let subtotal = 0;
       const saleItemsToSave: SaleItem[] = [];
       const inventoryMovements: InventoryMovement[] = [];
 
       // 4. Process items, verify/discount stock, compile costs
-      for (const itemDto of items) {
+      for (const [index, itemDto] of items.entries()) {
         const variant = await variantRepo.findOne({
           where: {
             id: itemDto.variantId,
@@ -184,8 +220,8 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
         const averageUnitCost = Number((totalCost / itemDto.quantity).toFixed(2));
 
         // Build Sale Item
-        const itemDiscountAmount = itemDto.discountAmount !== undefined ? Number(itemDto.discountAmount) : 0;
-        const hasItemDiscount = itemDiscountAmount > 0;
+        const pricedLine = pricing.lines[index];
+        const hasItemDiscount = pricedLine.discountAmount > 0;
 
         const saleItem = new SaleItem();
         saleItem.variantId = itemDto.variantId;
@@ -195,7 +231,10 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
         saleItem.cost = averageUnitCost;
         saleItem.discountType = hasItemDiscount ? (itemDto.discountType || null) : null;
         saleItem.discountRate = hasItemDiscount && itemDto.discountRate !== undefined ? Number(itemDto.discountRate) : null;
-        saleItem.discountAmount = itemDiscountAmount;
+        saleItem.discountAmount = pricedLine.discountAmount;
+        saleItem.subtotal = pricedLine.subtotal;
+        saleItem.globalDiscountAmount = pricedLine.globalDiscountAmount;
+        saleItem.total = pricedLine.total;
         saleItemsToSave.push(saleItem);
 
         // Build inventory movement (Kardex)
@@ -210,61 +249,7 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
         inventoryMovements.push(movement);
       }
 
-      // Totales agregados:
-      // grossSubtotal: Suma de precios de lista (quantity * price)
-      // totalItemsDiscount: Suma de descuentos propios de los productos
-      // netBaseAfterItemsDiscount: Base imponible sobre la cual se aplica el descuento global
-      const grossSubtotal = saleItemsToSave.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-      const totalItemsDiscount = saleItemsToSave.reduce((sum, item) => sum + item.discountAmount, 0);
-      const netBaseAfterItemsDiscount = Number((grossSubtotal - totalItemsDiscount).toFixed(2));
-
-      const totalGlobalDiscountAmount = discountAmount !== undefined ? Number(discountAmount) : 0;
-      const hasSaleDiscount = totalGlobalDiscountAmount > 0;
-      const total = Number((netBaseAfterItemsDiscount - totalGlobalDiscountAmount).toFixed(2));
-      const overallDiscountAmount = Number((totalItemsDiscount + totalGlobalDiscountAmount).toFixed(2));
-
-      // 4.1 Validar que los métodos de pago cubran el total de la venta
-      const totalPaid = payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-      const roundedTotalPaid = Math.round(totalPaid * 100) / 100;
-      const roundedTotal = Math.round(total * 100) / 100;
-
-      if (roundedTotalPaid < roundedTotal) {
-        this.logger.warn(
-          `Sale failed: Paid amount ($${roundedTotalPaid}) is less than sale total ($${roundedTotal}) for Tenant ${tenantId}`,
-        );
-        throw new BadRequestException(
-          `El monto pagado ($${roundedTotalPaid.toFixed(2)}) es menor al total de la venta ($${roundedTotal.toFixed(2)}).`,
-        );
-      }
-
-      // 4.2 Prorratear descuento global en cada ítem y calcular subtotal bruto y total neto
-      if (hasSaleDiscount && netBaseAfterItemsDiscount > 0) {
-        let accumulatedProrated = 0;
-        saleItemsToSave.forEach((item, index) => {
-          const rawSubtotal = Number((item.price * item.quantity).toFixed(2));
-          item.subtotal = rawSubtotal;
-
-          const itemBase = rawSubtotal - item.discountAmount;
-          if (index === saleItemsToSave.length - 1) {
-            // El último ítem absorbe el ajuste de centavos por redondeo
-            const remainingProrated = Number((totalGlobalDiscountAmount - accumulatedProrated).toFixed(2));
-            item.globalDiscountAmount = Math.max(0, remainingProrated);
-          } else {
-            const ratio = itemBase / netBaseAfterItemsDiscount;
-            const prorated = Number((totalGlobalDiscountAmount * ratio).toFixed(2));
-            item.globalDiscountAmount = prorated;
-            accumulatedProrated += prorated;
-          }
-          item.total = Number((itemBase - item.globalDiscountAmount).toFixed(2));
-        });
-      } else {
-        saleItemsToSave.forEach((item) => {
-          const rawSubtotal = Number((item.price * item.quantity).toFixed(2));
-          item.subtotal = rawSubtotal;
-          item.globalDiscountAmount = 0;
-          item.total = Number((rawSubtotal - item.discountAmount).toFixed(2));
-        });
-      }
+      const hasSaleDiscount = pricing.globalDiscountAmount > 0;
 
       // 5. Create and save Sale
       const sale = new Sale();
@@ -273,11 +258,11 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
       sale.cashSessionId = cashSessionId;
       sale.invoiceNumber = invoiceNumber;
       sale.customerId = customerId || null;
-      sale.subtotal = Number(grossSubtotal.toFixed(2));
-      sale.total = total;
-      sale.itemsDiscountAmount = Number(totalItemsDiscount.toFixed(2));
-      sale.globalDiscountAmount = totalGlobalDiscountAmount;
-      sale.discountAmount = overallDiscountAmount;
+      sale.subtotal = pricing.subtotal;
+      sale.total = pricing.total;
+      sale.itemsDiscountAmount = pricing.itemsDiscountAmount;
+      sale.globalDiscountAmount = pricing.globalDiscountAmount;
+      sale.discountAmount = pricing.discountAmount;
       sale.discountType = hasSaleDiscount ? (discountType || null) : null;
       sale.discountRate = hasSaleDiscount && discountRate !== undefined ? Number(discountRate) : null;
       sale.status = 'COMPLETED';

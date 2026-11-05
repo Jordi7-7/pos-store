@@ -3,6 +3,7 @@ import { Logger, NotFoundException } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { AssignUsersToCashRegisterCommand } from './assign-users-to-cash-register.command';
 import { CashRegister } from '../../../domain/entities/cash-register.entity';
+import { assertUsersBelongToTenant } from '../../../../../common/security/tenant-ownership';
 
 @CommandHandler(AssignUsersToCashRegisterCommand)
 export class AssignUsersToCashRegisterHandler implements ICommandHandler<AssignUsersToCashRegisterCommand> {
@@ -23,6 +24,9 @@ export class AssignUsersToCashRegisterHandler implements ICommandHandler<AssignU
       if (!register) {
         throw new NotFoundException('Caja registradora no encontrada');
       }
+
+      // Solo usuarios de este tenant (los IDs se insertan con SQL directo)
+      await assertUsersBelongToTenant(transactionalManager, tenantId, userIds ?? []);
 
       // Eliminar asignaciones anteriores
       await transactionalManager.query(

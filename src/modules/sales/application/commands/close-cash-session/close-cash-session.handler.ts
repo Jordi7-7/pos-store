@@ -7,6 +7,8 @@ import { CashSessionStatus } from '../../../domain/enums/cash-session-status.enu
 import { SalePayment, PaymentMethod } from '../../../domain/entities/sale-payment.entity';
 import { Expense } from '../../../domain/entities/expense.entity';
 import { Refund } from '../../../domain/entities/refund.entity';
+import { cashDifference, expectedCashBalance } from '../../../domain/services/cash-closing';
+import { lockCashSession } from '../shared/cash-session-lock';
 
 @CommandHandler(CloseCashSessionCommand)
 export class CloseCashSessionHandler implements ICommandHandler<CloseCashSessionCommand> {
@@ -20,6 +22,9 @@ export class CloseCashSessionHandler implements ICommandHandler<CloseCashSession
 
     return this.entityManager.transaction(async (transactionalManager) => {
       const cashSessionRepo = transactionalManager.getRepository(CashSession);
+
+      // Espera a las ventas/devoluciones/gastos en curso y bloquea nuevas hasta confirmar el cierre
+      await lockCashSession(transactionalManager, id, 'update');
 
       // 1. Verify cash session exists, is open, and belongs to caller's tenant
       const session = await cashSessionRepo.findOne({
@@ -67,8 +72,8 @@ export class CloseCashSessionHandler implements ICommandHandler<CloseCashSession
       const refunds = parseFloat(refundsRaw?.total || '0');
 
       const openingBalance = Number(session.openingBalance) || 0;
-      const expectedBalance = Math.round((openingBalance + cashSales - expenses - refunds) * 100) / 100;
-      const difference = Math.round((closingBalance - expectedBalance) * 100) / 100;
+      const expectedBalance = expectedCashBalance({ openingBalance, cashSales, expenses, refunds });
+      const difference = cashDifference(closingBalance, expectedBalance);
 
       session.closingBalance = closingBalance;
       session.expectedBalance = expectedBalance;

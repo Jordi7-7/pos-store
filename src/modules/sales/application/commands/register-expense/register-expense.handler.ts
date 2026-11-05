@@ -6,6 +6,8 @@ import { Expense } from '../../../domain/entities/expense.entity';
 import { Branch } from '../../../../branches/domain/entities/branch.entity';
 import { CashSession } from '../../../domain/entities/cash-session.entity';
 import { CashSessionStatus } from '../../../domain/enums/cash-session-status.enum';
+import { lockCashSession } from '../shared/cash-session-lock';
+import { assertUserAssignedToCashRegister } from '../shared/cash-register-access';
 
 @CommandHandler(RegisterExpenseCommand)
 export class RegisterExpenseHandler implements ICommandHandler<RegisterExpenseCommand> {
@@ -14,7 +16,7 @@ export class RegisterExpenseHandler implements ICommandHandler<RegisterExpenseCo
   constructor(private readonly entityManager: EntityManager) {}
 
   async execute(command: RegisterExpenseCommand): Promise<Expense> {
-    const { tenantId, branchId, description, amount, category, cashSessionId } = command;
+    const { tenantId, userId, branchId, description, amount, category, cashSessionId } = command;
     this.logger.log(`Registering expense: $${amount} (${category}) in Branch: ${branchId} for Tenant: ${tenantId}`);
 
     return this.entityManager.transaction(async (transactionalManager) => {
@@ -32,8 +34,11 @@ export class RegisterExpenseHandler implements ICommandHandler<RegisterExpenseCo
       }
 
       // 2. Verify there is an active open cash session at this branch
+      //    Si el cliente indica una sesión concreta, debe ser de esta sucursal/tenant y estar abierta
+      //    (antes se aceptaba cualquier ID y el gasto podía quedar en la sesión de otro tenant).
       const activeSession = await cashSessionRepo.findOne({
         where: {
+          ...(cashSessionId ? { id: cashSessionId } : {}),
           branchId,
           status: CashSessionStatus.OPEN,
         },
@@ -43,10 +48,19 @@ export class RegisterExpenseHandler implements ICommandHandler<RegisterExpenseCo
         throw new BadRequestException('Expense cannot be registered because there is no active open cash session in this branch.');
       }
 
+      await assertUserAssignedToCashRegister(transactionalManager, {
+        tenantId,
+        userId,
+        cashRegisterId: activeSession.cashRegisterId,
+        actionDescription: 'registrar gastos',
+      });
+
+      await lockCashSession(transactionalManager, activeSession.id, 'share');
+
       const expense = new Expense();
       expense.tenantId = tenantId;
       expense.branchId = branchId;
-      expense.cashSessionId = cashSessionId || activeSession.id;
+      expense.cashSessionId = activeSession.id;
       expense.description = description;
       expense.amount = amount;
       expense.category = category;

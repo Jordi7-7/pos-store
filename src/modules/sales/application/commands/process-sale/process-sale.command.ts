@@ -1,4 +1,19 @@
-import { ProcessSaleDto } from './process-sale.dto';
+import { PaymentMethod } from '../../../domain/entities/sale-payment.entity';
+
+export interface SaleItemInput {
+  variantId: string;
+  quantity: number;
+  price: number;
+  discountType?: string;
+  discountRate?: number;
+  discountAmount?: number;
+}
+
+export interface SalePaymentInput {
+  paymentMethod: PaymentMethod;
+  amount: number;
+  referenceNumber?: string;
+}
 
 export class ProcessSaleCommand {
   constructor(
@@ -7,8 +22,8 @@ export class ProcessSaleCommand {
     public readonly branchId: string,
     public readonly cashSessionId: string,
     public readonly customerId: string | undefined,
-    public readonly items: any[],
-    public readonly payments: any[],
+    public readonly items: SaleItemInput[],
+    public readonly payments: SalePaymentInput[],
     public readonly discountType?: string,
     public readonly discountRate?: number,
     public readonly discountAmount?: number,

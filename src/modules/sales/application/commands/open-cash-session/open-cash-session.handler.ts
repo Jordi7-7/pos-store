@@ -78,6 +78,9 @@ export class OpenCashSessionHandler implements ICommandHandler<OpenCashSessionCo
         }
       }
 
+      // Serializa aperturas simultáneas de la misma caja (el índice único parcial es la red de seguridad)
+      await transactionalManager.query(`SELECT "id" FROM "cash_registers" WHERE "id" = $1 FOR UPDATE`, [register.id]);
+
       // 3. Ensure this specific register doesn't already have an open session
       const registerActiveSession = await cashSessionRepo.findOne({
         where: {

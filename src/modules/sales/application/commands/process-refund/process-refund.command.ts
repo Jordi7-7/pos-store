@@ -1,3 +1,8 @@
+export interface RefundItemInput {
+  variantId: string;
+  quantity: number;
+}
+
 export class ProcessRefundCommand {
   constructor(
     public readonly tenantId: string,
@@ -6,6 +11,6 @@ export class ProcessRefundCommand {
     public readonly saleId: string,
     public readonly cashSessionId: string,
     public readonly reason: string,
-    public readonly items: any[],
+    public readonly items: RefundItemInput[],
   ) {}
 }

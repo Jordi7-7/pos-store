@@ -8,6 +8,7 @@ import { Sale } from '../../../domain/entities/sale.entity';
 import { Expense } from '../../../domain/entities/expense.entity';
 import { Refund } from '../../../domain/entities/refund.entity';
 import { PaymentMethod } from '../../../domain/entities/sale-payment.entity';
+import { cashDifference, expectedCashBalance } from '../../../domain/services/cash-closing';
 
 @QueryHandler(GetCashSessionDetailsQuery)
 export class GetCashSessionDetailsHandler implements IQueryHandler<GetCashSessionDetailsQuery> {
@@ -243,11 +244,11 @@ export class GetCashSessionDetailsHandler implements IQueryHandler<GetCashSessio
     const closingBalance = session.closingBalance !== null ? Number(session.closingBalance) : null;
     const expectedBalance = session.expectedBalance !== null 
       ? Number(session.expectedBalance)
-      : Math.round((openingBalance + cashSales - totalExpenses - totalRefunds) * 100) / 100;
+      : expectedCashBalance({ openingBalance, cashSales, expenses: totalExpenses, refunds: totalRefunds });
 
     const difference = session.difference !== null 
       ? Number(session.difference)
-      : (closingBalance !== null ? Math.round((closingBalance - expectedBalance) * 100) / 100 : null);
+      : (closingBalance !== null ? cashDifference(closingBalance, expectedBalance) : null);
 
     return {
       session: {

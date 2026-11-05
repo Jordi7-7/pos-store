@@ -16,18 +16,40 @@ import { ProductBatch } from '../../../../products/domain/entities/product-batch
 import { Batch, BatchOriginType } from '../../../../batches/domain/entities/batch.entity';
 
 import { SaleItem } from '../../../domain/entities/sale-item.entity';
+import { RedisService } from '../../../../../common/redis/redis.service';
+import { assertUserCanOperateInBranch } from '../../../../../common/security/branch-access.helper';
+import { assertValidRefundRequests, planRefund, RefundPlan } from '../../../domain/services/refund-plan';
+import { lockCashSession } from '../shared/cash-session-lock';
+import { assertUserAssignedToCashRegister } from '../shared/cash-register-access';
 
 @CommandHandler(ProcessRefundCommand)
 export class ProcessRefundHandler implements ICommandHandler<ProcessRefundCommand> {
   private readonly logger = new Logger(ProcessRefundHandler.name);
 
-  constructor(private readonly entityManager: EntityManager) {}
+  constructor(
+    private readonly entityManager: EntityManager,
+    private readonly redisService: RedisService,
+  ) {}
 
   async execute(command: ProcessRefundCommand): Promise<Refund> {
     const { tenantId, userId, branchId, saleId, cashSessionId, reason, items } = command;
     this.logger.log(`Processing refund for Sale ID: ${saleId} under Tenant: ${tenantId}`);
 
+    try {
+      assertValidRefundRequests(items);
+    } catch (error) {
+      this.logger.warn(`Refund rejected: invalid quantities for Sale ID ${saleId}`);
+      throw error;
+    }
+
     return this.entityManager.transaction(async (transactionalManager) => {
+      await assertUserCanOperateInBranch(transactionalManager, this.redisService, {
+        tenantId,
+        userId,
+        branchId,
+        actionDescription: 'registrar devoluciones',
+      });
+
       // 1. Grouped Repository Initialization (Pattern 3)
       const branchRepo = transactionalManager.getRepository(Branch);
       const cashSessionRepo = transactionalManager.getRepository(CashSession);
@@ -47,6 +69,8 @@ export class ProcessRefundHandler implements ICommandHandler<ProcessRefundComman
         throw new NotFoundException(`Branch with ID ${branchId} not found`);
       }
 
+      await lockCashSession(transactionalManager, cashSessionId, 'share');
+
       // 3. Validate Cash Session is active and open
       const cashSession = await cashSessionRepo.findOne({
         where: {
@@ -61,7 +85,21 @@ export class ProcessRefundHandler implements ICommandHandler<ProcessRefundComman
         throw new BadRequestException('Active cash session not found for this branch');
       }
 
-      // 4. Validate Sale exists under tenant and load its items (allows cross-branch returns)
+      await assertUserAssignedToCashRegister(transactionalManager, {
+        tenantId,
+        userId,
+        cashRegisterId: cashSession.cashRegisterId,
+        actionDescription: 'registrar devoluciones',
+      });
+
+      // 4. Bloquear la fila de la venta: dos devoluciones simultáneas de la misma venta se
+      //    serializan y la segunda ve las cantidades ya devueltas por la primera.
+      await saleRepo.findOne({
+        where: { id: saleId, tenantId },
+        lock: { mode: 'pessimistic_write' },
+      });
+
+      // 4.1 Validate Sale exists under tenant and load its items (allows cross-branch returns)
       const sale = await saleRepo.findOne({
         where: { id: saleId, tenantId },
         relations: { items: true },
@@ -75,66 +113,47 @@ export class ProcessRefundHandler implements ICommandHandler<ProcessRefundComman
         throw new BadRequestException(`La venta ${sale.invoiceNumber || saleId} ya ha sido devuelta en su totalidad.`);
       }
 
-      let totalRefunded = 0;
+      let plan: RefundPlan<SaleItem>;
+      try {
+        plan = planRefund(sale.items, items);
+      } catch (error) {
+        this.logger.warn(`Refund rejected for Sale ID ${saleId}: ${error instanceof Error ? error.message : 'unknown'}`);
+        throw error;
+      }
+
       const refundItemsToSave: RefundItem[] = [];
       const inventoryMovements: InventoryMovement[] = [];
 
-      // 4. Validate and process refund items using saleItem.refundedQuantity directly
-      for (const itemDto of items) {
-        // Find matching item in original sale
-        const saleItem = sale.items.find((si) => si.variantId === itemDto.variantId);
-        if (!saleItem) {
-          this.logger.warn(`Refund failed: Variant ID ${itemDto.variantId} was not part of Sale ID ${saleId}`);
-          throw new BadRequestException(`Product variant ${itemDto.variantId} was not purchased in this sale`);
-        }
+      // 5. Registrar cada parte de la devolución sobre su línea de venta
+      for (const { line: saleItem, quantity, refundedQuantityAfter, unitPrice } of plan.allocations) {
+        const { variantId } = saleItem;
 
-        // Validate quantity does not exceed original remaining refundable quantity
-        const alreadyRefunded = Number(saleItem.refundedQuantity || 0);
-        const remainingRefundable = Math.max(0, Number(saleItem.quantity) - alreadyRefunded);
-
-        if (itemDto.quantity > remainingRefundable) {
-          this.logger.warn(
-            `Refund failed: requested ${itemDto.quantity} for variant ${itemDto.variantId}, but only ${remainingRefundable} remain refundable (sold: ${saleItem.quantity}, already returned: ${alreadyRefunded})`,
-          );
-          throw new BadRequestException(
-            `No se puede devolver ${itemDto.quantity} pieza(s). Solo quedan ${remainingRefundable} pieza(s) disponible(s) para devolución de este producto en la venta.`,
-          );
-        }
-
-        // Calculate net unit price paid after all discounts (item + prorated global)
-        const soldQty = Number(saleItem.quantity) || 1;
-        const netUnitPrice = Number((Number(saleItem.total || (saleItem.price * soldQty)) / soldQty).toFixed(2));
-        const lineRefundAmount = Math.round(netUnitPrice * itemDto.quantity * 100) / 100;
-        totalRefunded += lineRefundAmount;
-
-        // Build Refund Item record
         const refundItem = new RefundItem();
-        refundItem.variantId = itemDto.variantId;
-        refundItem.quantity = itemDto.quantity;
-        refundItem.priceRefunded = netUnitPrice;
+        refundItem.variantId = variantId;
+        refundItem.quantity = quantity;
+        refundItem.priceRefunded = unitPrice;
         refundItemsToSave.push(refundItem);
 
-        // Update refundedQuantity in saleItem
-        saleItem.refundedQuantity = Number(saleItem.refundedQuantity || 0) + itemDto.quantity;
+        saleItem.refundedQuantity = refundedQuantityAfter;
         await saleItemRepo.save(saleItem);
 
         // Restore branch inventory stock (locked for concurrent updates)
         let stock = await stockRepo.findOne({
-          where: { branchId, variantId: itemDto.variantId },
+          where: { branchId, variantId },
           lock: { mode: 'pessimistic_write' },
         });
         if (!stock) {
           stock = new ProductStock();
           stock.branchId = branchId;
-          stock.variantId = itemDto.variantId;
+          stock.variantId = variantId;
           stock.quantity = 0;
         }
 
         const previousStock = Number(stock.quantity);
         const negativeDebt = previousStock < 0 ? Math.abs(previousStock) : 0;
-        const remainingForFutureSales = Math.max(0, itemDto.quantity - negativeDebt);
+        const remainingForFutureSales = Math.max(0, quantity - negativeDebt);
 
-        stock.quantity = previousStock + itemDto.quantity;
+        stock.quantity = previousStock + quantity;
         await stockRepo.save(stock);
 
         // Create Batch header for the returned merchandise
@@ -153,8 +172,8 @@ export class ProcessRefundHandler implements ICommandHandler<ProcessRefundComman
         batch.tenantId = tenantId;
         batch.branchId = branchId;
         batch.batchId = savedBatchHeader.id;
-        batch.variantId = itemDto.variantId;
-        batch.initialQuantity = itemDto.quantity;
+        batch.variantId = variantId;
+        batch.initialQuantity = quantity;
         batch.remainingQuantity = remainingForFutureSales;
         batch.unitCost = Number(saleItem.cost) || 0;
         await batchRepo.save(batch);
@@ -164,8 +183,8 @@ export class ProcessRefundHandler implements ICommandHandler<ProcessRefundComman
         movement.tenantId = tenantId;
         movement.originBranchId = null;
         movement.destinationBranchId = branchId;
-        movement.variantId = itemDto.variantId;
-        movement.quantity = itemDto.quantity;
+        movement.variantId = variantId;
+        movement.quantity = quantity;
         movement.type = InventoryMovementType.IN;
         movement.reason = InventoryMovementReason.DEVOLUCION;
         inventoryMovements.push(movement);
@@ -177,7 +196,7 @@ export class ProcessRefundHandler implements ICommandHandler<ProcessRefundComman
       refund.branchId = branchId;
       refund.saleId = saleId;
       refund.cashSessionId = cashSessionId;
-      refund.totalRefunded = totalRefunded;
+      refund.totalRefunded = plan.totalRefunded;
       refund.reason = reason;
       refund.userId = userId || null;
       refund.items = refundItemsToSave;
