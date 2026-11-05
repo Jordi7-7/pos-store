@@ -39,6 +39,6 @@ import { OnboardingSecretGuard } from './guards/onboarding-secret.guard';
     PinLoginHandler,
     GetProfileHandler,
   ],
-  exports: [HashService, JwtModule, OnboardingSecretGuard],
+  exports: [HashService, AuthTokenService, JwtModule, OnboardingSecretGuard],
 })
 export class AuthModule {}

@@ -34,6 +34,10 @@ import { Expense } from '../../src/modules/sales/domain/entities/expense.entity'
 import { Refund } from '../../src/modules/sales/domain/entities/refund.entity';
 import { GetProductSalesReportHandler } from '../../src/modules/reports/application/queries/get-product-sales-report/get-product-sales-report.handler';
 import { GetProductSalesReportQuery } from '../../src/modules/reports/application/queries/get-product-sales-report/get-product-sales-report.query';
+import { UpdateUserCommand } from '../../src/modules/users/application/commands/update-user/update-user.command';
+import { UpdateUserHandler } from '../../src/modules/users/application/commands/update-user/update-user.handler';
+import { HashService } from '../../src/modules/auth/services/hash.service';
+import { AuthTokenService } from '../../src/modules/auth/services/auth-token.service';
 import { Tenant } from '../../src/modules/tenants/domain/entities/tenant.entity';
 import { User } from '../../src/modules/users/domain/entities/user.entity';
 
@@ -44,7 +48,7 @@ import { User } from '../../src/modules/users/domain/entities/user.entity';
  */
 describe('Flujo de dinero: venta, devolución y cierre de caja', () => {
   const databaseName = `pos_store_it_${process.pid}_${Date.now()}`;
-  const redis = { get: () => Promise.resolve(null), set: () => Promise.resolve() } as unknown as RedisService;
+  const redis = { get: () => Promise.resolve(null), set: () => Promise.resolve(), del: () => Promise.resolve() } as unknown as RedisService;
 
   let admin: DataSource;
   let db: DataSource;
@@ -380,6 +384,61 @@ describe('Flujo de dinero: venta, devolución y cierre de caja', () => {
     } finally {
       await new CloseCashSessionHandler(db.manager).execute(new CloseCashSessionCommand(tenantId, sessionId, 6));
     }
+  });
+
+  describe('update-user', () => {
+    const revoked: string[] = [];
+    const handler = () =>
+      new UpdateUserHandler(
+        db.manager,
+        new HashService(),
+        redis,
+        { revokeSession: (id: string) => Promise.resolve(void revoked.push(id)) } as unknown as AuthTokenService,
+      );
+    const branchesOf = async (id: string): Promise<string[]> =>
+      (await db.query<Array<{ branch_id: string }>>(`SELECT branch_id FROM user_branches WHERE user_id = $1`, [id])).map((row) => row.branch_id);
+
+    it('reasigna sucursales con un solo INSERT real y el usuario sigue activo', async () => {
+      const second = await db.getRepository(Branch).save(db.getRepository(Branch).create({ tenantId, name: 'Sucursal 2', address: 'Norte', code: 2 }));
+      const cashier = await db.getRepository(User).save(
+        db.getRepository(User).create({ tenantId, name: 'Cajera', username: 'cajera', password: 'x', isOwner: false }),
+      );
+
+      const updated = await handler().execute(new UpdateUserCommand(tenantId, cashier.id, { branchIds: [branchId, second.id] }, userId));
+
+      expect(updated.isActive).toBe(true);
+      expect((await branchesOf(cashier.id)).sort()).toEqual([branchId, second.id].sort());
+
+      // Reemplazo, no suma: dejar una sola sucursal quita la otra
+      await handler().execute(new UpdateUserCommand(tenantId, cashier.id, { branchIds: [second.id] }, userId));
+      expect(await branchesOf(cashier.id)).toEqual([second.id]);
+    });
+
+    it('una sucursal de otro tenant se rechaza y no deja cambios a medias', async () => {
+      const cashier = await db.getRepository(User).save(
+        db.getRepository(User).create({ tenantId, name: 'Luis', username: 'luis', password: 'x', isOwner: false }),
+      );
+      await handler().execute(new UpdateUserCommand(tenantId, cashier.id, { branchIds: [branchId] }, userId));
+
+      await expect(
+        handler().execute(new UpdateUserCommand(tenantId, cashier.id, { name: 'Cambiado', branchIds: ['00000000-0000-4000-8000-000000000000'] }, userId)),
+      ).rejects.toMatchObject({ code: 'INVALID_REFERENCE' });
+
+      expect((await db.getRepository(User).findOneByOrFail({ id: cashier.id })).name).toBe('Luis');
+      expect(await branchesOf(cashier.id)).toEqual([branchId]);
+    });
+
+    it('desactivar a un usuario revoca su sesión y dejarlo sin sucursales lo desactiva', async () => {
+      const cashier = await db.getRepository(User).save(
+        db.getRepository(User).create({ tenantId, name: 'Eva', username: 'eva', password: 'x', isOwner: false }),
+      );
+      revoked.length = 0;
+
+      const updated = await handler().execute(new UpdateUserCommand(tenantId, cashier.id, { branchIds: [] }, userId));
+
+      expect(updated.isActive).toBe(false);
+      expect(revoked).toEqual([cashier.id]);
+    });
   });
 
   describe('dashboard', () => {
