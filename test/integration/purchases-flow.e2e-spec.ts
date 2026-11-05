@@ -207,6 +207,72 @@ describe('Compras: registrar, importar y cancelar', () => {
       expect((await movementsOf(variantId)).map((movement) => `${movement.type}:${movement.reason}`)).toEqual(['IN:COMPRA', 'OUT:ANULACION_COMPRA']);
     });
 
+    describe('costo promedio', () => {
+      it('anular la última compra devuelve el costo al de antes', async () => {
+        const variantId = await seedVariant(db, shop.tenantId, 'REV-1');
+        await register([{ variantId, quantity: 10, purchasePrice: 4 }]);
+        const second = await register([{ variantId, quantity: 10, purchasePrice: 6 }]);
+        expect(await costOf(variantId)).toBe(5);
+
+        await cancel(second.id);
+        expect(await costOf(variantId)).toBe(4);
+        expect(await stockOf(variantId)).toBe(10);
+      });
+
+      it('las ventas posteriores no distorsionan: se revalúa con las unidades que quedan de cada lote', async () => {
+        const variantId = await seedVariant(db, shop.tenantId, 'REV-2');
+        await register([{ variantId, quantity: 10, purchasePrice: 4 }]);
+        const second = await register([{ variantId, quantity: 10, purchasePrice: 6 }]);
+        await adjust(variantId, 3, InventoryMovementType.OUT); // sale del lote más antiguo (FIFO)
+
+        await cancel(second.id);
+        expect(await costOf(variantId)).toBe(4); // quedan 7 unidades a 4
+      });
+
+      it('con una compra posterior, anular la intermedia deja el promedio de las que quedan', async () => {
+        const variantId = await seedVariant(db, shop.tenantId, 'REV-3');
+        await register([{ variantId, quantity: 10, purchasePrice: 4 }]);
+        const middle = await register([{ variantId, quantity: 10, purchasePrice: 6 }]);
+        await register([{ variantId, quantity: 10, purchasePrice: 8 }]);
+
+        await cancel(middle.id);
+        expect(await costOf(variantId)).toBe(6); // (10×4 + 10×8) / 20
+      });
+
+      it('la misma variante en dos líneas de la compra se revierte entera', async () => {
+        const variantId = await seedVariant(db, shop.tenantId, 'REV-4');
+        await register([{ variantId, quantity: 10, purchasePrice: 4 }]);
+        const order = await register([
+          { variantId, quantity: 5, purchasePrice: 10 },
+          { variantId, quantity: 5, purchasePrice: 12 },
+        ]);
+
+        await cancel(order.id);
+        expect(await costOf(variantId)).toBe(4);
+        expect(await stockOf(variantId)).toBe(10);
+      });
+
+      it('si no queda nada en existencia conserva el último costo en vez de dejarlo en cero', async () => {
+        const variantId = await seedVariant(db, shop.tenantId, 'REV-5');
+        const only = await register([{ variantId, quantity: 8, purchasePrice: 5 }]);
+
+        await cancel(only.id);
+        expect(await costOf(variantId)).toBe(5);
+      });
+
+      it('solo se revalúan las variantes de la orden cancelada', async () => {
+        const touched = await seedVariant(db, shop.tenantId, 'REV-6A');
+        const untouched = await seedVariant(db, shop.tenantId, 'REV-6B');
+        await register([{ variantId: untouched, quantity: 10, purchasePrice: 7 }]);
+        await register([{ variantId: touched, quantity: 10, purchasePrice: 4 }]);
+        const order = await register([{ variantId: touched, quantity: 10, purchasePrice: 8 }]);
+
+        await cancel(order.id);
+        expect(await costOf(touched)).toBe(4);
+        expect(await costOf(untouched)).toBe(7);
+      });
+    });
+
     it('no se puede cancelar si ya se vendieron unidades de sus lotes, y no cambia nada', async () => {
       const variantId = await seedVariant(db, shop.tenantId, 'CAN-2');
       const order = await register([{ variantId, quantity: 10, purchasePrice: 5 }]);

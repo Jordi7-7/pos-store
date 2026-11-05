@@ -1,4 +1,4 @@
-import { applyStockEntry, FifoBatch, planFifoConsumption, weightedAverageCost } from './stock-rules';
+import { applyStockEntry, costFromRemainingLayers, FifoBatch, planFifoConsumption, weightedAverageCost } from './stock-rules';
 
 const batch = (remainingQuantity: number, unitCost: number): FifoBatch => ({ remainingQuantity, unitCost });
 
@@ -81,5 +81,42 @@ describe('weightedAverageCost', () => {
 
   it('redondea a céntimos', () => {
     expect(weightedAverageCost({ currentStock: 1, currentCost: 1, incomingQuantity: 2, incomingCost: 2 })).toBe(1.67);
+  });
+});
+
+describe('costFromRemainingLayers', () => {
+  it('con un solo lote restante el costo es el de ese lote', () => {
+    expect(costFromRemainingLayers({ layers: [{ remainingQuantity: 10, unitCost: 4 }], stockAfter: 10, currentCost: 5 })).toBe(4);
+  });
+
+  it('promedia varios lotes por sus unidades restantes', () => {
+    const layers = [
+      { remainingQuantity: 10, unitCost: 4 },
+      { remainingQuantity: 30, unitCost: 8 },
+    ];
+    expect(costFromRemainingLayers({ layers, stockAfter: 40, currentCost: 99 })).toBe(7);
+  });
+
+  it('las ventas posteriores no distorsionan: solo cuentan las unidades que quedan de cada lote', () => {
+    // De un lote de 10 a 4 se vendieron 3: quedan 7 a 4
+    expect(costFromRemainingLayers({ layers: [{ remainingQuantity: 7, unitCost: 4 }], stockAfter: 7, currentCost: 5 })).toBe(4);
+  });
+
+  it('las unidades en stock sin lote se valoran al costo vigente', () => {
+    // 6 unidades en lotes a 4 y 4 unidades antiguas sin lote al costo vigente de 9: (24 + 36) / 10
+    expect(costFromRemainingLayers({ layers: [{ remainingQuantity: 6, unitCost: 4 }], stockAfter: 10, currentCost: 9 })).toBe(6);
+  });
+
+  it('sin existencias conserva el costo vigente', () => {
+    expect(costFromRemainingLayers({ layers: [], stockAfter: 0, currentCost: 5.5 })).toBe(5.5);
+    expect(costFromRemainingLayers({ layers: [], stockAfter: -3, currentCost: 5.5 })).toBe(5.5);
+  });
+
+  it('redondea el promedio a centavos', () => {
+    const layers = [
+      { remainingQuantity: 1, unitCost: 1 },
+      { remainingQuantity: 2, unitCost: 2 },
+    ];
+    expect(costFromRemainingLayers({ layers, stockAfter: 3, currentCost: 0 })).toBe(1.67);
   });
 });

@@ -1,6 +1,6 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { Logger, HttpStatus } from '@nestjs/common';
-import { EntityManager } from 'typeorm';
+import { EntityManager, MoreThan } from 'typeorm';
 import { lockBranchStock } from '../../../../products/application/services/inventory-stock';
 import { RedisService } from '../../../../../common/redis/redis.service';
 import { assertUserCanOperateInBranch } from '../../../../../common/security/branch-access.helper';
@@ -12,6 +12,8 @@ import { ProductBatch } from '../../../../products/domain/entities/product-batch
 import { Batch, BatchStatus } from '../../../../batches/domain/entities/batch.entity';
 import { InventoryMovement } from '../../../../products/domain/entities/inventory-movement.entity';
 import { InventoryMovementReason } from '../../../../../common/enums/inventory-movement-reason.enum';
+import { ProductVariant } from '../../../../products/domain/entities/product-variant.entity';
+import { costFromRemainingLayers } from '../../../../products/domain/services/stock-rules';
 import { PurchaseOrderStatus } from '../../../../purchases/domain/enums/purchase-order-status.enum';
 import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
@@ -139,6 +141,11 @@ export class CancelPurchaseOrderHandler
 
       await movementRepo.save(movements);
 
+      // El costo promedio deja de incluir esta compra: se revalúa con lo que sigue en existencia
+      for (const variantId of variantIds) {
+        await this.revalueCost(tm, tenantId, variantId);
+      }
+
       // 4. Mark all batch headers associated with this purchase order as CANCELLED
       for (const batchHeader of batchHeaders) {
         batchHeader.status = BatchStatus.CANCELLED;
@@ -153,5 +160,23 @@ export class CancelPurchaseOrderHandler
         `Purchase order ${purchaseOrderId} successfully cancelled. Stock reversed for ${order.items.length} variant(s).`,
       );
     });
+  }
+
+  /** Recalcula el costo de la variante (precio medio ponderado) a partir de los lotes que quedan en existencia. */
+  private async revalueCost(tm: EntityManager, tenantId: string, variantId: string): Promise<void> {
+    const variantRepo = tm.getRepository(ProductVariant);
+    const variant = await variantRepo.findOne({ where: { id: variantId, tenantId } });
+    if (!variant) return;
+
+    const [layers, stocks] = await Promise.all([
+      tm.getRepository(ProductBatch).find({ where: { tenantId, variantId, remainingQuantity: MoreThan(0) } }),
+      tm.getRepository(ProductStock).find({ where: { variantId } }),
+    ]);
+    variant.purchasePrice = costFromRemainingLayers({
+      layers: layers.map((layer) => ({ remainingQuantity: Number(layer.remainingQuantity), unitCost: Number(layer.unitCost) })),
+      stockAfter: stocks.reduce((sum, stock) => sum + Number(stock.quantity), 0),
+      currentCost: Number(variant.purchasePrice),
+    });
+    await variantRepo.save(variant);
   }
 }

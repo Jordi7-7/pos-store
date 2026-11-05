@@ -84,3 +84,29 @@ export function weightedAverageCost(input: WeightedCostInput): number {
     .fraction(1, totalQuantity)
     .toNumber();
 }
+
+export interface RemainingCostInput {
+  /** Lotes que siguen con unidades en existencia (todas las sucursales). */
+  layers: readonly FifoBatch[];
+  /** Existencias totales de la variante después del cambio (todas las sucursales). */
+  stockAfter: number;
+  /** Costo vigente: valora las unidades que existen pero no están en ningún lote (datos antiguos). */
+  currentCost: number;
+}
+
+/**
+ * Costo promedio de lo que realmente queda en existencia, a partir de sus lotes. Se usa al anular una
+ * compra: no se "resta" matemáticamente su aporte (las ventas posteriores ya movieron el stock sin tocar
+ * el costo), se revalúa lo que queda. Sin unidades en existencia se conserva el costo vigente.
+ */
+export function costFromRemainingLayers(input: RemainingCostInput): number {
+  const layersQuantity = input.layers.reduce((sum, layer) => addQuantities(sum, layer.remainingQuantity), 0);
+  const layersValue = Money.sum(input.layers.map((layer) => Money.ofLine(layer.unitCost, layer.remainingQuantity)));
+  // Unidades que hay en stock pero ningún lote respalda: se valoran al costo vigente
+  const unbacked = Math.max(0, subtractQuantities(Math.max(0, input.stockAfter), layersQuantity));
+
+  const totalQuantity = addQuantities(layersQuantity, unbacked);
+  if (totalQuantity <= 0) return Money.of(input.currentCost).toNumber();
+
+  return layersValue.plus(Money.ofLine(input.currentCost, unbacked)).fraction(1, totalQuantity).toNumber();
+}
