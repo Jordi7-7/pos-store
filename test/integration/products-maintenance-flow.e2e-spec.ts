@@ -5,6 +5,8 @@ import { CreateAttributeValueCommand } from '../../src/modules/products/applicat
 import { CreateAttributeValueHandler } from '../../src/modules/products/application/commands/create-attribute-value/create-attribute-value.handler';
 import { CreateCategoryCommand } from '../../src/modules/products/application/commands/create-category/create-category.command';
 import { CreateCategoryHandler } from '../../src/modules/products/application/commands/create-category/create-category.handler';
+import { CreateVariantCommand } from '../../src/modules/products/application/commands/create-variant/create-variant.command';
+import { CreateVariantHandler } from '../../src/modules/products/application/commands/create-variant/create-variant.handler';
 import { CreateSimpleProductCommand } from '../../src/modules/products/application/commands/create-simple-product/create-simple-product.command';
 import { CreateSimpleProductHandler } from '../../src/modules/products/application/commands/create-simple-product/create-simple-product.handler';
 import { CreateTagCommand } from '../../src/modules/products/application/commands/create-tag/create-tag.command';
@@ -260,6 +262,30 @@ describe('Catálogo: editar producto, consulta por id, categorías, atributos y 
       await expect(editSku(product.id, 'PARES-A')).rejects.toMatchObject({ code: 'SKU_TAKEN' });
       expect(await baseSkuOf(product.id)).toBe('PARES-B');
       expect(await skusOf(product.id)).toEqual(['PARES-B']);
+    });
+
+    it('el SKU base no puede coincidir con el SKU de una variante de otro producto: al escanearlo saldría la variante, no la familia', async () => {
+      await variable('Pack', 'PACK', ['COMPARTIDO']);
+      await expect(variable('Otra familia', 'compartido', ['OTRA-1'])).rejects.toMatchObject({ code: 'BASE_SKU_TAKEN' });
+
+      const product = await variable('Renombrable', 'REN', ['REN-1']);
+      await expect(update(product.id, { baseSku: 'COMPARTIDO' })).rejects.toMatchObject({ code: 'BASE_SKU_TAKEN' });
+    });
+
+    it('y al revés: el SKU de una variante no puede coincidir con el SKU base de otra familia', async () => {
+      const family = await variable('Familia base', 'FAMBASE', ['FAMBASE-1']);
+      await expect(variable('Intrusa', 'INTR', ['famBase'])).rejects.toMatchObject({ code: 'SKU_TAKEN', details: { sku: 'FAMBASE' } });
+
+      const other2 = await variable('Segunda', 'SEG', ['SEG-1']);
+      const addVariant = (productId: string, sku: string) => new CreateVariantHandler(db.manager).execute(new CreateVariantCommand(shop.tenantId, productId, { sku, purchasePrice: 1, salePrice: 2 }));
+      await expect(addVariant(other2.id, 'FAMBASE')).rejects.toMatchObject({ code: 'SKU_TAKEN' });
+
+      const [seg] = await db.getRepository(ProductVariant).findBy({ productId: other2.id });
+      await expect(new UpdateVariantHandler(db.manager).execute(new UpdateVariantCommand(shop.tenantId, seg.id, 'FAMBASE'))).rejects.toMatchObject({ code: 'SKU_TAKEN' });
+      expect(await skusOf(other2.id)).toEqual(['SEG-1']);
+
+      // Una variante con el mismo SKU que la base de su propia familia sí es válida
+      await expect(addVariant(family.id, 'FAMBASE')).resolves.toMatchObject({ sku: 'FAMBASE' });
     });
 
     it('un producto eliminado libera su SKU base', async () => {

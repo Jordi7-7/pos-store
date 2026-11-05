@@ -9,6 +9,7 @@ import { ErrorCode } from '../../../../../common/errors/error-codes';
 import { translatingSkuConflict } from '../../services/sku-conflict';
 import { Product } from '../../../domain/entities/product.entity';
 import { ProductType } from '../../../domain/enums/product-type.enum';
+import { assertSkusDoNotShadowBaseSku } from '../../services/base-sku';
 
 @CommandHandler(UpdateVariantCommand)
 export class UpdateVariantHandler implements ICommandHandler<UpdateVariantCommand> {
@@ -61,6 +62,7 @@ export class UpdateVariantHandler implements ICommandHandler<UpdateVariantComman
       if (existingWithSku) {
         throw new AppException(ErrorCode.SkuTaken, `El SKU "${sku}" ya está registrado en otra variante.`, HttpStatus.CONFLICT, { sku });
       }
+      await assertSkusDoNotShadowBaseSku(manager, tenantId, [sku], variant.productId);
       variant.sku = sku;
       skuChanged = true;
     }

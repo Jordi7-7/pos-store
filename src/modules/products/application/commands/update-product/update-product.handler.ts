@@ -9,7 +9,7 @@ import { Category } from '../../../domain/entities/category.entity';
 import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
 import { translatingSkuConflict } from '../../services/sku-conflict';
-import { assertBaseSkuAvailable } from '../../services/base-sku';
+import { assertBaseSkuAvailable, assertSkusDoNotShadowBaseSku } from '../../services/base-sku';
 
 @CommandHandler(UpdateProductCommand)
 export class UpdateProductHandler implements ICommandHandler<UpdateProductCommand> {
@@ -100,6 +100,7 @@ export class UpdateProductHandler implements ICommandHandler<UpdateProductComman
         variant.sku = `${newPrefix}${variant.sku}`;
       }
     }
+    await assertSkusDoNotShadowBaseSku(manager, product.tenantId, product.variants.map((variant) => variant.sku), product.id);
     await manager.getRepository(ProductVariant).save(product.variants);
     this.logger.log(`Updated SKUs for ${product.variants.length} variants of product ${product.id}`);
   }

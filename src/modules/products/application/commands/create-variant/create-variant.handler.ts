@@ -15,6 +15,7 @@ import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
 import { translatingSkuConflict } from '../../services/sku-conflict';
 import { InventoryMovementType } from '../../../../../common/enums/inventory-movement-type.enum';
+import { assertSkusDoNotShadowBaseSku } from '../../services/base-sku';
 
 @CommandHandler(CreateVariantCommand)
 export class CreateVariantHandler implements ICommandHandler<CreateVariantCommand> {
@@ -53,6 +54,8 @@ export class CreateVariantHandler implements ICommandHandler<CreateVariantComman
       if (isSkuTaken) {
         throw new AppException(ErrorCode.SkuTaken, `El SKU "${variantDto.sku}" ya está registrado en el sistema.`, HttpStatus.CONFLICT, { sku: variantDto.sku });
       }
+
+      await assertSkusDoNotShadowBaseSku(transactionalManager, tenantId, [variantDto.sku], productId);
 
       // Validate no duplicate attribute combinations in existing product variants
       const valueIds = variantDto.attributeValues?.map((v) => v.attributeValueId) || [];

@@ -18,7 +18,7 @@ import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
 import { translatingSkuConflict } from '../../services/sku-conflict';
 import { InventoryMovementType } from '../../../../../common/enums/inventory-movement-type.enum';
-import { assertBaseSkuAvailable } from '../../services/base-sku';
+import { assertBaseSkuAvailable, assertSkusDoNotShadowBaseSku } from '../../services/base-sku';
 
 
 @CommandHandler(CreateVariableProductCommand)
@@ -94,6 +94,7 @@ export class CreateVariableProductHandler implements ICommandHandler<CreateVaria
       }
 
       await assertBaseSkuAvailable(transactionalManager, tenantId, baseSku);
+      await assertSkusDoNotShadowBaseSku(transactionalManager, tenantId, skusToCheck);
 
       const product = new Product();
       product.tenantId = tenantId;
