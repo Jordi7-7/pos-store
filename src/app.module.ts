@@ -3,8 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { validateEnv } from './config/env.validation';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { APP_GUARD } from '@nestjs/core';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
+import { HealthController } from './common/health/health.controller';
 import { databaseConnectionOptions } from './config/database.options';
 
 // Import Guards
@@ -52,9 +51,8 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
     ReportsModule,
     DashboardModule,
   ],
-  controllers: [AppController],
+  controllers: [HealthController],
   providers: [
-    AppService,
     {
       provide: APP_GUARD,
       useClass: AuthGuard,

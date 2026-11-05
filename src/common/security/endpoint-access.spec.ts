@@ -2,7 +2,7 @@ import { RequestMethod } from '@nestjs/common';
 import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 import { IS_PUBLIC_KEY } from '../../modules/auth/decorators/public.decorator';
 import { PERMISSIONS_KEY, REQUIRE_ANY_PERMISSIONS_KEY } from '../../modules/auth/decorators/permissions.decorator';
-import { AppController } from '../../app.controller';
+import { HealthController } from '../health/health.controller';
 import { AuthController } from '../../modules/auth/infrastructure/controllers/auth.controller';
 import { BatchesController } from '../../modules/batches/infrastructure/controllers/batches.controller';
 import { BranchesController } from '../../modules/branches/infrastructure/controllers/branches.controller';
@@ -27,16 +27,15 @@ type ControllerClass = new (...args: never[]) => object;
  */
 const AUTHENTICATED_ONLY: ReadonlySet<string> = new Set([
   'AuthController.getProfile', // datos del propio usuario
-  'AppController.getHello', // endpoint de ejemplo de la plantilla; exige token pero ningún permiso
 ]);
 
 const CONTROLLERS: readonly ControllerClass[] = [
-  AppController,
   AuthController,
   BatchesController,
   BranchesController,
   CustomersController,
   DashboardController,
+  HealthController,
   MediaController,
   ProductsController,
   PurchasesController,
@@ -113,6 +112,7 @@ describe('Control de acceso de endpoints', () => {
         'AuthController.onboard',
         'AuthController.pinLogin',
         'AuthController.refresh',
+        'HealthController.check',
         'TenantsController.getPublicBySlug',
       ].sort(),
     );

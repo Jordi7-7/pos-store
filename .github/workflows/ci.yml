@@ -60,6 +60,15 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+      redis:
+        image: redis:7-alpine # el refresh de sesión y los contadores de intentos de login lo usan
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     env:
       # Los tests crean su propia base de datos con nombre único y la borran al terminar
       DB_HOST: localhost
@@ -67,6 +76,8 @@ jobs:
       DB_USERNAME: postgres
       DB_PASSWORD: postgres
       DB_DATABASE: postgres
+      REDIS_HOST: localhost
+      REDIS_PORT: 6379
     steps:
       - uses: actions/checkout@v4
 
@@ -80,6 +91,6 @@ jobs:
       - name: Instalar dependencias
         run: pnpm install --frozen-lockfile
 
-      - name: Tests de integración (migraciones, ventas, caja, inventario, dashboard)
+      - name: Tests de integración (API por HTTP, migraciones, ventas, caja, inventario, compras, catálogo)
         run: pnpm test:integration
 
