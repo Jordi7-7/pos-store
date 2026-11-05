@@ -14,6 +14,7 @@ import { InventoryMovementReason } from '../../../../../common/enums/inventory-m
 import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
 import { translatingSkuConflict } from '../../services/sku-conflict';
+import { InventoryMovementType } from '../../../../../common/enums/inventory-movement-type.enum';
 
 @CommandHandler(CreateVariantCommand)
 export class CreateVariantHandler implements ICommandHandler<CreateVariantCommand> {
@@ -154,7 +155,7 @@ export class CreateVariantHandler implements ICommandHandler<CreateVariantComman
             movement.variantId = savedVariant.id;
             movement.purchaseOrderId = null;
             movement.quantity = Number(stock.quantity);
-            movement.type = 'IN';
+            movement.type = InventoryMovementType.IN;
             movement.reason = InventoryMovementReason.INITIAL_STOCK;
             await movementRepo.save(movement);
           }

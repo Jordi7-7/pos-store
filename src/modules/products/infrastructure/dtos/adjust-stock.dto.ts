@@ -1,4 +1,5 @@
-import { IsString, IsNotEmpty, IsNumber, IsUUID, IsIn, IsOptional } from 'class-validator';
+import { IsString, IsNotEmpty, IsNumber, IsUUID, IsEnum, IsOptional } from 'class-validator';
+import { InventoryMovementType } from '../../../../common/enums/inventory-movement-type.enum';
 
 export class AdjustStockDto {
   @IsUUID()
@@ -13,9 +14,9 @@ export class AdjustStockDto {
   @IsNotEmpty()
   quantity: number;
 
-  @IsIn(['IN', 'OUT'])
+  @IsEnum(InventoryMovementType)
   @IsNotEmpty()
-  type: 'IN' | 'OUT';
+  type: InventoryMovementType;
 
   @IsString()
   @IsOptional()

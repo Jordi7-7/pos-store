@@ -2,6 +2,7 @@ import { DomainError } from '../../../../common/domain/domain.error';
 import { Money } from '../../../../common/domain/money';
 import { ErrorCode } from '../../../../common/errors/error-codes';
 import { allocatePayments, assertPaymentsCoverTotal, priceSale, SaleLineAmounts } from './sale-pricing';
+import { PaymentMethod } from '../entities/sale-payment.entity';
 
 const line = (overrides: Partial<SaleLineAmounts> = {}): SaleLineAmounts => ({ quantity: 2, price: 10, ...overrides });
 
@@ -121,8 +122,8 @@ describe('assertPaymentsCoverTotal', () => {
 });
 
 describe('allocatePayments', () => {
-  const cash = (amount: number) => ({ paymentMethod: 'EFECTIVO', amount });
-  const card = (amount: number) => ({ paymentMethod: 'TARJETA', amount });
+  const cash = (amount: number) => ({ paymentMethod: PaymentMethod.EFECTIVO, amount });
+  const card = (amount: number) => ({ paymentMethod: PaymentMethod.TARJETA, amount });
 
   it('deja los pagos intactos cuando suman exactamente el total', () => {
     expect(allocatePayments(30, [cash(10), card(20)])).toEqual([cash(10), card(20)]);

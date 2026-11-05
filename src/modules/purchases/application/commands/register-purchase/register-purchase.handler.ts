@@ -19,6 +19,7 @@ import { InventoryMovementReason } from '../../../../../common/enums/inventory-m
 import { PurchaseOrderStatus } from '../../../../purchases/domain/enums/purchase-order-status.enum';
 import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
+import { InventoryMovementType } from '../../../../../common/enums/inventory-movement-type.enum';
 
 @CommandHandler(RegisterPurchaseCommand)
 export class RegisterPurchaseHandler implements ICommandHandler<RegisterPurchaseCommand> {
@@ -174,7 +175,7 @@ export class RegisterPurchaseHandler implements ICommandHandler<RegisterPurchase
         movement.destinationBranchId = branchId;
         movement.variantId = itemDto.variantId;
         movement.quantity = newQty;
-        movement.type = 'IN';
+        movement.type = InventoryMovementType.IN;
         movement.reason = InventoryMovementReason.COMPRA;
         movement.purchaseOrderId = savedPurchase.id;
         inventoryMovements.push(movement);

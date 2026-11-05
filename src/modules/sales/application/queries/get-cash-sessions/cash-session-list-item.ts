@@ -1,8 +1,9 @@
 import { Money } from '../../../../../common/domain/money';
+import { CashSessionStatus } from '../../../domain/enums/cash-session-status.enum';
 
 export interface CashSessionListItemDto {
   id: string;
-  status: string;
+  status: CashSessionStatus;
   openedAt: Date;
   closedAt: Date | null;
   openingBalance: number;
@@ -29,7 +30,7 @@ export interface CashSessionListItemDto {
 /** Fila tal como la devuelve Postgres: numeric llega como texto y los joins opcionales como null. */
 export interface CashSessionRow {
   id: string;
-  status: string;
+  status: CashSessionStatus;
   openedAt: Date;
   closedAt: Date | null;
   openingBalance: string | number | null;

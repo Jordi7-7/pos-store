@@ -4,6 +4,7 @@ import { Tenant } from '../../../tenants/domain/entities/tenant.entity';
 import { Branch } from '../../../branches/domain/entities/branch.entity';
 import { ProductVariant } from './product-variant.entity';
 import { ColumnNumericTransformer } from '../../../../common/database/numeric-transformer';
+import { InventoryMovementType } from '../../../../common/enums/inventory-movement-type.enum';
 
 @Entity('inventory_movements')
 export class InventoryMovement extends BaseEntity {
@@ -46,8 +47,8 @@ export class InventoryMovement extends BaseEntity {
   })
   quantity: number;
 
-  @Column()
-  type: string;
+  @Column({ type: 'varchar' })
+  type: InventoryMovementType;
 
   @Column()
   reason: string;

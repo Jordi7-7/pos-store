@@ -15,6 +15,7 @@ import { InventoryMovementReason } from '../../../../../common/enums/inventory-m
 import { PurchaseOrderStatus } from '../../../../purchases/domain/enums/purchase-order-status.enum';
 import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
+import { InventoryMovementType } from '../../../../../common/enums/inventory-movement-type.enum';
 
 @CommandHandler(CancelPurchaseOrderCommand)
 export class CancelPurchaseOrderHandler
@@ -130,7 +131,7 @@ export class CancelPurchaseOrderHandler
         movement.destinationBranchId = null;
         movement.variantId = item.variantId;
         movement.quantity = Number(item.quantity);
-        movement.type = 'OUT';
+        movement.type = InventoryMovementType.OUT;
         movement.reason = InventoryMovementReason.ANULACION_COMPRA;
         movement.purchaseOrderId = purchaseOrderId;
         movements.push(movement);

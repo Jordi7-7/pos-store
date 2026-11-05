@@ -79,11 +79,6 @@
       "count": 4
     }
   },
-  "src/modules/batches/application/queries/get-batches/get-batches.handler.ts": {
-    "@typescript-eslint/no-unsafe-enum-comparison": {
-      "count": 4
-    }
-  },
   "src/modules/batches/infrastructure/controllers/batches.controller.ts": {
     "@typescript-eslint/no-unsafe-return": {
       "count": 2
@@ -117,11 +112,6 @@
   "src/modules/media/services/safe-image-fetcher.ts": {
     "@typescript-eslint/no-unnecessary-type-assertion": {
       "count": 3
-    }
-  },
-  "src/modules/products/application/commands/adjust-stock/adjust-stock.handler.ts": {
-    "@typescript-eslint/no-unsafe-enum-comparison": {
-      "count": 2
     }
   },
   "src/modules/products/application/commands/create-simple-product/create-simple-product.handler.ts": {
@@ -170,11 +160,6 @@
     },
     "@typescript-eslint/no-unsafe-member-access": {
       "count": 2
-    }
-  },
-  "src/modules/products/application/queries/get-pos-variant-by-sku/get-pos-variant-by-sku.handler.ts": {
-    "@typescript-eslint/no-unused-vars": {
-      "count": 1
     }
   },
   "src/modules/products/application/queries/get-products-by-name/get-products-by-name.handler.ts": {
@@ -280,29 +265,7 @@
       "count": 2
     }
   },
-  "src/modules/sales/application/commands/open-cash-session/open-cash-session.handler.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-return": {
-      "count": 2
-    }
-  },
-  "src/modules/sales/application/queries/get-active-cash-session/get-active-cash-session.handler.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-assignment": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 4
-    }
-  },
   "src/modules/sales/application/queries/get-cash-registers/get-cash-registers.handler.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    },
     "@typescript-eslint/no-unsafe-member-access": {
       "count": 1
     },

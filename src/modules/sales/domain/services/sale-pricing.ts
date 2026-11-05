@@ -1,6 +1,7 @@
 import { DomainError } from '../../../../common/domain/domain.error';
 import { Money } from '../../../../common/domain/money';
 import { ErrorCode } from '../../../../common/errors/error-codes';
+import { PaymentMethod } from '../entities/sale-payment.entity';
 
 export interface SaleLineAmounts {
   quantity: number;
@@ -108,12 +109,12 @@ export function assertPaymentsCoverTotal(saleTotal: number, paymentAmounts: read
  * `sale_payments` nunca supera el total y el efectivo esperado en caja no se infla con el vuelto.
  * Conserva el orden original y descarta los pagos que quedan en cero.
  */
-export function allocatePayments<T extends { paymentMethod: string; amount: number }>(saleTotal: number, payments: readonly T[]): T[] {
+export function allocatePayments<T extends { paymentMethod: PaymentMethod; amount: number }>(saleTotal: number, payments: readonly T[]): T[] {
   let budget = Money.of(saleTotal);
   const applied = new Map<T, Money>();
 
   // Primero lo que no es efectivo (no admite vuelto); el efectivo cubre lo que falte
-  const byPriority = [...payments].sort((a, b) => Number(a.paymentMethod === 'EFECTIVO') - Number(b.paymentMethod === 'EFECTIVO'));
+  const byPriority = [...payments].sort((a, b) => Number(a.paymentMethod === PaymentMethod.EFECTIVO) - Number(b.paymentMethod === PaymentMethod.EFECTIVO));
   for (const payment of byPriority) {
     const amount = Money.of(payment.amount);
     const part = amount.lessThan(budget) ? amount : budget;

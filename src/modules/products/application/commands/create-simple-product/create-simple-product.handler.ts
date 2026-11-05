@@ -16,6 +16,7 @@ import { ProductType } from '../../../domain/enums/product-type.enum';
 import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
 import { translatingSkuConflict } from '../../services/sku-conflict';
+import { InventoryMovementType } from '../../../../../common/enums/inventory-movement-type.enum';
 
 
 @CommandHandler(CreateSimpleProductCommand)
@@ -169,7 +170,7 @@ export class CreateSimpleProductHandler implements ICommandHandler<CreateSimpleP
           movement.variantId = savedVariant.id;
           movement.purchaseOrderId = null;
           movement.quantity = Number(stock.quantity);
-          movement.type = 'IN';
+          movement.type = InventoryMovementType.IN;
           movement.reason = InventoryMovementReason.INITIAL_STOCK;
           movementsToSave.push(movement);
         }

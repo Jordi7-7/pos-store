@@ -16,6 +16,7 @@ import { PurchaseOrder } from '../../src/modules/purchases/domain/entities/purch
 import { PurchaseOrderStatus } from '../../src/modules/purchases/domain/enums/purchase-order-status.enum';
 import { User } from '../../src/modules/users/domain/entities/user.entity';
 import { redisStub, seedTenant, seedVariant, SeededTenant, startTestDatabase, TestDatabase } from './support/integration-database';
+import { InventoryMovementType } from '../../src/common/enums/inventory-movement-type.enum';
 
 /**
  * Compras con los handlers reales sobre Postgres: registrar, importar y cancelar, con sus
@@ -55,7 +56,7 @@ describe('Compras: registrar, importar y cancelar', () => {
   const movementsOf = (variantId: string) => db.getRepository(InventoryMovement).find({ where: { variantId }, order: { createdAt: 'ASC' } });
   const countOrders = (): Promise<number> => db.getRepository(PurchaseOrder).countBy({ tenantId: shop.tenantId });
 
-  const adjust = (variantId: string, quantity: number, type: 'IN' | 'OUT') =>
+  const adjust = (variantId: string, quantity: number, type: InventoryMovementType) =>
     new AdjustStockHandler(db.manager, redisStub).execute(new AdjustStockCommand(shop.tenantId, shop.ownerId, shop.branchId, variantId, quantity, type));
 
   beforeAll(async () => {
@@ -209,7 +210,7 @@ describe('Compras: registrar, importar y cancelar', () => {
     it('no se puede cancelar si ya se vendieron unidades de sus lotes, y no cambia nada', async () => {
       const variantId = await seedVariant(db, shop.tenantId, 'CAN-2');
       const order = await register([{ variantId, quantity: 10, purchasePrice: 5 }]);
-      await adjust(variantId, 3, 'OUT');
+      await adjust(variantId, 3, InventoryMovementType.OUT);
 
       await expect(cancel(order.id)).rejects.toMatchObject({ code: 'PURCHASE_BATCH_ALREADY_SOLD', details: { consumed: 3 } });
 
@@ -227,7 +228,7 @@ describe('Compras: registrar, importar y cancelar', () => {
 
     it('dos cancelaciones simultáneas revierten el stock una sola vez', async () => {
       const variantId = await seedVariant(db, shop.tenantId, 'CAN-4');
-      await adjust(variantId, 6, 'IN');
+      await adjust(variantId, 6, InventoryMovementType.IN);
       const order = await register([{ variantId, quantity: 4, purchasePrice: 5 }]);
 
       const results = await Promise.allSettled([cancel(order.id), cancel(order.id)]);
@@ -242,10 +243,10 @@ describe('Compras: registrar, importar y cancelar', () => {
 
       for (let attempt = 0; attempt < 12; attempt++) {
         const variantId = await seedVariant(db, shop.tenantId, `RACE-${attempt}`);
-        await adjust(variantId, 20, 'IN'); // otro lote, para que el chequeo de stock no oculte el problema
+        await adjust(variantId, 20, InventoryMovementType.IN); // otro lote, para que el chequeo de stock no oculte el problema
         const order = await register([{ variantId, quantity: 10, purchasePrice: 5 }], { invoice: `F-R${attempt}` });
 
-        await Promise.allSettled([cancel(order.id), adjust(variantId, 3, 'OUT')]);
+        await Promise.allSettled([cancel(order.id), adjust(variantId, 3, InventoryMovementType.OUT)]);
 
         expect(await stockOf(variantId)).toBe(await remainingInBatches(variantId));
       }

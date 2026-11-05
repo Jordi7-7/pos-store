@@ -3,6 +3,7 @@ import { GetBatchesHandler } from '../../src/modules/batches/application/queries
 import { GetBatchesQuery } from '../../src/modules/batches/application/queries/get-batches/get-batches.query';
 import { GetBatchesByVariantHandler } from '../../src/modules/batches/application/queries/get-batches-by-variant/get-batches-by-variant.handler';
 import { GetBatchesByVariantQuery } from '../../src/modules/batches/application/queries/get-batches-by-variant/get-batches-by-variant.query';
+import { BatchStatus } from '../../src/modules/batches/domain/entities/batch.entity';
 import { Branch } from '../../src/modules/branches/domain/entities/branch.entity';
 import { RegisterPurchaseCommand } from '../../src/modules/purchases/application/commands/register-purchase/register-purchase.command';
 import { RegisterPurchaseHandler } from '../../src/modules/purchases/application/commands/register-purchase/register-purchase.handler';
@@ -182,7 +183,7 @@ describe('Tienda y lotes', () => {
         new GetBatchesByVariantQuery(shop.tenantId, variantId, 1, 10, shop.branchId, shop.ownerId, true),
       );
       expect(result.meta.total).toBe(2);
-      const depleted = result.data.find((b) => b.status === 'DEPLETED');
+      const depleted = result.data.find((b) => b.status === BatchStatus.DEPLETED);
       expect(depleted).toMatchObject({ initialQuantity: 4, remainingQuantity: 0, consumedQuantity: 4, totalCostValue: 0 });
     });
   });

@@ -1,10 +1,11 @@
+import { CashSessionStatus } from '../../../domain/enums/cash-session-status.enum';
 import { CashSessionRow, toCashSessionListItem } from './cash-session-list-item';
 
 describe('toCashSessionListItem', () => {
   const opened = new Date('2026-11-04T10:00:00Z');
   const row: CashSessionRow = {
     id: 's1',
-    status: 'CLOSED',
+    status: CashSessionStatus.CLOSED,
     openedAt: opened,
     closedAt: new Date('2026-11-04T18:00:00Z'),
     openingBalance: '50.00',
@@ -25,7 +26,7 @@ describe('toCashSessionListItem', () => {
   it('convierte los importes de texto a número exacto y agrupa por entidad', () => {
     expect(toCashSessionListItem(row)).toEqual({
       id: 's1',
-      status: 'CLOSED',
+      status: CashSessionStatus.CLOSED,
       openedAt: opened,
       closedAt: new Date('2026-11-04T18:00:00Z'),
       openingBalance: 50,
@@ -40,7 +41,7 @@ describe('toCashSessionListItem', () => {
   });
 
   it('una sesión abierta conserva los importes de cierre como null (no 0)', () => {
-    const open = toCashSessionListItem({ ...row, status: 'OPEN', closedAt: null, closingBalance: null, expectedBalance: null, difference: null });
+    const open = toCashSessionListItem({ ...row, status: CashSessionStatus.OPEN, closedAt: null, closingBalance: null, expectedBalance: null, difference: null });
 
     expect(open.closingBalance).toBeNull();
     expect(open.expectedBalance).toBeNull();

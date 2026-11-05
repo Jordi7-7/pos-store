@@ -52,14 +52,14 @@ export class Batch extends BaseEntity {
     length: 50,
     default: BatchOriginType.PURCHASE,
   })
-  originType: BatchOriginType | string;
+  originType: BatchOriginType;
 
   @Column({
     type: 'varchar',
     length: 50,
     default: BatchStatus.ACTIVE,
   })
-  status: BatchStatus | string;
+  status: BatchStatus;
 
   @Column({ type: 'text', nullable: true })
   notes: string | null;

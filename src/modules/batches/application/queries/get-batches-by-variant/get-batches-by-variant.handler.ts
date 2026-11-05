@@ -4,6 +4,7 @@ import { GetBatchesByVariantQuery } from './get-batches-by-variant.query';
 import { ProductBatch } from '../../../../products/domain/entities/product-batch.entity';
 import { RedisService } from '../../../../../common/redis/redis.service';
 import { assertUserCanAccessBranch } from '../../../../../common/security/branch-access.helper';
+import { BatchOriginType, BatchStatus } from '../../../domain/entities/batch.entity';
 
 @QueryHandler(GetBatchesByVariantQuery)
 export class GetBatchesByVariantHandler implements IQueryHandler<GetBatchesByVariantQuery> {
@@ -49,15 +50,15 @@ export class GetBatchesByVariantHandler implements IQueryHandler<GetBatchesByVar
       let originLabel = 'Stock inicial / Ajuste';
       let originReference = batch?.code || 'Lote Directo';
 
-      if (batch?.originType === 'PURCHASE') {
+      if (batch?.originType === BatchOriginType.PURCHASE) {
         const supplierName = batch.purchaseOrder?.supplier?.name || 'Proveedor';
         originLabel = `Compra (${supplierName})`;
         originReference = batch.purchaseOrder?.invoiceNumber
           ? `Factura: ${batch.purchaseOrder.invoiceNumber}`
           : batch.code || (batch.purchaseOrderId ? `OC #${batch.purchaseOrderId.slice(0, 8)}` : 'Compra');
-      } else if (batch?.originType === 'REFUND') {
+      } else if (batch?.originType === BatchOriginType.REFUND) {
         originLabel = 'Devolución de cliente';
-      } else if (batch?.originType === 'ADJUSTMENT') {
+      } else if (batch?.originType === BatchOriginType.ADJUSTMENT) {
         originLabel = 'Ajuste de inventario';
       }
 
@@ -73,7 +74,7 @@ export class GetBatchesByVariantHandler implements IQueryHandler<GetBatchesByVar
         createdAt: batch?.createdAt || pb.createdAt,
         branchId: pb.branchId,
         branchName: pb.branch?.name || batch?.branch?.name || 'Sucursal Principal',
-        originType: batch?.originType || 'INITIAL_STOCK',
+        originType: batch?.originType || BatchOriginType.INITIAL_STOCK,
         originLabel,
         originReference,
         sku: pb.variant?.sku || '',
@@ -83,7 +84,7 @@ export class GetBatchesByVariantHandler implements IQueryHandler<GetBatchesByVar
         consumedQuantity,
         unitCost,
         totalCostValue: Number((remainingQuantity * unitCost).toFixed(2)),
-        status: remainingQuantity > 0 ? 'ACTIVE' : 'DEPLETED',
+        status: remainingQuantity > 0 ? BatchStatus.ACTIVE : BatchStatus.DEPLETED,
       };
     });
 

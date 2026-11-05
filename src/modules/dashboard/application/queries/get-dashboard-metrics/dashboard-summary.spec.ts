@@ -1,4 +1,5 @@
 import { buildPaymentMethods, buildToday, buildTopProducts, buildWeekSummary } from './dashboard-summary';
+import { PaymentMethod } from '../../../../sales/domain/entities/sale-payment.entity';
 
 describe('buildToday', () => {
   it('descuenta lo devuelto para obtener las ventas netas', () => {
@@ -37,8 +38,8 @@ describe('buildToday', () => {
 describe('buildPaymentMethods', () => {
   it('reparte efectivo y tarjeta con su porcentaje', () => {
     const result = buildPaymentMethods([
-      { method: 'EFECTIVO', amount: '75.10' },
-      { method: 'TARJETA', amount: '24.90' },
+      { method: PaymentMethod.EFECTIVO, amount: '75.10' },
+      { method: PaymentMethod.TARJETA, amount: '24.90' },
     ]);
 
     expect(result).toEqual({
@@ -50,8 +51,8 @@ describe('buildPaymentMethods', () => {
 
   it('suma varias filas del mismo método sin arrastrar error de coma flotante', () => {
     const result = buildPaymentMethods([
-      { method: 'EFECTIVO', amount: '0.10' },
-      { method: 'EFECTIVO', amount: '0.20' },
+      { method: PaymentMethod.EFECTIVO, amount: '0.10' },
+      { method: PaymentMethod.EFECTIVO, amount: '0.20' },
     ]);
 
     expect(result.cash.amount).toBe(0.3);

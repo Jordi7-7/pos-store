@@ -17,6 +17,7 @@ import { InventoryMovementReason } from '../../../../../common/enums/inventory-m
 import { PurchaseOrderStatus } from '../../../../purchases/domain/enums/purchase-order-status.enum';
 import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
+import { InventoryMovementType } from '../../../../../common/enums/inventory-movement-type.enum';
 
 @CommandHandler(ImportPurchasesCommand)
 export class ImportPurchasesHandler implements ICommandHandler<ImportPurchasesCommand> {
@@ -166,7 +167,7 @@ export class ImportPurchasesHandler implements ICommandHandler<ImportPurchasesCo
         movement.variantId = variant.id;
         movement.purchaseOrderId = savedPurchase.id;
         movement.quantity = qty;
-        movement.type = 'IN';
+        movement.type = InventoryMovementType.IN;
         movement.reason = InventoryMovementReason.COMPRA;
         inventoryMovements.push(movement);
       }

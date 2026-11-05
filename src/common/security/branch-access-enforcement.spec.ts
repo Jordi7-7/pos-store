@@ -12,6 +12,7 @@ import { ImportPurchasesCommand } from '../../modules/purchases/application/comm
 import { ImportPurchasesHandler } from '../../modules/purchases/application/commands/import-purchases/import-purchases.handler';
 import { RegisterPurchaseCommand } from '../../modules/purchases/application/commands/register-purchase/register-purchase.command';
 import { RegisterPurchaseHandler } from '../../modules/purchases/application/commands/register-purchase/register-purchase.handler';
+import { InventoryMovementType } from '../enums/inventory-movement-type.enum';
 
 /**
  * Todo comando que escribe stock en una sucursal debe verificar que el usuario tiene
@@ -46,7 +47,7 @@ describe('Acceso a sucursal en comandos de stock y compras', () => {
   const cases: Array<[string, () => Promise<unknown>, string]> = [
     [
       'AdjustStock',
-      () => new AdjustStockHandler(entityManager, redis).execute(new AdjustStockCommand('t1', 'u1', 'b1', 'v1', 1, 'IN')),
+      () => new AdjustStockHandler(entityManager, redis).execute(new AdjustStockCommand('t1', 'u1', 'b1', 'v1', 1, InventoryMovementType.IN)),
       'b1',
     ],
     [

@@ -43,6 +43,7 @@ import { HashService } from '../../src/modules/auth/services/hash.service';
 import { AuthTokenService } from '../../src/modules/auth/services/auth-token.service';
 import { Tenant } from '../../src/modules/tenants/domain/entities/tenant.entity';
 import { User } from '../../src/modules/users/domain/entities/user.entity';
+import { InventoryMovementType } from '../../src/common/enums/inventory-movement-type.enum';
 
 /**
  * Recorre ventas, devoluciones y cierre de caja con los handlers reales sobre Postgres.
@@ -632,7 +633,7 @@ describe('Flujo de dinero: venta, devolución y cierre de caja', () => {
       return variant.id;
     };
 
-    const adjust = (id: string, quantity: number, type: 'IN' | 'OUT') =>
+    const adjust = (id: string, quantity: number, type: InventoryMovementType) =>
       new AdjustStockHandler(db.manager, redis).execute(new AdjustStockCommand(tenantId, userId, branchId, id, quantity, type));
 
     const quantityOf = async (id: string): Promise<number> =>
@@ -641,14 +642,14 @@ describe('Flujo de dinero: venta, devolución y cierre de caja', () => {
     it('entradas simultáneas sobre una variante sin stock no chocan ni pierden unidades', async () => {
       const id = await newVariant('SIN-STOCK');
 
-      await Promise.all([1, 2, 3, 4, 5].map(() => adjust(id, 2, 'IN')));
+      await Promise.all([1, 2, 3, 4, 5].map(() => adjust(id, 2, InventoryMovementType.IN)));
 
       expect(await quantityOf(id)).toBe(10);
     });
 
     it('ventas simultáneas descuentan todas las unidades y numeran sin repetir', async () => {
       const id = await newVariant('CONCURRENTE');
-      await adjust(id, 10, 'IN');
+      await adjust(id, 10, InventoryMovementType.IN);
       const sessionId = await openSession(0);
 
       const sales = await Promise.all([1, 2, 3, 4].map(() => sell(sessionId, [{ variantId: id, quantity: 2, price: 10 }], 20)));
@@ -661,8 +662,8 @@ describe('Flujo de dinero: venta, devolución y cierre de caja', () => {
     it('ventas simultáneas con los mismos productos en orden cruzado no se bloquean entre sí', async () => {
       const a = await newVariant('CRUZADO-A');
       const b = await newVariant('CRUZADO-B');
-      await adjust(a, 50, 'IN');
-      await adjust(b, 50, 'IN');
+      await adjust(a, 50, InventoryMovementType.IN);
+      await adjust(b, 50, InventoryMovementType.IN);
       const sessionId = await openSession(0);
       const forward = [{ variantId: a, quantity: 1, price: 10 }, { variantId: b, quantity: 1, price: 10 }];
       const backward = [...forward].reverse();
@@ -685,7 +686,7 @@ describe('Flujo de dinero: venta, devolución y cierre de caja', () => {
       expect(await quantityOf(id)).toBe(-3);
       expect(sale.items[0].cost).toBe(4); // sin lotes: costo de ficha
 
-      await adjust(id, 5, 'IN');
+      await adjust(id, 5, InventoryMovementType.IN);
 
       expect(await quantityOf(id)).toBe(2);
       const batches = await db.getRepository(ProductBatch).findBy({ variantId: id });
@@ -695,9 +696,9 @@ describe('Flujo de dinero: venta, devolución y cierre de caja', () => {
 
     it('un ajuste de salida no puede dejar el stock en negativo', async () => {
       const id = await newVariant('AJUSTE');
-      await adjust(id, 1, 'IN');
+      await adjust(id, 1, InventoryMovementType.IN);
 
-      await expect(adjust(id, 2, 'OUT')).rejects.toThrow(/Stock insuficiente/);
+      await expect(adjust(id, 2, InventoryMovementType.OUT)).rejects.toThrow(/Stock insuficiente/);
 
       expect(await quantityOf(id)).toBe(1);
     });
@@ -705,9 +706,9 @@ describe('Flujo de dinero: venta, devolución y cierre de caja', () => {
     it('el costo de la venta sigue el orden FIFO de los lotes', async () => {
       const id = await newVariant('FIFO');
       const batchRepo = db.getRepository(ProductBatch);
-      await adjust(id, 2, 'IN');
+      await adjust(id, 2, InventoryMovementType.IN);
       await db.getRepository(ProductVariant).update(id, { purchasePrice: 8 });
-      await adjust(id, 2, 'IN');
+      await adjust(id, 2, InventoryMovementType.IN);
       const sessionId = await openSession(0);
 
       const sale = await sell(sessionId, [{ variantId: id, quantity: 3, price: 10 }], 30);

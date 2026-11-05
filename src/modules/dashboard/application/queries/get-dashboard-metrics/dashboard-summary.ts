@@ -1,5 +1,6 @@
 import { Money } from '../../../../../common/domain/money';
 import { DashboardMetricsDto } from './dashboard-metrics.read-model';
+import { PaymentMethod } from '../../../../sales/domain/entities/sale-payment.entity';
 
 /** Postgres devuelve numeric/bigint como texto; los agregados vacíos llegan como null. */
 type Numeric = string | number | null | undefined;
@@ -16,7 +17,7 @@ export interface TodayRefundsRow {
 }
 
 export interface PaymentMethodRow {
-  method: string;
+  method: PaymentMethod;
   amount: Numeric;
 }
 
@@ -49,8 +50,8 @@ export interface WeekDayRow {
 }
 
 const WEEK_DAY_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'] as const;
-const CASH_METHOD = 'EFECTIVO';
-const CARD_METHOD = 'TARJETA';
+const CASH_METHOD = PaymentMethod.EFECTIVO;
+const CARD_METHOD = PaymentMethod.TARJETA;
 
 function toNumber(value: Numeric): number {
   return Number(value || 0);

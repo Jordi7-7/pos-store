@@ -1,4 +1,5 @@
 import { Money } from '../../../../common/domain/money';
+import { PaymentMethod } from '../entities/sale-payment.entity';
 
 export interface CashDrawerMovements {
   openingBalance: number;
@@ -22,7 +23,7 @@ export function cashDifference(closingBalance: number, expectedBalance: number):
 }
 
 export interface SessionSalePayment {
-  paymentMethod: string;
+  paymentMethod: PaymentMethod;
   amount: number | string | null;
 }
 
@@ -40,8 +41,8 @@ export interface CashSessionTotals {
   totalRefunds: number;
 }
 
-const CASH = 'EFECTIVO';
-const CARD = 'TARJETA';
+const CASH = PaymentMethod.EFECTIVO;
+const CARD = PaymentMethod.TARJETA;
 
 /**
  * Totales de una sesión de caja. Una venta sin pagos registrados (datos antiguos) se considera

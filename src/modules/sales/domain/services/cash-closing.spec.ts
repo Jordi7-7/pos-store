@@ -1,4 +1,5 @@
 import { cashDifference, expectedCashBalance, summarizeCashSession } from './cash-closing';
+import { PaymentMethod } from '../entities/sale-payment.entity';
 
 describe('expectedCashBalance', () => {
   it('suma apertura y ventas, y resta gastos y devoluciones', () => {
@@ -31,8 +32,8 @@ describe('summarizeCashSession', () => {
   it('separa efectivo y tarjeta, resta devoluciones y suma gastos', () => {
     const totals = summarize({
       sales: [
-        { total: '30.10', payments: [{ paymentMethod: 'EFECTIVO', amount: '10.10' }, { paymentMethod: 'TARJETA', amount: '20' }] },
-        { total: 5, payments: [{ paymentMethod: 'EFECTIVO', amount: 5 }] },
+        { total: '30.10', payments: [{ paymentMethod: PaymentMethod.EFECTIVO, amount: '10.10' }, { paymentMethod: PaymentMethod.TARJETA, amount: '20' }] },
+        { total: 5, payments: [{ paymentMethod: PaymentMethod.EFECTIVO, amount: 5 }] },
       ],
       expenseAmounts: ['2.50', 1],
       refundAmounts: ['4'],
@@ -50,7 +51,7 @@ describe('summarizeCashSession', () => {
 
   it('suma importes decimales sin error de coma flotante', () => {
     const totals = summarize({
-      sales: [{ total: 0.3, payments: [{ paymentMethod: 'EFECTIVO', amount: 0.1 }, { paymentMethod: 'EFECTIVO', amount: 0.2 }] }],
+      sales: [{ total: 0.3, payments: [{ paymentMethod: PaymentMethod.EFECTIVO, amount: 0.1 }, { paymentMethod: PaymentMethod.EFECTIVO, amount: 0.2 }] }],
       expenseAmounts: [],
       refundAmounts: [],
     });
