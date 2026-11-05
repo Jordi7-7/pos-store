@@ -13,24 +13,26 @@ export class CreateTagHandler implements ICommandHandler<CreateTagCommand> {
   async execute(command: CreateTagCommand): Promise<Tag> {
     const { tenantId, name } = command;
     this.logger.log(`Creating tag for Tenant ${tenantId}`);
-    const repo = this.entityManager.getRepository(Tag);
     const trimmedName = name.trim();
 
-    // Check duplicate tag case insensitively
-    const existing = await repo
-      .createQueryBuilder('tag')
-      .where('tag.tenantId = :tenantId', { tenantId })
-      .andWhere('LOWER(tag.name) = LOWER(:name)', { name: trimmedName })
-      .getOne();
+    // No hay índice único sobre el nombre: dos altas simultáneas de la misma etiqueta se serializan aquí
+    return this.entityManager.transaction(async (manager) => {
+      await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`tags:${tenantId}:${trimmedName.toLowerCase()}`]);
+      const repo = manager.getRepository(Tag);
 
-    if (existing) {
-      this.logger.log(`Tag ${existing.id} already exists for Tenant ${tenantId}; reusing it`);
-      return existing;
-    }
+      const existing = await repo
+        .createQueryBuilder('tag')
+        .where('tag.tenantId = :tenantId', { tenantId })
+        .andWhere('LOWER(tag.name) = LOWER(:name)', { name: trimmedName })
+        .getOne();
+      if (existing) {
+        this.logger.log(`Tag ${existing.id} already exists for Tenant ${tenantId}; reusing it`);
+        return existing;
+      }
 
-    const tag = repo.create({ tenantId, name: trimmedName });
-    const saved = await repo.save(tag);
-    this.logger.log(`Tag ${saved.id} created for Tenant ${tenantId}`);
-    return saved;
+      const saved = await repo.save(repo.create({ tenantId, name: trimmedName }));
+      this.logger.log(`Tag ${saved.id} created for Tenant ${tenantId}`);
+      return saved;
+    });
   }
 }

@@ -34,8 +34,10 @@ export class GetProductByIdHandler implements IQueryHandler<GetProductByIdQuery>
     // 2. Si no se encuentra, intentar buscar por ID de Variante
     if (!product) {
       product = await repo.findOne({
+        // También acotado a la tienda: sin esto, el id de una variante ajena devolvería su producto
         where: {
-          variants: { id }
+          tenantId,
+          variants: { id },
         },
         relations: {
           category: true,
