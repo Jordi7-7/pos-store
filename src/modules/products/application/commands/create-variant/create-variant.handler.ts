@@ -1,5 +1,5 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import { Logger, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Logger, HttpStatus } from '@nestjs/common';
 import { In, EntityManager } from 'typeorm';
 import { CreateVariantCommand } from './create-variant.command';
 import { Product } from '../../../domain/entities/product.entity';
@@ -11,6 +11,8 @@ import { ProductBatch } from '../../../domain/entities/product-batch.entity';
 import { Batch, BatchOriginType } from '../../../../batches/domain/entities/batch.entity';
 import { InventoryMovement } from '../../../domain/entities/inventory-movement.entity';
 import { InventoryMovementReason } from '../../../../../common/enums/inventory-movement-reason.enum';
+import { AppException } from '../../../../../common/errors/app.exception';
+import { ErrorCode } from '../../../../../common/errors/error-codes';
 
 @CommandHandler(CreateVariantCommand)
 export class CreateVariantHandler implements ICommandHandler<CreateVariantCommand> {
@@ -35,7 +37,7 @@ export class CreateVariantHandler implements ICommandHandler<CreateVariantComman
         relations: { variants: { attributeValues: true } },
       });
       if (!product) {
-        throw new NotFoundException(`Product with ID ${productId} not found`);
+        throw new AppException(ErrorCode.ProductNotFound, 'Producto no encontrado.', HttpStatus.NOT_FOUND, { productId });
       }
 
       // Validate SKU uniqueness per tenant
@@ -43,11 +45,11 @@ export class CreateVariantHandler implements ICommandHandler<CreateVariantComman
         where: { sku: variantDto.sku, tenantId },
       });
       if (isSkuTaken) {
-        throw new BadRequestException(`El SKU "${variantDto.sku}" ya está registrado en el sistema.`);
+        throw new AppException(ErrorCode.SkuTaken, `El SKU "${variantDto.sku}" ya está registrado en el sistema.`, HttpStatus.CONFLICT, { sku: variantDto.sku });
       }
 
       // Validate no duplicate attribute combinations in existing product variants
-      const valueIds = variantDto.attributeValues?.map((v: any) => v.attributeValueId) || [];
+      const valueIds = variantDto.attributeValues?.map((v) => v.attributeValueId) || [];
       const newCombinationKey = [...valueIds].sort().join(',');
 
       if (newCombinationKey) {
@@ -57,7 +59,7 @@ export class CreateVariantHandler implements ICommandHandler<CreateVariantComman
             .sort()
             .join(',') || '';
           if (existingKey === newCombinationKey) {
-            throw new BadRequestException('Ya existe una variante con la misma combinación de atributos para este producto.');
+            throw new AppException(ErrorCode.DuplicateVariantCombination, 'Ya existe una variante con la misma combinación de atributos para este producto.', HttpStatus.CONFLICT);
           }
         }
       }
@@ -94,7 +96,7 @@ export class CreateVariantHandler implements ICommandHandler<CreateVariantComman
           relations: { attribute: true },
         });
         if (attributeValues.length !== valueIds.length) {
-          throw new BadRequestException('Some variant attribute values were not found');
+          throw new AppException(ErrorCode.AttributeValuesNotFound, 'Uno o más valores de atributo no existen.', HttpStatus.NOT_FOUND);
         }
         variant.attributeValues = attributeValues;
       } else {

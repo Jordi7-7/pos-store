@@ -1,8 +1,10 @@
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
-import { BadRequestException } from '@nestjs/common';
+import { HttpStatus } from '@nestjs/common';
 import { EntityManager, In } from 'typeorm';
 import { ValidateImportProductsQuery } from './validate-import-products.query';
 import { ProductVariant } from '../../../domain/entities/product-variant.entity';
+import { AppException } from '../../../../../common/errors/app.exception';
+import { ErrorCode } from '../../../../../common/errors/error-codes';
 
 @QueryHandler(ValidateImportProductsQuery)
 export class ValidateImportProductsHandler implements IQueryHandler<ValidateImportProductsQuery> {
@@ -18,9 +20,7 @@ export class ValidateImportProductsHandler implements IQueryHandler<ValidateImpo
     }
 
     if (items.length > 3000) {
-      throw new BadRequestException(
-        `El archivo contiene ${items.length} productos. El límite máximo permitido por importación es de 3,000 productos.`,
-      );
+      throw new AppException(ErrorCode.ImportLimitExceeded, `El archivo contiene ${items.length} productos. El límite máximo permitido por importación es de 3,000 productos.`, HttpStatus.BAD_REQUEST, { received: items.length, max: 3000 });
     }
 
     const existingSkusSet = new Set<string>();

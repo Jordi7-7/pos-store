@@ -1,9 +1,11 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import { Logger, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Logger, HttpStatus } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { CreateAttributeValueCommand } from './create-attribute-value.command';
 import { Attribute } from '../../../domain/entities/attribute.entity';
 import { AttributeValue } from '../../../domain/entities/attribute-value.entity';
+import { AppException } from '../../../../../common/errors/app.exception';
+import { ErrorCode } from '../../../../../common/errors/error-codes';
 
 @CommandHandler(CreateAttributeValueCommand)
 export class CreateAttributeValueHandler implements ICommandHandler<CreateAttributeValueCommand> {
@@ -27,7 +29,7 @@ export class CreateAttributeValueHandler implements ICommandHandler<CreateAttrib
     });
     if (!attribute) {
       this.logger.warn(`Attribute value creation failed: Attribute ID ${attributeId} not found or belongs to another tenant`);
-      throw new NotFoundException(`Attribute with ID ${attributeId} not found`);
+      throw new AppException(ErrorCode.AttributeNotFound, 'Atributo no encontrado.', HttpStatus.NOT_FOUND, { attributeId });
     }
 
     // 2. Prevent duplicate values for the same Attribute
@@ -39,7 +41,7 @@ export class CreateAttributeValueHandler implements ICommandHandler<CreateAttrib
     });
     if (existing) {
       this.logger.warn(`Attribute value creation failed: value "${value}" already exists for Attribute ${attributeId}`);
-      throw new BadRequestException(`Value "${value}" already exists for this attribute`);
+      throw new AppException(ErrorCode.AttributeValueTaken, `El valor "${value}" ya existe para este atributo.`, HttpStatus.CONFLICT, { value });
     }
 
     const attrValue = new AttributeValue();

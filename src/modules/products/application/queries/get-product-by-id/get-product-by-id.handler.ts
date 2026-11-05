@@ -1,8 +1,10 @@
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
-import { NotFoundException } from '@nestjs/common';
+import { HttpStatus } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { GetProductByIdQuery } from './get-product-by-id.query';
 import { Product } from '../../../domain/entities/product.entity';
+import { AppException } from '../../../../../common/errors/app.exception';
+import { ErrorCode } from '../../../../../common/errors/error-codes';
 
 @QueryHandler(GetProductByIdQuery)
 export class GetProductByIdHandler implements IQueryHandler<GetProductByIdQuery> {
@@ -51,7 +53,7 @@ export class GetProductByIdHandler implements IQueryHandler<GetProductByIdQuery>
     }
 
     if (!product) {
-      throw new NotFoundException(`Product or Variant with ID ${id} not found`);
+      throw new AppException(ErrorCode.ProductNotFound, 'Producto o variante no encontrado.', HttpStatus.NOT_FOUND, { id });
     }
 
     return product;

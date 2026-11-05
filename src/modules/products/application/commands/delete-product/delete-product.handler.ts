@@ -1,8 +1,10 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import { Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Logger, HttpStatus } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { DeleteProductCommand } from './delete-product.command';
 import { Product } from '../../../domain/entities/product.entity';
+import { AppException } from '../../../../../common/errors/app.exception';
+import { ErrorCode } from '../../../../../common/errors/error-codes';
 
 @CommandHandler(DeleteProductCommand)
 export class DeleteProductHandler implements ICommandHandler<DeleteProductCommand> {
@@ -23,7 +25,7 @@ export class DeleteProductHandler implements ICommandHandler<DeleteProductComman
 
     if (!product) {
       this.logger.warn(`Product soft-deletion failed: Product ID ${id} not found for Tenant ${tenantId}`);
-      throw new NotFoundException(`Product with ID ${id} not found`);
+      throw new AppException(ErrorCode.ProductNotFound, 'Producto no encontrado.', HttpStatus.NOT_FOUND, { id });
     }
 
     // Validar que el producto no tenga existencias activas ni saldos negativos en ninguna variante
@@ -32,9 +34,7 @@ export class DeleteProductHandler implements ICommandHandler<DeleteProductComman
     );
 
     if (hasNonZeroStock) {
-      throw new BadRequestException(
-        'No se puede eliminar el producto porque tiene existencias activas o saldos negativos en inventario. Todas las cantidades deben estar en 0.',
-      );
+      throw new AppException(ErrorCode.ProductHasStock, 'No se puede eliminar el producto porque tiene existencias activas o saldos negativos en inventario. Todas las cantidades deben estar en 0.', HttpStatus.CONFLICT);
     }
 
     // TypeORM softRemove will cascade to variants due to cascade: true on the entity relation

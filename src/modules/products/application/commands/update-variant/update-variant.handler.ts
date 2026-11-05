@@ -1,9 +1,11 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import { Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Logger, HttpStatus } from '@nestjs/common';
 import { EntityManager, In, Not } from 'typeorm';
 import { UpdateVariantCommand } from './update-variant.command';
 import { ProductVariant } from '../../../domain/entities/product-variant.entity';
 import { ProductImage } from '../../../domain/entities/product-image.entity';
+import { AppException } from '../../../../../common/errors/app.exception';
+import { ErrorCode } from '../../../../../common/errors/error-codes';
 
 @CommandHandler(UpdateVariantCommand)
 export class UpdateVariantHandler implements ICommandHandler<UpdateVariantCommand> {
@@ -35,7 +37,7 @@ export class UpdateVariantHandler implements ICommandHandler<UpdateVariantComman
 
     if (!variant) {
       this.logger.warn(`Variant update failed: Variant ID ${variantId} not found for Tenant ${tenantId}`);
-      throw new NotFoundException(`Variant with ID ${variantId} not found`);
+      throw new AppException(ErrorCode.VariantNotFound, 'Variante no encontrada.', HttpStatus.NOT_FOUND, { variantId });
     }
 
     // Check SKU uniqueness if changed
@@ -49,7 +51,7 @@ export class UpdateVariantHandler implements ICommandHandler<UpdateVariantComman
       });
 
       if (existingWithSku) {
-        throw new BadRequestException(`El SKU "${sku}" ya está registrado en otra variante.`);
+        throw new AppException(ErrorCode.SkuTaken, `El SKU "${sku}" ya está registrado en otra variante.`, HttpStatus.CONFLICT, { sku });
       }
       variant.sku = sku;
     }
@@ -67,7 +69,7 @@ export class UpdateVariantHandler implements ICommandHandler<UpdateVariantComman
           where: { id: In(imageIds), tenantId },
         });
         if (images.length !== imageIds.length) {
-          throw new BadRequestException('Some variant images were not found');
+          throw new AppException(ErrorCode.ImagesNotFound, 'Una o más imágenes de la variante no existen.', HttpStatus.NOT_FOUND);
         }
         variant.images = images;
       } else {
@@ -81,7 +83,7 @@ export class UpdateVariantHandler implements ICommandHandler<UpdateVariantComman
       return savedVariant;
     } catch (error: any) {
       if (error?.code === '23505' || error?.driverError?.code === '23505') {
-        throw new BadRequestException('El SKU o código ingresado ya está en uso por otra variante.');
+        throw new AppException(ErrorCode.SkuTaken, 'El SKU o código ingresado ya está en uso por otra variante.', HttpStatus.CONFLICT);
       }
       throw error;
     }

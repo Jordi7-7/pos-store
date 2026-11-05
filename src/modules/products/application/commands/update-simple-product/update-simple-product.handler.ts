@@ -1,5 +1,5 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import { Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Logger, HttpStatus } from '@nestjs/common';
 import { EntityManager, In, Not } from 'typeorm';
 import { UpdateSimpleProductCommand } from './update-simple-product.command';
 import { Product } from '../../../domain/entities/product.entity';
@@ -7,6 +7,8 @@ import { ProductImage } from '../../../domain/entities/product-image.entity';
 import { Category } from '../../../domain/entities/category.entity';
 import { ProductVariant } from '../../../domain/entities/product-variant.entity';
 import { ProductType } from '../../../domain/enums/product-type.enum';
+import { AppException } from '../../../../../common/errors/app.exception';
+import { ErrorCode } from '../../../../../common/errors/error-codes';
 
 @CommandHandler(UpdateSimpleProductCommand)
 export class UpdateSimpleProductHandler implements ICommandHandler<UpdateSimpleProductCommand> {
@@ -44,7 +46,7 @@ export class UpdateSimpleProductHandler implements ICommandHandler<UpdateSimpleP
 
     if (!product) {
       this.logger.warn(`Product update failed: Product ID ${id} not found for Tenant ${tenantId}`);
-      throw new NotFoundException(`Product with ID ${id} not found`);
+      throw new AppException(ErrorCode.ProductNotFound, 'Producto no encontrado.', HttpStatus.NOT_FOUND, { id });
     }
 
     if (name !== undefined) product.name = name;
@@ -59,7 +61,7 @@ export class UpdateSimpleProductHandler implements ICommandHandler<UpdateSimpleP
           where: { id: categoryId, tenantId },
         });
         if (!category) {
-          throw new NotFoundException(`Category with ID ${categoryId} not found`);
+          throw new AppException(ErrorCode.CategoryNotFound, 'Categoría no encontrada.', HttpStatus.NOT_FOUND, { categoryId });
         }
         product.categoryId = categoryId;
       }
@@ -72,7 +74,7 @@ export class UpdateSimpleProductHandler implements ICommandHandler<UpdateSimpleP
           where: { id: In(imageIds), tenantId },
         });
         if (images.length !== imageIds.length) {
-          throw new BadRequestException('Some product images were not found');
+          throw new AppException(ErrorCode.ImagesNotFound, 'Una o más imágenes del producto no existen.', HttpStatus.NOT_FOUND);
         }
         product.images = images;
       } else {
@@ -83,9 +85,7 @@ export class UpdateSimpleProductHandler implements ICommandHandler<UpdateSimpleP
     // 4. Update Variant
     // If the product has multiple variants or is marked as VARIABLE, reject simple update
     if (product.type === ProductType.VARIABLE || (product.variants && product.variants.length > 1)) {
-      throw new BadRequestException(
-        'Este producto es de tipo compuesto o tiene múltiples variantes. Debe actualizarse mediante la edición de producto compuesto o por variante individual.'
-      );
+      throw new AppException(ErrorCode.ProductNotSimple, 'Este producto es de tipo compuesto o tiene múltiples variantes. Debe actualizarse mediante la edición de producto compuesto o por variante individual.', HttpStatus.CONFLICT);
     }
 
     let variant = product.variants?.[0];
@@ -108,7 +108,7 @@ export class UpdateSimpleProductHandler implements ICommandHandler<UpdateSimpleP
       });
 
       if (existingWithSku) {
-        throw new BadRequestException(`El SKU "${sku}" ya está registrado en otro producto del sistema.`);
+        throw new AppException(ErrorCode.SkuTaken, `El SKU "${sku}" ya está registrado en otro producto del sistema.`, HttpStatus.CONFLICT, { sku });
       }
       variant.sku = sku;
     }
@@ -136,7 +136,7 @@ export class UpdateSimpleProductHandler implements ICommandHandler<UpdateSimpleP
       return savedProduct;
     } catch (error: any) {
       if (error?.code === '23505' || error?.driverError?.code === '23505') {
-        throw new BadRequestException('El SKU o código ingresado ya está en uso por otro producto.');
+        throw new AppException(ErrorCode.SkuTaken, 'El SKU o código ingresado ya está en uso por otro producto.', HttpStatus.CONFLICT);
       }
       throw error;
     }

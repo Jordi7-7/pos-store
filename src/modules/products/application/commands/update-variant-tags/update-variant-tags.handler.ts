@@ -1,9 +1,11 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { EntityManager, In } from 'typeorm';
-import { NotFoundException, Logger } from '@nestjs/common';
+import { Logger, HttpStatus } from '@nestjs/common';
 import { UpdateVariantTagsCommand } from './update-variant-tags.command';
 import { ProductVariant } from '../../../domain/entities/product-variant.entity';
 import { Tag } from '../../../domain/entities/tag.entity';
+import { AppException } from '../../../../../common/errors/app.exception';
+import { ErrorCode } from '../../../../../common/errors/error-codes';
 
 @CommandHandler(UpdateVariantTagsCommand)
 export class UpdateVariantTagsHandler implements ICommandHandler<UpdateVariantTagsCommand> {
@@ -24,7 +26,7 @@ export class UpdateVariantTagsHandler implements ICommandHandler<UpdateVariantTa
 
     if (!variant) {
       this.logger.warn(`Variant tags update rejected: ${variantId} not found in Tenant ${tenantId}`);
-      throw new NotFoundException(`La variante con ID ${variantId} no existe.`);
+      throw new AppException(ErrorCode.VariantNotFound, `La variante con ID ${variantId} no existe.`, HttpStatus.NOT_FOUND, { variantId });
     }
 
     const tags = tagIds.length > 0

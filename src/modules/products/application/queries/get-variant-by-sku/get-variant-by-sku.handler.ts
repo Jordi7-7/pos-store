@@ -1,8 +1,10 @@
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
-import { NotFoundException } from '@nestjs/common';
+import { HttpStatus } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { GetVariantBySkuQuery } from './get-variant-by-sku.query';
 import { ProductVariant } from '../../../domain/entities/product-variant.entity';
+import { AppException } from '../../../../../common/errors/app.exception';
+import { ErrorCode } from '../../../../../common/errors/error-codes';
 
 @QueryHandler(GetVariantBySkuQuery)
 export class GetVariantBySkuHandler implements IQueryHandler<GetVariantBySkuQuery> {
@@ -25,7 +27,7 @@ export class GetVariantBySkuHandler implements IQueryHandler<GetVariantBySkuQuer
       .getOne();
 
     if (!variant) {
-      throw new NotFoundException(`Variante con SKU ${sku} no encontrada`);
+      throw new AppException(ErrorCode.VariantNotFound, `Variante con SKU ${sku} no encontrada`, HttpStatus.NOT_FOUND, { sku });
     }
 
     return {

@@ -1,5 +1,5 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import { Logger, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Logger, HttpStatus } from '@nestjs/common';
 import { In, EntityManager } from 'typeorm';
 import { CreateSimpleProductCommand } from './create-simple-product.command';
 import { Product } from '../../../domain/entities/product.entity';
@@ -13,6 +13,8 @@ import { InventoryMovement } from '../../../domain/entities/inventory-movement.e
 import { Branch } from '../../../../branches/domain/entities/branch.entity';
 import { InventoryMovementReason } from '../../../../../common/enums/inventory-movement-reason.enum';
 import { ProductType } from '../../../domain/enums/product-type.enum';
+import { AppException } from '../../../../../common/errors/app.exception';
+import { ErrorCode } from '../../../../../common/errors/error-codes';
 
 
 @CommandHandler(CreateSimpleProductCommand)
@@ -55,7 +57,7 @@ export class CreateSimpleProductHandler implements ICommandHandler<CreateSimpleP
             where: { id: stockDto.branchId, tenantId },
           });
           if (!branchExists) {
-            throw new BadRequestException(`La sucursal con ID "${stockDto.branchId}" no existe o no pertenece al inquilino.`);
+            throw new AppException(ErrorCode.BranchNotFound, `La sucursal con ID "${stockDto.branchId}" no existe o no pertenece al inquilino.`, HttpStatus.NOT_FOUND, { branchId: stockDto.branchId });
           }
         }
       }
@@ -65,7 +67,7 @@ export class CreateSimpleProductHandler implements ICommandHandler<CreateSimpleP
         where: { sku, tenantId },
       });
       if (isSkuTaken) {
-        throw new BadRequestException(`El SKU "${sku}" ya está registrado en el sistema.`);
+        throw new AppException(ErrorCode.SkuTaken, `El SKU "${sku}" ya está registrado en el sistema.`, HttpStatus.CONFLICT, { sku });
       }
 
       const product = new Product();
@@ -81,7 +83,7 @@ export class CreateSimpleProductHandler implements ICommandHandler<CreateSimpleP
           where: { id: categoryId, tenantId },
         });
         if (!category) {
-          throw new NotFoundException(`Category with ID ${categoryId} not found`);
+          throw new AppException(ErrorCode.CategoryNotFound, 'Categoría no encontrada.', HttpStatus.NOT_FOUND, { categoryId });
         }
         product.categoryId = categoryId;
       } else {
@@ -94,7 +96,7 @@ export class CreateSimpleProductHandler implements ICommandHandler<CreateSimpleP
           where: { id: In(imageIds), tenantId },
         });
         if (images.length !== imageIds.length) {
-          throw new BadRequestException('Some product images were not found');
+          throw new AppException(ErrorCode.ImagesNotFound, 'Una o más imágenes del producto no existen.', HttpStatus.NOT_FOUND);
         }
         product.images = images;
       } else {

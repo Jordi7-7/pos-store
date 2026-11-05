@@ -1,5 +1,5 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import { Logger, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Logger, HttpStatus } from '@nestjs/common';
 import { EntityManager, In } from 'typeorm';
 import { RedisService } from '../../../../../common/redis/redis.service';
 import { assertUserCanOperateInBranch } from '../../../../../common/security/branch-access.helper';
@@ -14,6 +14,8 @@ import { Branch } from '../../../../branches/domain/entities/branch.entity';
 import { InventoryMovementReason } from '../../../../../common/enums/inventory-movement-reason.enum';
 import { InventoryMovementType } from '../../../../../common/enums/inventory-movement-type.enum';
 import { ProductType } from '../../../domain/enums/product-type.enum';
+import { AppException } from '../../../../../common/errors/app.exception';
+import { ErrorCode } from '../../../../../common/errors/error-codes';
 
 @CommandHandler(ImportProductsCommand)
 
@@ -30,13 +32,11 @@ export class ImportProductsHandler implements ICommandHandler<ImportProductsComm
     this.logger.log(`Executing bulk product import: ${items.length} items for Tenant: ${tenantId}`);
 
     if (items.length === 0) {
-      throw new BadRequestException('No se proporcionaron productos para importar.');
+      throw new AppException(ErrorCode.ImportEmpty, 'No se proporcionaron productos para importar.', HttpStatus.BAD_REQUEST);
     }
 
     if (items.length > 3000) {
-      throw new BadRequestException(
-        `El archivo contiene ${items.length} productos. El límite máximo permitido por importación es de 3,000 productos.`,
-      );
+      throw new AppException(ErrorCode.ImportLimitExceeded, `El archivo contiene ${items.length} productos. El límite máximo permitido por importación es de 3,000 productos.`, HttpStatus.BAD_REQUEST, { received: items.length, max: 3000 });
     }
 
     return this.entityManager.transaction(async (tm) => {
@@ -60,7 +60,7 @@ export class ImportProductsHandler implements ICommandHandler<ImportProductsComm
       if (branchId) {
         const branch = await branchRepo.findOne({ where: { id: branchId, tenantId } });
         if (!branch) {
-          throw new NotFoundException(`La sucursal destino con ID ${branchId} no existe.`);
+          throw new AppException(ErrorCode.BranchNotFound, `La sucursal destino con ID ${branchId} no existe.`, HttpStatus.NOT_FOUND, { branchId });
         }
       }
 
@@ -83,7 +83,7 @@ export class ImportProductsHandler implements ICommandHandler<ImportProductsComm
       if (duplicateSkus.length > 0) {
         const dupSkus = duplicateSkus.slice(0, 10).join(', ');
         const extraCount = duplicateSkus.length > 10 ? ` y ${duplicateSkus.length - 10} más` : '';
-        throw new BadRequestException(`Los siguientes SKUs ya existen en el sistema: ${dupSkus}${extraCount}`);
+        throw new AppException(ErrorCode.SkuTaken, `Los siguientes SKUs ya existen en el sistema: ${dupSkus}${extraCount}`, HttpStatus.CONFLICT, { skus: duplicateSkus });
       }
 
       // Create a single physical Batch header for the entire import operation if branchId is present

@@ -1,5 +1,5 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import { Logger, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Logger, HttpStatus } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { RedisService } from '../../../../../common/redis/redis.service';
 import { assertUserCanOperateInBranch } from '../../../../../common/security/branch-access.helper';
@@ -11,6 +11,8 @@ import { InventoryMovement } from '../../../domain/entities/inventory-movement.e
 import { Branch } from '../../../../branches/domain/entities/branch.entity';
 import { InventoryMovementReason } from '../../../../../common/enums/inventory-movement-reason.enum';
 import { InventoryMovementType } from '../../../../../common/enums/inventory-movement-type.enum';
+import { AppException } from '../../../../../common/errors/app.exception';
+import { ErrorCode } from '../../../../../common/errors/error-codes';
 
 export interface AdjustStockResult {
   success: boolean;
@@ -34,7 +36,7 @@ export class AdjustStockHandler implements ICommandHandler<AdjustStockCommand> {
     );
 
     if (quantity <= 0) {
-      throw new BadRequestException('La cantidad debe ser mayor a 0');
+      throw new AppException(ErrorCode.InvalidQuantity, 'La cantidad debe ser mayor a 0', HttpStatus.BAD_REQUEST);
     }
 
     return this.entityManager.transaction(async (transactionalManager) => {
@@ -54,7 +56,7 @@ export class AdjustStockHandler implements ICommandHandler<AdjustStockCommand> {
         where: { id: branchId, tenantId },
       });
       if (!branch) {
-        throw new NotFoundException(`La sucursal con ID ${branchId} no existe para este tenant.`);
+        throw new AppException(ErrorCode.BranchNotFound, `La sucursal con ID ${branchId} no existe para este tenant.`, HttpStatus.NOT_FOUND, { branchId });
       }
 
       // Verify variant exists and belongs to tenant
@@ -63,7 +65,7 @@ export class AdjustStockHandler implements ICommandHandler<AdjustStockCommand> {
         relations: { product: true },
       });
       if (!variant) {
-        throw new NotFoundException(`La variante del producto con ID ${variantId} no existe.`);
+        throw new AppException(ErrorCode.VariantNotFound, `La variante del producto con ID ${variantId} no existe.`, HttpStatus.NOT_FOUND, { variantId });
       }
 
       let newQuantity: number;
@@ -73,9 +75,7 @@ export class AdjustStockHandler implements ICommandHandler<AdjustStockCommand> {
         const branchStock = await lockBranchStock(transactionalManager, branchId, variantId);
         if (branchStock.quantity < quantity) {
           this.logger.warn(`Stock adjustment rejected: insufficient stock for Variant ${variantId} on Branch ${branchId}`);
-          throw new BadRequestException(
-            `Stock insuficiente en la sucursal ${branch.name}. Stock actual: ${branchStock.quantity}, solicitado: ${quantity}.`,
-          );
+          throw new AppException(ErrorCode.InsufficientStock, `Stock insuficiente en la sucursal ${branch.name}. Stock actual: ${branchStock.quantity}, solicitado: ${quantity}.`, HttpStatus.CONFLICT, { branchId, available: branchStock.quantity, requested: quantity });
         }
 
         const consumed = await consumeStock(transactionalManager, {

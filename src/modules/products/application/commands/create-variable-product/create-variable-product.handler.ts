@@ -1,5 +1,5 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import { Logger, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Logger, HttpStatus } from '@nestjs/common';
 import { In, EntityManager } from 'typeorm';
 import { CreateVariableProductCommand } from './create-variable-product.command';
 import { Product } from '../../../domain/entities/product.entity';
@@ -14,6 +14,8 @@ import { InventoryMovement } from '../../../domain/entities/inventory-movement.e
 import { Branch } from '../../../../branches/domain/entities/branch.entity';
 import { InventoryMovementReason } from '../../../../../common/enums/inventory-movement-reason.enum';
 import { ProductType } from '../../../domain/enums/product-type.enum';
+import { AppException } from '../../../../../common/errors/app.exception';
+import { ErrorCode } from '../../../../../common/errors/error-codes';
 
 
 @CommandHandler(CreateVariableProductCommand)
@@ -28,11 +30,11 @@ export class CreateVariableProductHandler implements ICommandHandler<CreateVaria
     this.logger.log(`Creating variable product: ${name} with ${variants.length} variant(s) for Tenant: ${tenantId}`);
 
     if (!baseSku || !baseSku.trim()) {
-      throw new BadRequestException('El SKU base es obligatorio para un producto variable.');
+      throw new AppException(ErrorCode.BaseSkuRequired, 'El SKU base es obligatorio para un producto variable.', HttpStatus.BAD_REQUEST);
     }
 
     if (!variants || variants.length === 0) {
-      throw new BadRequestException('Un producto variable debe tener al menos una variante.');
+      throw new AppException(ErrorCode.VariantsRequired, 'Un producto variable debe tener al menos una variante.', HttpStatus.BAD_REQUEST);
     }
 
     // Validate no duplicate attribute combinations in input variants
@@ -45,7 +47,7 @@ export class CreateVariableProductHandler implements ICommandHandler<CreateVaria
 
       if (attributeValueIds) {
         if (combinationSet.has(attributeValueIds)) {
-          throw new BadRequestException('No se permiten múltiples variantes con la misma combinación de atributos en un mismo producto.');
+          throw new AppException(ErrorCode.DuplicateVariantCombination, 'No se permiten múltiples variantes con la misma combinación de atributos en un mismo producto.', HttpStatus.CONFLICT);
         }
         combinationSet.add(attributeValueIds);
       }
@@ -69,7 +71,7 @@ export class CreateVariableProductHandler implements ICommandHandler<CreateVaria
               where: { id: stockDto.branchId, tenantId },
             });
             if (!branchExists) {
-              throw new BadRequestException(`La sucursal con ID "${stockDto.branchId}" no existe o no pertenece al inquilino.`);
+              throw new AppException(ErrorCode.BranchNotFound, `La sucursal con ID "${stockDto.branchId}" no existe o no pertenece al inquilino.`, HttpStatus.NOT_FOUND, { branchId: stockDto.branchId });
             }
           }
         }
@@ -81,7 +83,7 @@ export class CreateVariableProductHandler implements ICommandHandler<CreateVaria
         where: { sku: In(skusToCheck), tenantId },
       });
       if (existingSkuCount > 0) {
-        throw new BadRequestException('Uno o más SKUs ya están registrados en el sistema para este inquilino.');
+        throw new AppException(ErrorCode.SkuTaken, 'Uno o más SKUs ya están registrados en el sistema para este inquilino.', HttpStatus.CONFLICT);
       }
 
 
@@ -99,7 +101,7 @@ export class CreateVariableProductHandler implements ICommandHandler<CreateVaria
           where: { id: categoryId, tenantId },
         });
         if (!category) {
-          throw new NotFoundException(`Category with ID ${categoryId} not found`);
+          throw new AppException(ErrorCode.CategoryNotFound, 'Categoría no encontrada.', HttpStatus.NOT_FOUND, { categoryId });
         }
         product.categoryId = categoryId;
       } else {
@@ -112,7 +114,7 @@ export class CreateVariableProductHandler implements ICommandHandler<CreateVaria
           where: { id: In(imageIds), tenantId },
         });
         if (images.length !== imageIds.length) {
-          throw new BadRequestException('Some product images were not found');
+          throw new AppException(ErrorCode.ImagesNotFound, 'Una o más imágenes del producto no existen.', HttpStatus.NOT_FOUND);
         }
         product.images = images;
       } else {
@@ -144,7 +146,7 @@ export class CreateVariableProductHandler implements ICommandHandler<CreateVaria
         }
 
         // Link attribute values
-        const valueIds = variantDto.attributeValues?.map((v: any) => v.attributeValueId) || [];
+        const valueIds = variantDto.attributeValues?.map((v) => v.attributeValueId) || [];
         if (valueIds.length > 0) {
           const attributeValues = await attributeValueRepo.find({
             where: {
@@ -154,7 +156,7 @@ export class CreateVariableProductHandler implements ICommandHandler<CreateVaria
             relations: { attribute: true },
           });
           if (attributeValues.length !== valueIds.length) {
-            throw new BadRequestException('Some variant attribute values were not found');
+            throw new AppException(ErrorCode.AttributeValuesNotFound, 'Uno o más valores de atributo no existen.', HttpStatus.NOT_FOUND);
           }
           variant.attributeValues = attributeValues;
         } else {

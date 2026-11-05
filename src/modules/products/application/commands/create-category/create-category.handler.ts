@@ -1,8 +1,10 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import { Logger, BadRequestException } from '@nestjs/common';
+import { Logger, HttpStatus } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { CreateCategoryCommand } from './create-category.command';
 import { Category } from '../../../domain/entities/category.entity';
+import { AppException } from '../../../../../common/errors/app.exception';
+import { ErrorCode } from '../../../../../common/errors/error-codes';
 
 @CommandHandler(CreateCategoryCommand)
 export class CreateCategoryHandler implements ICommandHandler<CreateCategoryCommand> {
@@ -22,7 +24,7 @@ export class CreateCategoryHandler implements ICommandHandler<CreateCategoryComm
 
     if (existing) {
       this.logger.warn(`Category creation failed: Category name "${name}" already exists for Tenant ${tenantId}`);
-      throw new BadRequestException(`Category with name "${name}" already exists`);
+      throw new AppException(ErrorCode.CategoryNameTaken, `La categoría "${name}" ya existe.`, HttpStatus.CONFLICT, { name });
     }
 
     const category = new Category();

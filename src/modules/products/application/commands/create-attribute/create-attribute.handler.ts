@@ -1,8 +1,10 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import { Logger, BadRequestException } from '@nestjs/common';
+import { Logger, HttpStatus } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { CreateAttributeCommand } from './create-attribute.command';
 import { Attribute } from '../../../domain/entities/attribute.entity';
+import { AppException } from '../../../../../common/errors/app.exception';
+import { ErrorCode } from '../../../../../common/errors/error-codes';
 
 @CommandHandler(CreateAttributeCommand)
 export class CreateAttributeHandler implements ICommandHandler<CreateAttributeCommand> {
@@ -26,7 +28,7 @@ export class CreateAttributeHandler implements ICommandHandler<CreateAttributeCo
 
     if (existing) {
       this.logger.warn(`Attribute creation failed: attribute "${name}" already exists for Tenant ${tenantId}`);
-      throw new BadRequestException(`Attribute "${name}" already exists`);
+      throw new AppException(ErrorCode.AttributeNameTaken, `El atributo "${name}" ya existe.`, HttpStatus.CONFLICT, { name });
     }
 
     const attribute = new Attribute();
