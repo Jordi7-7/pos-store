@@ -90,31 +90,6 @@
       "count": 1
     }
   },
-  "src/modules/auth/guards/auth.guard.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-argument": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-assignment": {
-      "count": 6
-    },
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 3
-    }
-  },
-  "src/modules/auth/guards/permissions.guard.ts": {
-    "@typescript-eslint/no-unsafe-assignment": {
-      "count": 2
-    },
-    "@typescript-eslint/no-unsafe-call": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 5
-    }
-  },
   "src/modules/auth/guards/roles.guard.ts": {
     "@typescript-eslint/no-unsafe-argument": {
       "count": 1
