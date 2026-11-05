@@ -6,6 +6,7 @@ import { CreateCustomerCommand } from './create-customer.command';
 import { Customer } from '../../../domain/entities/customer.entity';
 import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
+import { isUniqueViolation } from '../../../../../common/errors/database-errors';
 
 @CommandHandler(CreateCustomerCommand)
 export class CreateCustomerHandler implements ICommandHandler<CreateCustomerCommand> {
@@ -35,7 +36,13 @@ export class CreateCustomerHandler implements ICommandHandler<CreateCustomerComm
     customer.email = input.email?.trim() ? input.email.trim() : null;
     customer.phone = input.phone?.trim() ? input.phone.trim() : null;
 
-    const saved = await this.customerRepository.save(customer);
+    const saved = await this.customerRepository.save(customer).catch((error: unknown) => {
+      // Dos peticiones con el mismo documento pasan la comprobación previa a la vez
+      if (isUniqueViolation(error)) {
+        throw new AppException(ErrorCode.CustomerIdentityTaken, `Ya existe un cliente con el documento ${customer.identityNumber}.`, HttpStatus.CONFLICT, { identityNumber: customer.identityNumber });
+      }
+      throw error;
+    });
     this.logger.log(`Customer ${saved.id} created for Tenant ${tenantId}`);
     return saved;
   }

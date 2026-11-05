@@ -6,6 +6,7 @@ import { UpdateCustomerCommand } from './update-customer.command';
 import { Customer } from '../../../domain/entities/customer.entity';
 import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
+import { isUniqueViolation } from '../../../../../common/errors/database-errors';
 
 @CommandHandler(UpdateCustomerCommand)
 export class UpdateCustomerHandler implements ICommandHandler<UpdateCustomerCommand> {
@@ -49,7 +50,13 @@ export class UpdateCustomerHandler implements ICommandHandler<UpdateCustomerComm
       customer.phone = input.phone?.trim() ? input.phone.trim() : null;
     }
 
-    const saved = await this.customerRepository.save(customer);
+    const saved = await this.customerRepository.save(customer).catch((error: unknown) => {
+      // Dos peticiones con el mismo documento pasan la comprobación previa a la vez
+      if (isUniqueViolation(error)) {
+        throw new AppException(ErrorCode.CustomerIdentityTaken, `Ya existe un cliente con el documento ${customer.identityNumber}.`, HttpStatus.CONFLICT, { identityNumber: customer.identityNumber });
+      }
+      throw error;
+    });
     this.logger.log(`Customer ${id} updated for Tenant ${tenantId}`);
     return saved;
   }

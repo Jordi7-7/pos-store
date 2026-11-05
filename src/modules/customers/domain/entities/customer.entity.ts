@@ -3,7 +3,7 @@ import { BaseEntity } from '../../../../common/database/base.entity';
 import { Tenant } from '../../../tenants/domain/entities/tenant.entity';
 
 @Entity('customers')
-@Index(['tenantId', 'identityNumber'], { unique: true })
+@Index('UQ_customers_tenant_identity', ['tenantId', 'identityNumber'], { unique: true, where: '"deleted_at" IS NULL' })
 export class Customer extends BaseEntity {
   @Column({ name: 'tenant_id', type: 'uuid' })
   tenantId: string;

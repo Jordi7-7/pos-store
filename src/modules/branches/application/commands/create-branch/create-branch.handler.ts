@@ -19,6 +19,9 @@ export class CreateBranchHandler implements ICommandHandler<CreateBranchCommand>
     const saved = await this.entityManager.transaction(async (manager) => {
       const branchRepo = manager.getRepository(Branch);
 
+      // Altas simultáneas de la misma tienda: se serializan para no repetir nombre ni código
+      await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`branches:${tenantId}`]);
+
       // Validate unique name per tenant
       const existing = await branchRepo.findOne({
         where: { tenantId, name: name.trim() },
@@ -28,9 +31,14 @@ export class CreateBranchHandler implements ICommandHandler<CreateBranchCommand>
         throw new AppException(ErrorCode.BranchNameTaken, `Ya existe una sucursal con el nombre "${name.trim()}".`, HttpStatus.CONFLICT, { name: name.trim() });
       }
 
-      // Calculate sequential branch code
-      const count = await branchRepo.count({ where: { tenantId } });
-      const nextCode = count + 1;
+      // Código secuencial: el mayor existente (incluidas las borradas) + 1, no el conteo, que repite códigos tras borrar
+      const { maxCode } = await branchRepo
+        .createQueryBuilder('branch')
+        .withDeleted()
+        .select('COALESCE(MAX(branch.code), 0)', 'maxCode')
+        .where('branch.tenantId = :tenantId', { tenantId })
+        .getRawOne<{ maxCode: string }>() ?? { maxCode: '0' };
+      const nextCode = Number(maxCode) + 1;
 
       const branch = branchRepo.create({
         tenantId,
