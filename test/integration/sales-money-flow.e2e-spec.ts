@@ -26,6 +26,8 @@ import { CashSessionStatus } from '../../src/modules/sales/domain/enums/cash-ses
 import { DashboardReadQueries } from '../../src/modules/dashboard/application/queries/get-dashboard-metrics/dashboard-read-queries';
 import { GetDashboardMetricsHandler } from '../../src/modules/dashboard/application/queries/get-dashboard-metrics/get-dashboard-metrics.handler';
 import { GetDashboardMetricsQuery } from '../../src/modules/dashboard/application/queries/get-dashboard-metrics/get-dashboard-metrics.query';
+import { GetCashSessionsHandler } from '../../src/modules/sales/application/queries/get-cash-sessions/get-cash-sessions.handler';
+import { GetCashSessionsQuery } from '../../src/modules/sales/application/queries/get-cash-sessions/get-cash-sessions.query';
 import { Tenant } from '../../src/modules/tenants/domain/entities/tenant.entity';
 import { User } from '../../src/modules/users/domain/entities/user.entity';
 
@@ -243,6 +245,31 @@ describe('Flujo de dinero: venta, devolución y cierre de caja', () => {
     );
 
     await new CloseCashSessionHandler(db.manager).execute(new CloseCashSessionCommand(tenantId, sessionId, 0));
+  });
+
+  it('el listado de sesiones suma ventas menos devoluciones solo de cada sesión', async () => {
+    const sessionId = await openSession(0);
+    try {
+      const sale = await sell(sessionId, [{ variantId, quantity: 3, price: 10 }], 30);
+      await refund(sale.id, sessionId, 1);
+
+      const list = await new GetCashSessionsHandler(db.manager, redis).execute(
+        new GetCashSessionsQuery(tenantId, branchId, userId, true),
+      );
+      const item = list.find((session) => session.id === sessionId);
+
+      expect(item).toMatchObject({
+        status: CashSessionStatus.OPEN,
+        totalSales: 20,
+        closingBalance: null,
+        branch: { id: branchId, name: 'Matriz' },
+        cashRegister: { id: cashRegisterId, name: 'Caja 1', code: 1 },
+        user: { id: userId, name: 'Dueño' },
+      });
+      expect(list.length).toBeLessThanOrEqual(100);
+    } finally {
+      await new CloseCashSessionHandler(db.manager).execute(new CloseCashSessionCommand(tenantId, sessionId, 20));
+    }
   });
 
   describe('dashboard', () => {

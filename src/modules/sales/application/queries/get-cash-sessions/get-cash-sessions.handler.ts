@@ -1,34 +1,14 @@
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
 import { EntityManager } from 'typeorm';
 import { GetCashSessionsQuery } from './get-cash-sessions.query';
+import { CashSessionListItemDto, CashSessionRow, toCashSessionListItem } from './cash-session-list-item';
 import { RedisService } from '../../../../../common/redis/redis.service';
 import { assertUserCanAccessBranch } from '../../../../../common/security/branch-access.helper';
+import { SqlParams } from '../../../../../common/utils/sql-params';
 
-export interface CashSessionListItemDto {
-  id: string;
-  status: string;
-  openedAt: string;
-  closedAt: string | null;
-  openingBalance: number;
-  closingBalance: number | null;
-  expectedBalance: number | null;
-  difference: number | null;
-  branch: {
-    id: string;
-    name: string;
-    address?: string;
-  };
-  cashRegister: {
-    id: string;
-    name: string;
-    code: number;
-  };
-  user: {
-    id: string;
-    name: string;
-  };
-  totalSales: number;
-}
+export type { CashSessionListItemDto } from './cash-session-list-item';
+
+const MAX_SESSIONS = 100;
 
 @QueryHandler(GetCashSessionsQuery)
 export class GetCashSessionsHandler implements IQueryHandler<GetCashSessionsQuery> {
@@ -47,17 +27,32 @@ export class GetCashSessionsHandler implements IQueryHandler<GetCashSessionsQuer
       actionDescription: 'consultar las sesiones de caja',
     });
 
-    const params: any[] = [tenantId];
-    let branchFilterSql = '';
+    const rows = await this.findLatestSessions(tenantId, branchId);
+    return rows.map(toCashSessionListItem);
+  }
 
-    if (branchId) {
-      params.push(branchId);
-      branchFilterSql = `AND cs.branch_id = $${params.length}`;
-    }
+  /**
+   * Las 100 sesiones más recientes; las ventas y devoluciones se suman solo para esas
+   * sesiones (no se agrupa todo el historial del tenant).
+   */
+  private findLatestSessions(tenantId: string, branchId?: string): Promise<CashSessionRow[]> {
+    const params = new SqlParams();
+    const tenant = params.add(tenantId);
+    const branchFilter = branchId ? `AND cs.branch_id = ${params.add(branchId)}` : '';
 
-    const rawRows = await this.entityManager.query(
+    return this.entityManager.query<CashSessionRow[]>(
       `
-      SELECT 
+      WITH latest AS (
+        SELECT cs.*
+        FROM cash_sessions cs
+        INNER JOIN branches b ON b.id = cs.branch_id
+        WHERE b.tenant_id = ${tenant}
+          AND cs.deleted_at IS NULL
+          ${branchFilter}
+        ORDER BY cs.opened_at DESC
+        LIMIT ${MAX_SESSIONS}
+      )
+      SELECT
         cs.id AS "id",
         cs.status AS "status",
         cs.opened_at AS "openedAt",
@@ -74,62 +69,24 @@ export class GetCashSessionsHandler implements IQueryHandler<GetCashSessionsQuer
         cr.code AS "cashRegisterCode",
         u.id AS "userId",
         u.name AS "userName",
-        GREATEST(COALESCE(sales_summary.gross_sales, 0) - COALESCE(refunds_summary.session_refunds, 0), 0) AS "totalSales"
-      FROM cash_sessions cs
+        GREATEST(
+          COALESCE((
+            SELECT SUM(s.total) FROM sales s
+            WHERE s.cash_session_id = cs.id AND s.tenant_id = ${tenant} AND s.deleted_at IS NULL
+          ), 0)
+          - COALESCE((
+            SELECT SUM(r.total_refunded) FROM refunds r
+            WHERE r.cash_session_id = cs.id AND r.tenant_id = ${tenant} AND r.deleted_at IS NULL
+          ), 0),
+          0
+        ) AS "totalSales"
+      FROM latest cs
       INNER JOIN branches b ON b.id = cs.branch_id
       LEFT JOIN cash_registers cr ON cr.id = cs.cash_register_id
       LEFT JOIN users u ON u.id = cs.user_id
-      LEFT JOIN (
-        SELECT 
-          s.cash_session_id,
-          SUM(s.total) AS gross_sales
-        FROM sales s
-        WHERE s.tenant_id = $1
-          AND s.deleted_at IS NULL
-        GROUP BY s.cash_session_id
-      ) sales_summary ON sales_summary.cash_session_id = cs.id
-      LEFT JOIN (
-        SELECT 
-          r.cash_session_id,
-          SUM(r.total_refunded) AS session_refunds
-        FROM refunds r
-        WHERE r.tenant_id = $1
-          AND r.deleted_at IS NULL
-        GROUP BY r.cash_session_id
-      ) refunds_summary ON refunds_summary.cash_session_id = cs.id
-      WHERE b.tenant_id = $1
-        AND cs.deleted_at IS NULL
-        ${branchFilterSql}
       ORDER BY cs.opened_at DESC
-      LIMIT 100
       `,
-      params,
+      params.values,
     );
-
-    return rawRows.map((row: any) => ({
-      id: row.id,
-      status: row.status,
-      openedAt: row.openedAt,
-      closedAt: row.closedAt,
-      openingBalance: Number(row.openingBalance || 0),
-      closingBalance: row.closingBalance !== null ? Number(row.closingBalance) : null,
-      expectedBalance: row.expectedBalance !== null ? Number(row.expectedBalance) : null,
-      difference: row.difference !== null ? Number(row.difference) : null,
-      branch: {
-        id: row.branchId,
-        name: row.branchName,
-        address: row.branchAddress || '',
-      },
-      cashRegister: {
-        id: row.cashRegisterId,
-        name: row.cashRegisterName,
-        code: Number(row.cashRegisterCode),
-      },
-      user: {
-        id: row.userId,
-        name: row.userName,
-      },
-      totalSales: Number(row.totalSales || 0),
-    }));
   }
 }
