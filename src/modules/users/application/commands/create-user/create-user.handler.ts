@@ -1,9 +1,13 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import { Logger, BadRequestException } from '@nestjs/common';
+import { HttpStatus, Logger, BadRequestException } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { CreateUserCommand } from './create-user.command';
 import { User } from '../../../domain/entities/user.entity';
 import { HashService } from '../../../../auth/services/hash.service';
+import { AppException } from '../../../../../common/errors/app.exception';
+import { ErrorCode } from '../../../../../common/errors/error-codes';
+import { isPinInUse } from '../../pin-uniqueness';
+import { assertBranchesBelongToTenant } from '../../../../../common/security/tenant-ownership';
 import { assertValidPermissions } from '../../../../../common/security/permissions.helper';
 
 @CommandHandler(CreateUserCommand)
@@ -44,6 +48,8 @@ export class CreateUserHandler implements ICommandHandler<CreateUserCommand> {
       }
     }
 
+    await assertBranchesBelongToTenant(this.entityManager, tenantId, branchIds ?? []);
+
     // Resolve Role entity: roleId is strictly used
     let resolvedRoleId: string | null = null;
 
@@ -81,6 +87,10 @@ export class CreateUserHandler implements ICommandHandler<CreateUserCommand> {
     user.isActive = true;
 
     if (pin && pin.trim()) {
+      if (await isPinInUse(this.entityManager, this.hashService, tenantId, pin.trim())) {
+        this.logger.warn(`PIN already in use in Tenant ${tenantId}`);
+        throw new AppException(ErrorCode.PinAlreadyInUse, 'Ese PIN ya está en uso por otro usuario.', HttpStatus.CONFLICT);
+      }
       user.pin = await this.hashService.hash(pin.trim());
     } else {
       user.pin = undefined;

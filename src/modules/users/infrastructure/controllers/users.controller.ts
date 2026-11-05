@@ -1,9 +1,9 @@
 import { Controller, Post, Put, Body, Param, Get } from '@nestjs/common';
 import { CommandBus } from '@nestjs/cqrs';
 import { EntityManager } from 'typeorm';
-import { CreateUserDto } from '../../application/commands/create-user/create-user.dto';
+import { CreateUserDto } from '../dtos/create-user.dto';
 import { CreateUserCommand } from '../../application/commands/create-user/create-user.command';
-import { UpdateUserDto } from '../../application/commands/update-user/update-user.dto';
+import { UpdateUserDto } from '../dtos/update-user.dto';
 import { UpdateUserCommand } from '../../application/commands/update-user/update-user.command';
 import { GeneratePinCommand } from '../../application/commands/generate-pin/generate-pin.command';
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator';

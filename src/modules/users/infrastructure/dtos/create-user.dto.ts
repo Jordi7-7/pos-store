@@ -1,14 +1,14 @@
-import { IsString, IsEmail, MinLength, IsOptional, IsBoolean, IsArray, Matches } from 'class-validator';
+import { IsString, IsNotEmpty, IsEmail, MinLength, IsOptional, Matches } from 'class-validator';
 
-export class UpdateUserDto {
+export class CreateUserDto {
   @IsString()
-  @IsOptional()
-  name?: string;
+  @IsNotEmpty()
+  name: string;
 
   @IsString()
-  @IsOptional()
+  @IsNotEmpty({ message: 'El nombre de usuario es obligatorio.' })
   @Matches(/^[a-zA-Z0-9._-]+$/, { message: 'El nombre de usuario solo puede contener letras, números, puntos, guiones y guiones bajos.' })
-  username?: string;
+  username: string;
 
   @IsEmail({}, { message: 'El formato del correo electrónico no es válido.' })
   @IsOptional()
@@ -16,28 +16,20 @@ export class UpdateUserDto {
 
   @IsString()
   @MinLength(6)
-  @IsOptional()
-  password?: string;
+  password: string;
 
   @IsString()
   @IsOptional()
   roleId?: string;
 
-  @IsArray()
-  @IsString({ each: true })
   @IsOptional()
   customPermissions?: string[];
 
   @IsString()
   @IsOptional()
+  @Matches(/^(\d{4,8})?$/, { message: 'El PIN debe tener entre 4 y 8 dígitos.' })
   pin?: string;
 
-  @IsBoolean()
-  @IsOptional()
-  isActive?: boolean;
-
-  @IsArray()
-  @IsString({ each: true })
   @IsOptional()
   branchIds?: string[];
 }

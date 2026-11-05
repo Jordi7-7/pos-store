@@ -1,10 +1,14 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import { Logger, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { HttpStatus, Logger, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { EntityManager, Not } from 'typeorm';
 import { UpdateUserCommand } from './update-user.command';
 import { User } from '../../../domain/entities/user.entity';
 import { HashService } from '../../../../auth/services/hash.service';
 import { RedisService } from '../../../../../common/redis/redis.service';
+import { AppException } from '../../../../../common/errors/app.exception';
+import { ErrorCode } from '../../../../../common/errors/error-codes';
+import { isPinInUse } from '../../pin-uniqueness';
+import { assertBranchesBelongToTenant } from '../../../../../common/security/tenant-ownership';
 import { assertValidPermissions } from '../../../../../common/security/permissions.helper';
 import { invalidateUserBranchesCache } from '../../../../../common/security/branch-access.helper';
 
@@ -19,7 +23,7 @@ export class UpdateUserHandler implements ICommandHandler<UpdateUserCommand> {
   ) {}
 
   async execute(command: UpdateUserCommand): Promise<User> {
-    const { tenantId, userId, dto, currentUserId } = command;
+    const { tenantId, userId, input, currentUserId } = command;
     this.logger.log(`Updating user: ${userId} for Tenant: ${tenantId}`);
 
     const userRepo = this.entityManager.getRepository(User);
@@ -38,16 +42,16 @@ export class UpdateUserHandler implements ICommandHandler<UpdateUserCommand> {
     }
 
     // Seguridad: Prevenir que el usuario en sesión se auto-desactive
-    if (currentUserId && currentUserId === userId && dto.isActive === false) {
+    if (currentUserId && currentUserId === userId && input.isActive === false) {
       throw new BadRequestException('No puedes desactivar tu propia cuenta mientras estás en sesión.');
     }
 
-    if (dto.name !== undefined) {
-      user.name = dto.name.trim();
+    if (input.name !== undefined) {
+      user.name = input.name.trim();
     }
 
-    if (dto.username !== undefined) {
-      const cleanUsername = dto.username.toLowerCase().trim();
+    if (input.username !== undefined) {
+      const cleanUsername = input.username.toLowerCase().trim();
       if (!cleanUsername) {
         throw new BadRequestException('El nombre de usuario no puede estar vacío.');
       }
@@ -60,8 +64,8 @@ export class UpdateUserHandler implements ICommandHandler<UpdateUserCommand> {
       user.username = cleanUsername;
     }
 
-    if (dto.email !== undefined) {
-      const cleanEmail = dto.email && dto.email.trim() ? dto.email.toLowerCase().trim() : null;
+    if (input.email !== undefined) {
+      const cleanEmail = input.email && input.email.trim() ? input.email.toLowerCase().trim() : null;
       if (cleanEmail) {
         const emailExists = await userRepo.findOne({
           where: { tenantId, email: cleanEmail, id: Not(userId) },
@@ -73,18 +77,18 @@ export class UpdateUserHandler implements ICommandHandler<UpdateUserCommand> {
       user.email = cleanEmail;
     }
 
-    if (dto.password !== undefined && dto.password.trim()) {
-      user.password = await this.hashService.hash(dto.password);
+    if (input.password !== undefined && input.password.trim()) {
+      user.password = await this.hashService.hash(input.password);
     }
 
     if (user.isOwner) {
       // El Propietario tiene acceso absoluto por is_owner: true y no requiere roleId
       user.roleId = null;
-    } else if (dto.roleId !== undefined) {
-      if (dto.roleId) {
+    } else if (input.roleId !== undefined) {
+      if (input.roleId) {
         const roleEntity = await this.entityManager.query(
           `SELECT id, name FROM "roles" WHERE "id" = $1 AND "tenant_id" = $2`,
-          [dto.roleId, tenantId],
+          [input.roleId, tenantId],
         );
         if (roleEntity.length === 0) {
           throw new BadRequestException('El rol especificado no existe para esta tienda.');
@@ -95,33 +99,41 @@ export class UpdateUserHandler implements ICommandHandler<UpdateUserCommand> {
       }
     }
 
-    if (dto.customPermissions !== undefined) {
-      user.customPermissions = assertValidPermissions(dto.customPermissions);
+    if (input.branchIds !== undefined) {
+      await assertBranchesBelongToTenant(this.entityManager, tenantId, input.branchIds || []);
     }
 
-    if (dto.pin !== undefined) {
-      const trimmedPin = dto.pin ? dto.pin.trim() : '';
+    if (input.customPermissions !== undefined) {
+      user.customPermissions = assertValidPermissions(input.customPermissions);
+    }
+
+    if (input.pin !== undefined) {
+      const trimmedPin = input.pin ? input.pin.trim() : '';
       if (trimmedPin) {
+        if (await isPinInUse(this.entityManager, this.hashService, tenantId, trimmedPin, userId)) {
+          this.logger.warn(`PIN already in use in Tenant ${tenantId}`);
+          throw new AppException(ErrorCode.PinAlreadyInUse, 'Ese PIN ya está en uso por otro usuario.', HttpStatus.CONFLICT);
+        }
         user.pin = await this.hashService.hash(trimmedPin);
       } else {
         user.pin = undefined;
       }
     }
 
-    if (dto.isActive !== undefined) {
-      user.isActive = dto.isActive;
+    if (input.isActive !== undefined) {
+      user.isActive = input.isActive;
     }
 
     const savedUser = await userRepo.save(user);
 
     // Sync assigned branches if explicitly passed
-    if (dto.branchIds !== undefined) {
+    if (input.branchIds !== undefined) {
       await this.entityManager.query(
         `DELETE FROM "user_branches" WHERE "user_id" = $1`,
         [savedUser.id],
       );
 
-      const finalBranchIds = dto.branchIds || [];
+      const finalBranchIds = input.branchIds || [];
       if (finalBranchIds.length === 0) {
         // As requested: if all branches are deselected, inactivate the user
         savedUser.isActive = false;

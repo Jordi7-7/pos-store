@@ -17,12 +17,12 @@ import { EntityManager } from 'typeorm';
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
 import { AuthGuard } from '../../../auth/guards/auth.guard';
 import { PermissionsGuard } from '../../../auth/guards/permissions.guard';
-import { RequirePermissions } from '../../../auth/decorators/permissions.decorator';
+import { RequireAnyPermissions, RequirePermissions } from '../../../auth/decorators/permissions.decorator';
 import { APP_PERMISSIONS, PERMISSION_DEFINITIONS, PERMISSION_MODULES } from '../../../../common/enums/permissions.enum';
 import { assertValidPermissions } from '../../../../common/security/permissions.helper';
 import { Role } from '../../domain/entities/role.entity';
 import { User } from '../../../users/domain/entities/user.entity';
-import { CreateRoleDto, UpdateRoleDto } from '../../application/dto/role.dto';
+import { CreateRoleDto, UpdateRoleDto } from '../dtos/role.dto';
 
 @Controller('roles')
 @UseGuards(AuthGuard, PermissionsGuard)
@@ -30,6 +30,7 @@ export class RolesController {
   constructor(private readonly entityManager: EntityManager) {}
 
   @Get('permissions-catalog')
+  @RequireAnyPermissions(APP_PERMISSIONS.ROLES_GET, APP_PERMISSIONS.ROLES_CREATE, APP_PERMISSIONS.ROLES_EDIT)
   @Header('Cache-Control', 'public, max-age=1800')
   getPermissionsCatalog() {
     return {

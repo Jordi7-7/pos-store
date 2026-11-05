@@ -1,11 +1,12 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { RedisService } from '../../../../../common/redis/redis.service';
+import { ErrorCode } from '../../../../../common/errors/error-codes';
 import { APP_PERMISSIONS } from '../../../../../common/enums/permissions.enum';
 import { HashService } from '../../../../auth/services/hash.service';
 import { User } from '../../../domain/entities/user.entity';
 import { UpdateUserCommand } from './update-user.command';
-import { UpdateUserDto } from './update-user.dto';
+import { UpdateUserDto } from '../../../infrastructure/dtos/update-user.dto';
 import { UpdateUserHandler } from './update-user.handler';
 
 describe('UpdateUserHandler', () => {
@@ -98,5 +99,15 @@ describe('UpdateUserHandler', () => {
     await expect(run('u2', { isActive: false }, 'u2')).rejects.toThrow(
       BadRequestException,
     );
+  });
+
+  it('rechaza branchIds de otro tenant antes de guardar nada', async () => {
+    findOne.mockResolvedValue({ id: 'u2', isOwner: false, tenantId: 't1' } as User);
+    query.mockResolvedValue([]); // ninguna de las sucursales pertenece al tenant
+
+    await expect(run('u2', { branchIds: ['sucursal-ajena'] }, 'manager')).rejects.toMatchObject({
+      code: ErrorCode.InvalidReference,
+    });
+    expect(save).not.toHaveBeenCalled();
   });
 });

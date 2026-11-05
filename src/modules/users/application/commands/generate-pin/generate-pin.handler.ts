@@ -1,10 +1,13 @@
 import { randomInt } from 'crypto';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import { Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { HttpStatus, Logger, NotFoundException } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { GeneratePinCommand } from './generate-pin.command';
 import { User } from '../../../domain/entities/user.entity';
 import { HashService } from '../../../../auth/services/hash.service';
+import { AppException } from '../../../../../common/errors/app.exception';
+import { ErrorCode } from '../../../../../common/errors/error-codes';
+import { isPinInUse } from '../../pin-uniqueness';
 
 @CommandHandler(GeneratePinCommand)
 export class GeneratePinHandler implements ICommandHandler<GeneratePinCommand> {
@@ -29,7 +32,7 @@ export class GeneratePinHandler implements ICommandHandler<GeneratePinCommand> {
     }
 
     // Generate cryptographically random 6-digit PIN
-    const pin = randomInt(100000, 1000000).toString();
+    const pin = await this.generateAvailablePin(tenantId, targetUserId);
     const hashedPin = await this.hashService.hash(pin);
 
     user.pin = hashedPin;
@@ -39,5 +42,17 @@ export class GeneratePinHandler implements ICommandHandler<GeneratePinCommand> {
 
     // Return plain PIN only once — never stored in plain text
     return { pin, userId: user.id };
+  }
+
+  private async generateAvailablePin(tenantId: string, userId: string): Promise<string> {
+    const maxAttempts = 10;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const candidate = randomInt(100000, 1000000).toString();
+      if (!(await isPinInUse(this.entityManager, this.hashService, tenantId, candidate, userId))) {
+        return candidate;
+      }
+    }
+    this.logger.warn(`Could not generate a unique PIN for Tenant ${tenantId}`);
+    throw new AppException(ErrorCode.PinAlreadyInUse, 'No se pudo generar un PIN único. Inténtalo de nuevo.', HttpStatus.CONFLICT);
   }
 }
