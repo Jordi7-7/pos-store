@@ -20,6 +20,7 @@ import { receiveStock } from '../../../../products/application/services/inventor
 import { assertValidRefundRequests, planRefund, RefundPlan } from '../../../domain/services/refund-plan';
 import { lockCashSession } from '../shared/cash-session-lock';
 import { assertUserAssignedToCashRegister } from '../shared/cash-register-access';
+import { SaleStatus } from '../../../../../common/enums/sale-status.enum';
 
 @CommandHandler(ProcessRefundCommand)
 export class ProcessRefundHandler implements ICommandHandler<ProcessRefundCommand> {
@@ -106,7 +107,7 @@ export class ProcessRefundHandler implements ICommandHandler<ProcessRefundComman
         throw new NotFoundException(`Sale with ID ${saleId} not found`);
       }
 
-      if (sale.status === 'REFUNDED') {
+      if (sale.status === SaleStatus.REFUNDED) {
         throw new BadRequestException(`La venta ${sale.invoiceNumber || saleId} ya ha sido devuelta en su totalidad.`);
       }
 
@@ -185,7 +186,7 @@ export class ProcessRefundHandler implements ICommandHandler<ProcessRefundComman
       const isFullRefund = sale.items.every((si) =>
         Number(si.refundedQuantity || 0) >= Number(si.quantity)
       );
-      sale.status = isFullRefund ? 'REFUNDED' : 'PARTIALLY_REFUNDED';
+      sale.status = isFullRefund ? SaleStatus.REFUNDED : SaleStatus.PARTIALLY_REFUNDED;
       await saleRepo.save(sale);
 
       this.logger.log(`Refund processed successfully: ID ${savedRefund.id}, Total Refunded: $${savedRefund.totalRefunded}. Sale ${saleId} status updated to: ${sale.status}`);

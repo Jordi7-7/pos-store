@@ -286,6 +286,24 @@ describe('Flujo de dinero: venta, devolución y cierre de caja', () => {
       await new CloseCashSessionHandler(db.manager).execute(new CloseCashSessionCommand(tenantId, sessionId, 80));
     });
 
+    it('ventas simultáneas con los mismos productos en orden cruzado no se bloquean entre sí', async () => {
+      const a = await newVariant('CRUZADO-A');
+      const b = await newVariant('CRUZADO-B');
+      await adjust(a, 50, 'IN');
+      await adjust(b, 50, 'IN');
+      const sessionId = await openSession(0);
+      const forward = [{ variantId: a, quantity: 1, price: 10 }, { variantId: b, quantity: 1, price: 10 }];
+      const backward = [...forward].reverse();
+
+      await Promise.all(
+        Array.from({ length: 10 }, (_, i) => sell(sessionId, i % 2 === 0 ? forward : backward, 20)),
+      );
+
+      expect(await quantityOf(a)).toBe(40);
+      expect(await quantityOf(b)).toBe(40);
+      await new CloseCashSessionHandler(db.manager).execute(new CloseCashSessionCommand(tenantId, sessionId, 200));
+    });
+
     it('vender sin stock lo deja negativo y la siguiente entrada salda la deuda', async () => {
       const id = await newVariant('NEGATIVO');
       const sessionId = await openSession(0);

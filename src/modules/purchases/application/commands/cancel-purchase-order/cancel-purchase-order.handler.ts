@@ -16,6 +16,7 @@ import { ProductBatch } from '../../../../products/domain/entities/product-batch
 import { Batch, BatchStatus } from '../../../../batches/domain/entities/batch.entity';
 import { InventoryMovement } from '../../../../products/domain/entities/inventory-movement.entity';
 import { InventoryMovementReason } from '../../../../../common/enums/inventory-movement-reason.enum';
+import { PurchaseOrderStatus } from '../../../../purchases/domain/enums/purchase-order-status.enum';
 
 @CommandHandler(CancelPurchaseOrderCommand)
 export class CancelPurchaseOrderHandler
@@ -65,13 +66,13 @@ export class CancelPurchaseOrderHandler
         actionDescription: 'cancelar compras',
       });
 
-      if (order.status === 'CANCELLED') {
+      if (order.status === PurchaseOrderStatus.CANCELLED) {
         throw new BadRequestException(
           `Purchase order ${purchaseOrderId} is already cancelled`,
         );
       }
 
-      if (order.status !== 'COMPLETED') {
+      if (order.status !== PurchaseOrderStatus.COMPLETED) {
         throw new BadRequestException(
           `Only COMPLETED purchase orders can be cancelled`,
         );
@@ -152,7 +153,7 @@ export class CancelPurchaseOrderHandler
       }
 
       // 5. Mark order as cancelled
-      order.status = 'CANCELLED';
+      order.status = PurchaseOrderStatus.CANCELLED;
       await purchaseRepo.save(order);
 
       this.logger.log(

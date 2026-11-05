@@ -14,6 +14,7 @@ import { ProductVariant } from '../../../../products/domain/entities/product-var
 import { Batch, BatchOriginType } from '../../../../batches/domain/entities/batch.entity';
 import { InventoryMovement } from '../../../../products/domain/entities/inventory-movement.entity';
 import { InventoryMovementReason } from '../../../../../common/enums/inventory-movement-reason.enum';
+import { PurchaseOrderStatus } from '../../../../purchases/domain/enums/purchase-order-status.enum';
 
 @CommandHandler(ImportPurchasesCommand)
 export class ImportPurchasesHandler implements ICommandHandler<ImportPurchasesCommand> {
@@ -117,7 +118,7 @@ export class ImportPurchasesHandler implements ICommandHandler<ImportPurchasesCo
       purchaseOrder.branchId = branchId;
       purchaseOrder.invoiceNumber = cleanInvoiceNumber || 'IMP-MASIVO';
       purchaseOrder.totalAmount = totalAmount;
-      purchaseOrder.status = 'COMPLETED';
+      purchaseOrder.status = PurchaseOrderStatus.COMPLETED;
       const savedPurchase = await purchaseRepo.save(purchaseOrder);
 
       // Create physical Batch header for this imported purchase

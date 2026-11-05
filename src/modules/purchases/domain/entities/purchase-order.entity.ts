@@ -5,6 +5,7 @@ import { Supplier } from './supplier.entity';
 import { Branch } from '../../../branches/domain/entities/branch.entity';
 import { ColumnNumericTransformer } from '../../../../common/database/numeric-transformer';
 import { PurchaseOrderItem } from './purchase-order-item.entity';
+import { PurchaseOrderStatus } from '../enums/purchase-order-status.enum';
 
 @Entity('purchase_orders')
 export class PurchaseOrder extends BaseEntity {
@@ -41,8 +42,8 @@ export class PurchaseOrder extends BaseEntity {
   })
   totalAmount: number;
 
-  @Column()
-  status: string;
+  @Column({ type: 'varchar' })
+  status: PurchaseOrderStatus;
 
   @OneToMany(() => PurchaseOrderItem, (item) => item.purchaseOrder, { cascade: true })
   items: PurchaseOrderItem[];

@@ -16,6 +16,7 @@ import { ProductStock } from '../../../../products/domain/entities/product-stock
 import { InventoryMovement } from '../../../../products/domain/entities/inventory-movement.entity';
 import { Batch, BatchOriginType } from '../../../../batches/domain/entities/batch.entity';
 import { InventoryMovementReason } from '../../../../../common/enums/inventory-movement-reason.enum';
+import { PurchaseOrderStatus } from '../../../../purchases/domain/enums/purchase-order-status.enum';
 
 @CommandHandler(RegisterPurchaseCommand)
 export class RegisterPurchaseHandler implements ICommandHandler<RegisterPurchaseCommand> {
@@ -93,7 +94,7 @@ export class RegisterPurchaseHandler implements ICommandHandler<RegisterPurchase
       purchaseOrder.branchId = branchId;
       purchaseOrder.invoiceNumber = invoiceNumber || null;
       purchaseOrder.totalAmount = totalAmount;
-      purchaseOrder.status = 'COMPLETED';
+      purchaseOrder.status = PurchaseOrderStatus.COMPLETED;
 
       const savedPurchase = await purchaseRepo.save(purchaseOrder);
       const inventoryMovements: InventoryMovement[] = [];

@@ -19,6 +19,7 @@ import { consumeStock } from '../../../../products/application/services/inventor
 import { assertPaymentsCoverTotal, priceSale, SalePricing } from '../../../domain/services/sale-pricing';
 import { lockCashSession } from '../shared/cash-session-lock';
 import { assertUserAssignedToCashRegister } from '../shared/cash-register-access';
+import { SaleStatus } from '../../../../../common/enums/sale-status.enum';
 
 @CommandHandler(ProcessSaleCommand)
 export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
@@ -146,11 +147,18 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
         }
       }
 
-      const saleItemsToSave: SaleItem[] = [];
+      const saleItemsToSave: SaleItem[] = new Array<SaleItem>(items.length);
       const inventoryMovements: InventoryMovement[] = [];
 
-      // 4. Process items, verify/discount stock, compile costs
-      for (const [index, itemDto] of items.entries()) {
+      // 4. Process items, verify/discount stock, compile costs.
+      //    Se recorren ordenados por variante: dos ventas con los mismos productos en distinto
+      //    orden bloquearían las filas de stock en orden cruzado (deadlock).
+      const processingOrder = items
+        .map((_, index) => index)
+        .sort((a, b) => items[a].variantId.localeCompare(items[b].variantId));
+
+      for (const index of processingOrder) {
+        const itemDto = items[index];
         const variant = await variantRepo.findOne({
           where: {
             id: itemDto.variantId,
@@ -187,7 +195,7 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
         saleItem.subtotal = pricedLine.subtotal;
         saleItem.globalDiscountAmount = pricedLine.globalDiscountAmount;
         saleItem.total = pricedLine.total;
-        saleItemsToSave.push(saleItem);
+        saleItemsToSave[index] = saleItem;
 
         // Build inventory movement (Kardex)
         const movement = new InventoryMovement();
@@ -217,7 +225,7 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
       sale.discountAmount = pricing.discountAmount;
       sale.discountType = hasSaleDiscount ? (discountType || null) : null;
       sale.discountRate = hasSaleDiscount && discountRate !== undefined ? Number(discountRate) : null;
-      sale.status = 'COMPLETED';
+      sale.status = SaleStatus.COMPLETED;
       sale.userId = userId || null;
       sale.items = saleItemsToSave;
 

@@ -8,6 +8,7 @@ import { User } from '../../../users/domain/entities/user.entity';
 import { ColumnNumericTransformer } from '../../../../common/database/numeric-transformer';
 import { SaleItem } from './sale-item.entity';
 import { SalePayment } from './sale-payment.entity';
+import { SaleStatus } from '../../../../common/enums/sale-status.enum';
 
 @Entity('sales')
 export class Sale extends BaseEntity {
@@ -98,8 +99,8 @@ export class Sale extends BaseEntity {
   })
   discountAmount: number;
 
-  @Column({ type: 'varchar', default: 'COMPLETED' })
-  status: string;
+  @Column({ type: 'varchar', default: SaleStatus.COMPLETED })
+  status: SaleStatus;
 
   @Column({ name: 'user_id', type: 'uuid', nullable: true })
   userId: string | null;

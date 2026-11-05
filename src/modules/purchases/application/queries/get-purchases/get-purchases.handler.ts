@@ -6,6 +6,7 @@ import { Batch } from '../../../../batches/domain/entities/batch.entity';
 import { RedisService } from '../../../../../common/redis/redis.service';
 import { assertUserCanAccessBranch } from '../../../../../common/security/branch-access.helper';
 import { parseReportDates } from '../../../../reports/application/queries/parse-dates.helper';
+import { PurchaseOrderStatus } from '../../../../purchases/domain/enums/purchase-order-status.enum';
 
 @QueryHandler(GetPurchasesQuery)
 export class GetPurchasesHandler implements IQueryHandler<GetPurchasesQuery> {
@@ -60,7 +61,7 @@ export class GetPurchasesHandler implements IQueryHandler<GetPurchasesQuery> {
 
     const data = await Promise.all(
       orders.map(async (order) => {
-        if (order.status !== 'COMPLETED') {
+        if (order.status !== PurchaseOrderStatus.COMPLETED) {
           return { ...order, isCancellable: false };
         }
 

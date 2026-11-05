@@ -5,6 +5,7 @@ import { Repository } from 'typeorm';
 import { GetSaleByInvoiceQuery } from './get-sale-by-invoice.query';
 import { Sale } from '../../../domain/entities/sale.entity';
 import { Refund } from '../../../domain/entities/refund.entity';
+import { SaleStatus } from '../../../../../common/enums/sale-status.enum';
 
 @QueryHandler(GetSaleByInvoiceQuery)
 export class GetSaleByInvoiceHandler implements IQueryHandler<GetSaleByInvoiceQuery> {
@@ -60,7 +61,7 @@ export class GetSaleByInvoiceHandler implements IQueryHandler<GetSaleByInvoiceQu
       branchId: sale.branchId,
       cashSessionId: sale.cashSessionId,
       createdAt: sale.createdAt,
-      isFullyRefunded: sale.status === 'REFUNDED',
+      isFullyRefunded: sale.status === SaleStatus.REFUNDED,
       branch: sale.branch
         ? { id: sale.branch.id, name: sale.branch.name, address: sale.branch.address }
         : null,
