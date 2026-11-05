@@ -17,11 +17,11 @@
     "incremental": true,
     "skipLibCheck": true,
     "types": ["node", "jest"],
-    "strict": false,
-    "strictNullChecks": true,
+    "strict": true,
+    // Las propiedades de DTOs y entidades las inicializan los decoradores (class-validator/TypeORM)
+    "strictPropertyInitialization": false,
     "forceConsistentCasingInFileNames": true,
-    "noImplicitAny": false,
-    "strictBindCallApply": false,
-    "noFallthroughCasesInSwitch": false
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true
   }
 }
