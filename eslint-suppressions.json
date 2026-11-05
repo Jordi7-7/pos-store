@@ -203,54 +203,23 @@
       "count": 1
     }
   },
-  "src/modules/products/application/commands/create-variable-product/create-variable-product.command.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    }
-  },
   "src/modules/products/application/commands/create-variable-product/create-variable-product.handler.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 4
-    },
-    "@typescript-eslint/no-unsafe-argument": {
-      "count": 4
-    },
-    "@typescript-eslint/no-unsafe-assignment": {
-      "count": 6
-    },
-    "@typescript-eslint/no-unsafe-call": {
-      "count": 4
+      "count": 3
     },
     "@typescript-eslint/no-unsafe-member-access": {
-      "count": 30
+      "count": 3
     },
     "@typescript-eslint/no-unsafe-return": {
-      "count": 3
-    }
-  },
-  "src/modules/products/application/commands/create-variant/create-variant.command.ts": {
-    "@typescript-eslint/no-explicit-any": {
       "count": 1
     }
   },
   "src/modules/products/application/commands/create-variant/create-variant.handler.ts": {
     "@typescript-eslint/no-explicit-any": {
-      "count": 3
-    },
-    "@typescript-eslint/no-unsafe-argument": {
       "count": 2
     },
-    "@typescript-eslint/no-unsafe-assignment": {
-      "count": 7
-    },
-    "@typescript-eslint/no-unsafe-call": {
-      "count": 1
-    },
     "@typescript-eslint/no-unsafe-member-access": {
-      "count": 22
-    },
-    "@typescript-eslint/no-unsafe-return": {
-      "count": 1
+      "count": 2
     }
   },
   "src/modules/products/application/commands/delete-variant/delete-variant.handler.ts": {
@@ -346,11 +315,6 @@
     }
   },
   "src/modules/purchases/application/commands/cancel-purchase-order/cancel-purchase-order.handler.ts": {
-    "@typescript-eslint/no-unused-vars": {
-      "count": 1
-    }
-  },
-  "src/modules/purchases/application/commands/register-purchase/register-purchase.handler.ts": {
     "@typescript-eslint/no-unused-vars": {
       "count": 1
     }

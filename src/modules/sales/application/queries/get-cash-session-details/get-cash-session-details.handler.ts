@@ -1,7 +1,7 @@
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { NotFoundException } from '@nestjs/common';
+import { HttpStatus } from '@nestjs/common';
 import { GetCashSessionDetailsQuery } from './get-cash-session-details.query';
 import { CashSession } from '../../../domain/entities/cash-session.entity';
 import { Sale } from '../../../domain/entities/sale.entity';
@@ -9,6 +9,8 @@ import { Expense } from '../../../domain/entities/expense.entity';
 import { Refund } from '../../../domain/entities/refund.entity';
 import { PaymentMethod } from '../../../domain/entities/sale-payment.entity';
 import { cashDifference, expectedCashBalance } from '../../../domain/services/cash-closing';
+import { AppException } from '../../../../../common/errors/app.exception';
+import { ErrorCode } from '../../../../../common/errors/error-codes';
 
 @QueryHandler(GetCashSessionDetailsQuery)
 export class GetCashSessionDetailsHandler implements IQueryHandler<GetCashSessionDetailsQuery> {
@@ -36,7 +38,7 @@ export class GetCashSessionDetailsHandler implements IQueryHandler<GetCashSessio
       .getOne();
 
     if (!session) {
-      throw new NotFoundException(`Cash session with ID ${sessionId} not found or access denied`);
+      throw new AppException(ErrorCode.CashSessionNotFound, 'Sesión de caja no encontrada.', HttpStatus.NOT_FOUND, { sessionId });
     }
 
     // Ventas de esta sesión (solo datos esenciales para la UI)

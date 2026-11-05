@@ -1,11 +1,13 @@
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
-import { NotFoundException } from '@nestjs/common';
+import { HttpStatus } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { GetSaleByInvoiceQuery } from './get-sale-by-invoice.query';
 import { Sale } from '../../../domain/entities/sale.entity';
 import { Refund } from '../../../domain/entities/refund.entity';
 import { SaleStatus } from '../../../../../common/enums/sale-status.enum';
+import { AppException } from '../../../../../common/errors/app.exception';
+import { ErrorCode } from '../../../../../common/errors/error-codes';
 
 @QueryHandler(GetSaleByInvoiceQuery)
 export class GetSaleByInvoiceHandler implements IQueryHandler<GetSaleByInvoiceQuery> {
@@ -39,7 +41,7 @@ export class GetSaleByInvoiceHandler implements IQueryHandler<GetSaleByInvoiceQu
     });
 
     if (!sale) {
-      throw new NotFoundException(`No se encontró la venta con folio "${invoiceNumber}"`);
+      throw new AppException(ErrorCode.SaleNotFound, `No se encontró la venta con folio "${invoiceNumber}"`, HttpStatus.NOT_FOUND, { invoiceNumber });
     }
 
     // Load all refunds for this sale to know already-refunded quantities per variant

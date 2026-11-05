@@ -1,5 +1,5 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import { Logger, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Logger, HttpStatus } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { ProcessRefundCommand } from './process-refund.command';
 import { Refund } from '../../../domain/entities/refund.entity';
@@ -21,6 +21,8 @@ import { assertValidRefundRequests, planRefund, RefundPlan } from '../../../doma
 import { lockCashSession } from '../shared/cash-session-lock';
 import { assertUserAssignedToCashRegister } from '../shared/cash-register-access';
 import { SaleStatus } from '../../../../../common/enums/sale-status.enum';
+import { AppException } from '../../../../../common/errors/app.exception';
+import { ErrorCode } from '../../../../../common/errors/error-codes';
 
 @CommandHandler(ProcessRefundCommand)
 export class ProcessRefundHandler implements ICommandHandler<ProcessRefundCommand> {
@@ -64,7 +66,7 @@ export class ProcessRefundHandler implements ICommandHandler<ProcessRefundComman
       });
       if (!branch) {
         this.logger.warn(`Refund failed: Branch ID ${branchId} not found under Tenant ${tenantId}`);
-        throw new NotFoundException(`Branch with ID ${branchId} not found`);
+        throw new AppException(ErrorCode.BranchNotFound, 'Sucursal no encontrada.', HttpStatus.NOT_FOUND, { branchId });
       }
 
       await lockCashSession(transactionalManager, cashSessionId, 'share');
@@ -80,7 +82,7 @@ export class ProcessRefundHandler implements ICommandHandler<ProcessRefundComman
       });
       if (!cashSession) {
         this.logger.warn(`Refund failed: active cash session ${cashSessionId} not found or closed in Branch ${branchId}`);
-        throw new BadRequestException('Active cash session not found for this branch');
+        throw new AppException(ErrorCode.NoOpenCashSession, 'No hay una sesión de caja abierta en esta sucursal.', HttpStatus.CONFLICT, { cashSessionId, branchId });
       }
 
       await assertUserAssignedToCashRegister(transactionalManager, {
@@ -104,11 +106,11 @@ export class ProcessRefundHandler implements ICommandHandler<ProcessRefundComman
       });
       if (!sale) {
         this.logger.warn(`Refund failed: Sale ID ${saleId} not found for Tenant ${tenantId}`);
-        throw new NotFoundException(`Sale with ID ${saleId} not found`);
+        throw new AppException(ErrorCode.SaleNotFound, 'Venta no encontrada.', HttpStatus.NOT_FOUND, { saleId });
       }
 
       if (sale.status === SaleStatus.REFUNDED) {
-        throw new BadRequestException(`La venta ${sale.invoiceNumber || saleId} ya ha sido devuelta en su totalidad.`);
+        throw new AppException(ErrorCode.SaleAlreadyRefunded, `La venta ${sale.invoiceNumber || saleId} ya ha sido devuelta en su totalidad.`, HttpStatus.CONFLICT, { saleId, invoiceNumber: sale.invoiceNumber });
       }
 
       let plan: RefundPlan<SaleItem>;

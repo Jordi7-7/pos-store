@@ -1,5 +1,5 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import { Logger, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Logger, HttpStatus } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { RegisterExpenseCommand } from './register-expense.command';
 import { Expense } from '../../../domain/entities/expense.entity';
@@ -8,6 +8,8 @@ import { CashSession } from '../../../domain/entities/cash-session.entity';
 import { CashSessionStatus } from '../../../domain/enums/cash-session-status.enum';
 import { lockCashSession } from '../shared/cash-session-lock';
 import { assertUserAssignedToCashRegister } from '../shared/cash-register-access';
+import { AppException } from '../../../../../common/errors/app.exception';
+import { ErrorCode } from '../../../../../common/errors/error-codes';
 
 @CommandHandler(RegisterExpenseCommand)
 export class RegisterExpenseHandler implements ICommandHandler<RegisterExpenseCommand> {
@@ -30,7 +32,7 @@ export class RegisterExpenseHandler implements ICommandHandler<RegisterExpenseCo
       });
       if (!branch) {
         this.logger.warn(`Expense registration failed: Branch ID ${branchId} not found under Tenant ${tenantId}`);
-        throw new NotFoundException(`Branch with ID ${branchId} not found`);
+        throw new AppException(ErrorCode.BranchNotFound, 'Sucursal no encontrada.', HttpStatus.NOT_FOUND, { branchId });
       }
 
       // 2. Verify there is an active open cash session at this branch
@@ -45,7 +47,7 @@ export class RegisterExpenseHandler implements ICommandHandler<RegisterExpenseCo
       });
       if (!activeSession) {
         this.logger.warn(`Expense registration failed: no active open cash session found in Branch ${branchId}`);
-        throw new BadRequestException('Expense cannot be registered because there is no active open cash session in this branch.');
+        throw new AppException(ErrorCode.NoOpenCashSession, 'No se puede registrar el gasto porque no hay una sesión de caja abierta en esta sucursal.', HttpStatus.CONFLICT, { branchId });
       }
 
       await assertUserAssignedToCashRegister(transactionalManager, {

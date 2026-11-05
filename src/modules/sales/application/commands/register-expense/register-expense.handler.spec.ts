@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { ErrorCode } from '../../../../../common/errors/error-codes';
 import { EntityManager } from 'typeorm';
 import { CashSessionStatus } from '../../../domain/enums/cash-session-status.enum';
 import { Expense } from '../../../domain/entities/expense.entity';
@@ -58,7 +58,7 @@ describe('RegisterExpenseHandler', () => {
   it('rechaza una sesión inexistente, cerrada o de otra sucursal/tenant (no la acepta a ciegas)', async () => {
     findSession.mockResolvedValue(null);
 
-    await expect(handler.execute(command('de-otro-tenant'))).rejects.toThrow(BadRequestException);
+    await expect(handler.execute(command('de-otro-tenant'))).rejects.toMatchObject({ code: ErrorCode.NoOpenCashSession });
     expect(saveExpense).not.toHaveBeenCalled();
   });
 

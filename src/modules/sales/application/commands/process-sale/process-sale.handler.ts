@@ -1,5 +1,5 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import { Logger, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Logger, HttpStatus } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { ProcessSaleCommand } from './process-sale.command';
 import { Sale } from '../../../domain/entities/sale.entity';
@@ -20,6 +20,8 @@ import { assertPaymentsCoverTotal, priceSale, SalePricing } from '../../../domai
 import { lockCashSession } from '../shared/cash-session-lock';
 import { assertUserAssignedToCashRegister } from '../shared/cash-register-access';
 import { SaleStatus } from '../../../../../common/enums/sale-status.enum';
+import { AppException } from '../../../../../common/errors/app.exception';
+import { ErrorCode } from '../../../../../common/errors/error-codes';
 
 @CommandHandler(ProcessSaleCommand)
 export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
@@ -46,7 +48,7 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
     this.logger.log(`Processing sale for Tenant: ${tenantId}, Branch: ${branchId}, Cash Session: ${cashSessionId}`);
 
     if (!cashSessionId) {
-      throw new BadRequestException('Debes tener una sesión de caja abierta para registrar una venta.');
+      throw new AppException(ErrorCode.CashSessionRequired, 'Debes tener una sesión de caja abierta para registrar una venta.', HttpStatus.BAD_REQUEST);
     }
 
     // Importes e invariantes monetarias (sin tocar la base de datos): falla rápido ante datos manipulados
@@ -89,7 +91,7 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
       });
       if (!cashSession) {
         this.logger.warn(`Sale failed: active cash session ${cashSessionId} not found or closed for branch ${branchId} under tenant ${tenantId}`);
-        throw new BadRequestException('Active cash session not found for this branch');
+        throw new AppException(ErrorCode.NoOpenCashSession, 'No hay una sesión de caja abierta en esta sucursal.', HttpStatus.CONFLICT, { cashSessionId, branchId });
       }
 
       // Cualquier cajero asignado a la caja puede vender en su sesión abierta (no solo quien la abrió)
@@ -124,7 +126,7 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
         lock: { mode: 'pessimistic_write' }
       });
       if (!register) {
-        throw new BadRequestException('Cash register not found');
+        throw new AppException(ErrorCode.CashRegisterNotFound, 'Caja registradora no encontrada.', HttpStatus.NOT_FOUND);
       }
 
       const branchCode = String(cashSession.branch.code || 1).padStart(3, '0');
@@ -143,7 +145,7 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
         });
         if (!customerExists) {
           this.logger.warn(`Sale failed: Customer ID ${customerId} not found for Tenant ${tenantId}`);
-          throw new NotFoundException(`Customer with ID ${customerId} not found`);
+          throw new AppException(ErrorCode.CustomerNotFound, 'Cliente no encontrado.', HttpStatus.NOT_FOUND, { customerId });
         }
       }
 
@@ -168,7 +170,7 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
         });
         if (!variant) {
           this.logger.warn(`Sale failed: Product Variant ID ${itemDto.variantId} not found for Tenant ${tenantId}`);
-          throw new NotFoundException(`Product Variant with ID ${itemDto.variantId} not found`);
+          throw new AppException(ErrorCode.VariantNotFound, 'Variante no encontrada.', HttpStatus.NOT_FOUND, { variantId: itemDto.variantId });
         }
 
         // Descuenta stock (puede quedar en negativo) y lotes FIFO

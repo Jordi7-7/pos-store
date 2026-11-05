@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { ErrorCode } from '../../../../../common/errors/error-codes';
 import { EntityManager } from 'typeorm';
 import { CashSession } from '../../../domain/entities/cash-session.entity';
 import { CloseCashSessionCommand } from './close-cash-session.command';
@@ -62,7 +62,7 @@ describe('CloseCashSessionHandler', () => {
   it('falla si la sesión no está abierta o es de otro tenant', async () => {
     findOne.mockResolvedValue(null);
 
-    await expect(handler.execute(new CloseCashSessionCommand('t1', 's1', 0))).rejects.toThrow(NotFoundException);
+    await expect(handler.execute(new CloseCashSessionCommand('t1', 's1', 0))).rejects.toMatchObject({ code: ErrorCode.CashSessionNotFound });
     expect(save).not.toHaveBeenCalled();
   });
 });

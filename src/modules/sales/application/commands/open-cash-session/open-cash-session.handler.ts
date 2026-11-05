@@ -1,5 +1,5 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import { Logger, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Logger, HttpStatus } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { OpenCashSessionCommand } from './open-cash-session.command';
 import { CashSession } from '../../../domain/entities/cash-session.entity';
@@ -9,6 +9,8 @@ import { Branch } from '../../../../branches/domain/entities/branch.entity';
 import { User } from '../../../../users/domain/entities/user.entity';
 import { RedisService } from '../../../../../common/redis/redis.service';
 import { assertUserCanAccessBranch } from '../../../../../common/security/branch-access.helper';
+import { AppException } from '../../../../../common/errors/app.exception';
+import { ErrorCode } from '../../../../../common/errors/error-codes';
 
 @CommandHandler(OpenCashSessionCommand)
 export class OpenCashSessionHandler implements ICommandHandler<OpenCashSessionCommand> {
@@ -34,7 +36,7 @@ export class OpenCashSessionHandler implements ICommandHandler<OpenCashSessionCo
       });
       if (!branch) {
         this.logger.warn(`Cash session opening failed: Branch ID ${branchId} not found under Tenant ${tenantId}`);
-        throw new NotFoundException(`Branch with ID ${branchId} not found`);
+        throw new AppException(ErrorCode.BranchNotFound, 'Sucursal no encontrada.', HttpStatus.NOT_FOUND, { branchId });
       }
 
       // 1.1 Verify user exists
@@ -44,7 +46,7 @@ export class OpenCashSessionHandler implements ICommandHandler<OpenCashSessionCo
         relations: { cashRegisters: true },
       });
       if (!user) {
-        throw new NotFoundException('Usuario no encontrado');
+        throw new AppException(ErrorCode.UserNotFound, 'Usuario no encontrado', HttpStatus.NOT_FOUND);
       }
 
       const isOwner = user.isOwner;
@@ -62,7 +64,7 @@ export class OpenCashSessionHandler implements ICommandHandler<OpenCashSessionCo
         where: { id: cashRegisterId, branchId, tenantId },
       });
       if (!register) {
-        throw new NotFoundException('La caja registradora seleccionada no existe en esta sucursal.');
+        throw new AppException(ErrorCode.CashRegisterNotFound, 'La caja registradora seleccionada no existe en esta sucursal.', HttpStatus.NOT_FOUND);
       }
 
       // 2.1 Check cash register authorization for non-owner users
@@ -70,11 +72,11 @@ export class OpenCashSessionHandler implements ICommandHandler<OpenCashSessionCo
         const assignedRegisterIds = (user.cashRegisters || []).map((cr) => cr.id);
         if (assignedRegisterIds.length === 0) {
           this.logger.warn(`User ${userId} attempted to open cash register without any assigned registers`);
-          throw new ForbiddenException('No tienes ninguna caja registradora asignada para operar. Contacta a un administrador.');
+          throw new AppException(ErrorCode.CashRegisterNotAssigned, 'No tienes ninguna caja registradora asignada para operar. Contacta a un administrador.', HttpStatus.FORBIDDEN);
         }
         if (!assignedRegisterIds.includes(register.id)) {
           this.logger.warn(`User ${userId} attempted to open unauthorized cash register ${register.id}`);
-          throw new ForbiddenException(`No tienes autorización para operar en la ${register.name}.`);
+          throw new AppException(ErrorCode.CashRegisterNotAuthorized, `No tienes autorización para operar en la ${register.name}.`, HttpStatus.FORBIDDEN, { cashRegisterName: register.name });
         }
       }
 
@@ -92,7 +94,7 @@ export class OpenCashSessionHandler implements ICommandHandler<OpenCashSessionCo
       if (registerActiveSession) {
         const openedByName = registerActiveSession.user?.name || 'otro usuario';
         this.logger.warn(`Cash session opening failed: Register ${register.id} already has an active open cash session by User ${registerActiveSession.userId}`);
-        throw new BadRequestException(`La ${register.name} ya tiene un turno abierto (por ${openedByName}). Debes cerrar ese turno o seleccionar otra caja.`);
+        throw new AppException(ErrorCode.CashRegisterBusy, `La ${register.name} ya tiene un turno abierto (por ${openedByName}). Debes cerrar ese turno o seleccionar otra caja.`, HttpStatus.CONFLICT, { cashRegisterName: register.name, openedBy: openedByName });
       }
 
       const session = new CashSession();

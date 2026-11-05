@@ -1,9 +1,11 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import { Logger, NotFoundException } from '@nestjs/common';
+import { Logger, HttpStatus } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { CreateCashRegisterCommand } from './create-cash-register.command';
 import { CashRegister } from '../../../domain/entities/cash-register.entity';
 import { Branch } from '../../../../branches/domain/entities/branch.entity';
+import { AppException } from '../../../../../common/errors/app.exception';
+import { ErrorCode } from '../../../../../common/errors/error-codes';
 
 @CommandHandler(CreateCashRegisterCommand)
 export class CreateCashRegisterHandler implements ICommandHandler<CreateCashRegisterCommand> {
@@ -23,7 +25,7 @@ export class CreateCashRegisterHandler implements ICommandHandler<CreateCashRegi
         where: { id: branchId, tenantId },
       });
       if (!branch) {
-        throw new NotFoundException('Sucursal no encontrada');
+        throw new AppException(ErrorCode.BranchNotFound, 'Sucursal no encontrada', HttpStatus.NOT_FOUND);
       }
 
       // Obtener el código correlativo más alto dentro de la sucursal

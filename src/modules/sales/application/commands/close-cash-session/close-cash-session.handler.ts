@@ -1,5 +1,5 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import { Logger, NotFoundException } from '@nestjs/common';
+import { Logger, HttpStatus } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { CloseCashSessionCommand } from './close-cash-session.command';
 import { CashSession } from '../../../domain/entities/cash-session.entity';
@@ -9,6 +9,8 @@ import { Expense } from '../../../domain/entities/expense.entity';
 import { Refund } from '../../../domain/entities/refund.entity';
 import { cashDifference, expectedCashBalance } from '../../../domain/services/cash-closing';
 import { lockCashSession } from '../shared/cash-session-lock';
+import { AppException } from '../../../../../common/errors/app.exception';
+import { ErrorCode } from '../../../../../common/errors/error-codes';
 
 @CommandHandler(CloseCashSessionCommand)
 export class CloseCashSessionHandler implements ICommandHandler<CloseCashSessionCommand> {
@@ -38,7 +40,7 @@ export class CloseCashSessionHandler implements ICommandHandler<CloseCashSession
 
       if (!session) {
         this.logger.warn(`Cash session closure failed: active cash session ID ${id} not found or belongs to another tenant`);
-        throw new NotFoundException(`Active cash session with ID ${id} not found`);
+        throw new AppException(ErrorCode.CashSessionNotFound, 'Sesión de caja activa no encontrada.', HttpStatus.NOT_FOUND, { id });
       }
 
       // 2. Compute expected cash balance in drawer directly from database

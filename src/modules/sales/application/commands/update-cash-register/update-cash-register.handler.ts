@@ -1,8 +1,10 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import { Logger, NotFoundException } from '@nestjs/common';
+import { Logger, HttpStatus } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { UpdateCashRegisterCommand } from './update-cash-register.command';
 import { CashRegister } from '../../../domain/entities/cash-register.entity';
+import { AppException } from '../../../../../common/errors/app.exception';
+import { ErrorCode } from '../../../../../common/errors/error-codes';
 
 @CommandHandler(UpdateCashRegisterCommand)
 export class UpdateCashRegisterHandler implements ICommandHandler<UpdateCashRegisterCommand> {
@@ -20,7 +22,7 @@ export class UpdateCashRegisterHandler implements ICommandHandler<UpdateCashRegi
     });
 
     if (!register) {
-      throw new NotFoundException('Caja registradora no encontrada');
+      throw new AppException(ErrorCode.CashRegisterNotFound, 'Caja registradora no encontrada', HttpStatus.NOT_FOUND);
     }
 
     if (name !== undefined && name.trim()) {
