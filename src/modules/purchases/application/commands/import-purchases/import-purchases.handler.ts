@@ -132,7 +132,11 @@ export class ImportPurchasesHandler implements ICommandHandler<ImportPurchasesCo
 
       const inventoryMovements: InventoryMovement[] = [];
 
-      for (const itemDto of items) {
+      // Siempre en el mismo orden (por variante) para no bloquear las filas de stock en orden cruzado
+      const itemsInLockOrder = [...items].sort((a, b) =>
+        variantMap.get(a.sku.toLowerCase())!.id.localeCompare(variantMap.get(b.sku.toLowerCase())!.id),
+      );
+      for (const itemDto of itemsInLockOrder) {
         const variant = variantMap.get(itemDto.sku.toLowerCase())!;
         const qty = Number(itemDto.quantity);
         const cost = Number(variant.purchasePrice || 0);

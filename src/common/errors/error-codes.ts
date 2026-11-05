@@ -13,6 +13,7 @@ export enum ErrorCode {
   PayloadTooLarge = 'PAYLOAD_TOO_LARGE',
   TooManyRequests = 'TOO_MANY_REQUESTS',
   InternalError = 'INTERNAL_ERROR',
+  ServiceUnavailable = 'SERVICE_UNAVAILABLE',
 
   // Autenticación y sesión
   InvalidCredentials = 'INVALID_CREDENTIALS',
@@ -73,6 +74,7 @@ export enum ErrorCode {
   VariantsRequired = 'VARIANTS_REQUIRED',
   BaseSkuRequired = 'BASE_SKU_REQUIRED',
   SkuTaken = 'SKU_TAKEN',
+  DuplicateSkuInImport = 'DUPLICATE_SKU_IN_IMPORT',
   SkusNotFound = 'SKUS_NOT_FOUND',
   CategoryNotFound = 'CATEGORY_NOT_FOUND',
   CategoryNameTaken = 'CATEGORY_NAME_TAKEN',
@@ -95,6 +97,7 @@ export enum ErrorCode {
   DefaultSupplierNotFound = 'DEFAULT_SUPPLIER_NOT_FOUND',
   SupplierIdentityTaken = 'SUPPLIER_IDENTITY_TAKEN',
   SupplierHasPurchases = 'SUPPLIER_HAS_PURCHASES',
+  EmptyPurchase = 'EMPTY_PURCHASE',
   PurchaseOrderNotFound = 'PURCHASE_ORDER_NOT_FOUND',
   PurchaseOrderAlreadyCancelled = 'PURCHASE_ORDER_ALREADY_CANCELLED',
   PurchaseOrderNotCancellable = 'PURCHASE_ORDER_NOT_CANCELLABLE',

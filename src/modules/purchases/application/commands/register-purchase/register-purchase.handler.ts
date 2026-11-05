@@ -33,6 +33,10 @@ export class RegisterPurchaseHandler implements ICommandHandler<RegisterPurchase
     const { tenantId, userId, supplierId, branchId, invoiceNumber, items } = command;
     this.logger.log(`Registering purchase order from Supplier: ${supplierId} in Branch: ${branchId} for Tenant: ${tenantId}`);
 
+    if (items.length === 0) {
+      throw new AppException(ErrorCode.EmptyPurchase, 'La compra debe tener al menos un producto.', HttpStatus.BAD_REQUEST);
+    }
+
     return this.entityManager.transaction(async (transactionalManager) => {
       await assertUserCanOperateInBranch(transactionalManager, this.redisService, {
         tenantId,
@@ -110,8 +114,11 @@ export class RegisterPurchaseHandler implements ICommandHandler<RegisterPurchase
       batchHeader.originType = BatchOriginType.PURCHASE;
       const savedBatchHeader = await batchHeaderRepo.save(batchHeader);
 
-      // 6. Process items (Update PMP cost and add branch stocks)
-      for (const itemDto of items) {
+      // 6. Process items (Update PMP cost and add branch stocks).
+      //    Siempre en el mismo orden (por variante): dos compras con las mismas variantes en distinto
+      //    orden bloquearían las filas en orden cruzado (deadlock).
+      const itemsInLockOrder = [...items].sort((a, b) => a.variantId.localeCompare(b.variantId));
+      for (const itemDto of itemsInLockOrder) {
         // Validate variant exists and belongs to this tenant
         const variant = await variantRepo.findOne({
           where: {

@@ -1,6 +1,7 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { Logger, HttpStatus } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
+import { lockBranchStock } from '../../../../products/application/services/inventory-stock';
 import { RedisService } from '../../../../../common/redis/redis.service';
 import { assertUserCanOperateInBranch } from '../../../../../common/security/branch-access.helper';
 import { CancelPurchaseOrderCommand } from './cancel-purchase-order.command';
@@ -67,6 +68,13 @@ export class CancelPurchaseOrderHandler
 
       if (order.status !== PurchaseOrderStatus.COMPLETED) {
         throw new AppException(ErrorCode.PurchaseOrderNotCancellable, 'Solo se pueden cancelar órdenes de compra completadas.', HttpStatus.CONFLICT);
+      }
+
+      // Bloquea las filas de stock (en orden fijo) ANTES de leer los lotes: una venta simultánea no puede
+      // consumir unidades entre la comprobación de lotes intactos y la reversión del stock.
+      const variantIds = [...new Set(order.items.map((item) => item.variantId))].sort();
+      for (const variantId of variantIds) {
+        await lockBranchStock(tm, order.branchId, variantId);
       }
 
       // 2. Verify no items have been sold: all batches must be fully intact

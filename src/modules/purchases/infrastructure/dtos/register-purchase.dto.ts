@@ -1,4 +1,4 @@
-import { IsUUID, IsNotEmpty, IsArray, ValidateNested, IsNumber, Min, IsString, IsOptional } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsUUID, IsNotEmpty, IsArray, ValidateNested, IsNumber, Min, IsString, IsOptional } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class PurchaseItemDto {
@@ -29,6 +29,8 @@ export class RegisterPurchaseDto {
   invoiceNumber?: string;
 
   @IsArray()
+  @ArrayMinSize(1, { message: 'La compra debe tener al menos un producto.' })
+  @ArrayMaxSize(1000)
   @ValidateNested({ each: true })
   @Type(() => PurchaseItemDto)
   items: PurchaseItemDto[];

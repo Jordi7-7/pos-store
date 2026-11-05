@@ -53,8 +53,10 @@ Forma de toda respuesta de error:
 | `CUSTOMER_IDENTITY_TAKEN` | 409 | customers | Ya existe un cliente con el documento {input.identityNumber}. | `identityNumber` |
 | `CUSTOMER_NOT_FOUND` | 404 | customers, sales | Cliente no encontrado. | `customerId`, `id` |
 | `DEFAULT_SUPPLIER_NOT_FOUND` | 404 | purchases | No se encontró un proveedor configurado para este tenant. | — |
+| `DUPLICATE_SKU_IN_IMPORT` | 400 | products | El archivo repite estos SKUs: {repeated.slice(0, 10).join(', ')} | `skus` |
 | `DUPLICATE_VARIANT_COMBINATION` | 409 | products | No se permiten múltiples variantes con la misma combinación de atributos en un mismo producto. | — |
-| `EMAIL_TAKEN` | 409 | users | El correo "{cleanEmail}" ya está en uso por otro usuario. | `email` |
+| `EMAIL_TAKEN` | 409 | users | El correo "{email}" ya está en uso por otro usuario. | `email` |
+| `EMPTY_PURCHASE` | 400 | purchases | La compra debe tener al menos un producto. | — |
 | `IMAGES_NOT_FOUND` | 404 | products | Una o más imágenes de la variante no existen. | — |
 | `IMPORT_EMPTY` | 400 | products, purchases | No se proporcionaron registros para importar. | — |
 | `IMPORT_LIMIT_EXCEEDED` | 400 | products, purchases | El archivo contiene {items.length} filas. El límite máximo permitido por importación es de 3,000 registros. | `max`, `received` |
@@ -92,6 +94,7 @@ Forma de toda respuesta de error:
 | `ROLE_REQUIRED` | 400 | users | Un usuario debe tener un rol asignado. | — |
 | `SALE_ALREADY_REFUNDED` | 409 | sales | La venta {sale.invoiceNumber \|\| saleId} ya ha sido devuelta en su totalidad. | `invoiceNumber`, `saleId` |
 | `SALE_NOT_FOUND` | 404 | sales | No se encontró la venta con folio "{invoiceNumber} | `invoiceNumber`, `saleId` |
+| `SERVICE_UNAVAILABLE` | HttpStatus.SERVICE_UNAVAILABLE | common | La base de datos no está disponible. | — |
 | `SESSION_EXPIRED` | 401 | auth | La sesión expiró. Inicia sesión nuevamente. | — |
 | `SKUS_NOT_FOUND` | 404 | purchases | Los siguientes SKUs no existen en el catálogo: {missingSkus.join(', ')} | `skus` |
 | `SKU_TAKEN` | 409 | products | El SKU "{sku}" ya está registrado en otra variante. | `sku`, `skus` |
@@ -107,7 +110,7 @@ Forma de toda respuesta de error:
 | `UNSUPPORTED_MEDIA_TYPE` | HttpStatus.UNSUPPORTED_MEDIA_TYPE | media | Tipo de archivo no permitido. Solo se aceptan imágenes JPEG, PNG, WebP, GIF o AVIF. | — |
 | `USERNAME_INVALID` | 400 | auth | El nombre de usuario es obligatorio y debe contener caracteres válidos. | — |
 | `USERNAME_REQUIRED` | 400 | users | El nombre de usuario no puede estar vacío. | — |
-| `USERNAME_TAKEN` | 409 | users | El nombre de usuario "{cleanUsername}" ya está en uso. | `username` |
+| `USERNAME_TAKEN` | 409 | users | El nombre de usuario "{username}" ya está en uso. | `username` |
 | `USER_DISABLED` | 401 | auth | Usuario deshabilitado. Contacta a un administrador. | — |
 | `USER_NOT_AUTHENTICATED` | 403 | auth, common | Usuario no autenticado o no válido para {actionDescription}. | — |
 | `USER_NOT_FOUND` | 401, 404 | auth, sales, users | Usuario no encontrado | `targetUserId` |
