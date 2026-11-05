@@ -17,6 +17,7 @@ import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
 import { translatingSkuConflict } from '../../services/sku-conflict';
 import { InventoryMovementType } from '../../../../../common/enums/inventory-movement-type.enum';
+import { normalizeSku } from '../../../domain/sku';
 
 
 @CommandHandler(CreateSimpleProductCommand)
@@ -35,7 +36,6 @@ export class CreateSimpleProductHandler implements ICommandHandler<CreateSimpleP
       tenantId,
       name,
       description,
-      sku,
       barcode,
       purchasePrice,
       salePrice,
@@ -44,6 +44,7 @@ export class CreateSimpleProductHandler implements ICommandHandler<CreateSimpleP
       imageIds,
       stocks,
     } = command;
+    const sku = normalizeSku(command.sku);
 
     this.logger.log(`Creating simple product: ${name} for Tenant: ${tenantId}`);
 
@@ -81,7 +82,7 @@ export class CreateSimpleProductHandler implements ICommandHandler<CreateSimpleP
       product.name = name;
       product.description = description;
       product.type = ProductType.SIMPLE;
-      product.baseSku = sku ? sku.trim().toUpperCase() : null;
+      product.baseSku = sku || null;
 
       // Link Category if provided
       if (categoryId) {

@@ -5,6 +5,7 @@ import { ValidateImportPurchasesQuery } from './validate-import-purchases.query'
 import { ProductVariant } from '../../../../products/domain/entities/product-variant.entity';
 import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
+import { normalizeSku } from '../../../../products/domain/sku';
 
 @QueryHandler(ValidateImportPurchasesQuery)
 export class ValidateImportPurchasesHandler implements IQueryHandler<ValidateImportPurchasesQuery> {
@@ -13,7 +14,7 @@ export class ValidateImportPurchasesHandler implements IQueryHandler<ValidateImp
   async execute(query: ValidateImportPurchasesQuery): Promise<{ errors: Record<string, string>; names: Record<string, string> }> {
     const { tenantId, items } = query;
     const variantRepo = this.entityManager.getRepository(ProductVariant);
-    const skus = items.map((it) => it.sku.trim());
+    const skus = items.map((it) => normalizeSku(it.sku));
 
     if (skus.length === 0) {
       return { errors: {}, names: {} };
@@ -34,13 +35,13 @@ export class ValidateImportPurchasesHandler implements IQueryHandler<ValidateImp
       variants.push(...chunkVariants);
     }
 
-    const variantMap = new Map(variants.map((v) => [v.sku.toLowerCase(), v]));
+    const variantMap = new Map(variants.map((v) => [normalizeSku(v.sku), v]));
     const errors: Record<string, string> = {};
     const names: Record<string, string> = {};
     const fileSkusSet = new Set<string>();
 
     for (const item of items) {
-      const skuLower = item.sku.trim().toLowerCase();
+      const skuLower = normalizeSku(item.sku);
 
       if (fileSkusSet.has(skuLower)) {
         errors[item.sku] = 'SKU duplicado en el mismo archivo de Excel.';

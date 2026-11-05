@@ -3,6 +3,7 @@ import { EntityManager } from 'typeorm';
 import { GetPosVariantsByBaseSkuQuery } from './get-pos-variants-by-base-sku.query';
 import { Product } from '../../../domain/entities/product.entity';
 import { ProductType } from '../../../domain/enums/product-type.enum';
+import { normalizeSku } from '../../../domain/sku';
 
 export interface PosVariableProductOptionValue {
   id: string;
@@ -51,7 +52,7 @@ export class GetPosVariantsByBaseSkuHandler implements IQueryHandler<GetPosVaria
 
   async execute(query: GetPosVariantsByBaseSkuQuery): Promise<PosVariableProductResponse | null> {
     const { tenantId, baseSku, branchId } = query;
-    const searchString = baseSku.trim();
+    const searchString = normalizeSku(baseSku);
     const productRepo = this.entityManager.getRepository(Product);
 
     // Indexed lookup on (tenant_id, base_sku)

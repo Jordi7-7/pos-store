@@ -6,6 +6,7 @@ import { ProductVariant } from '../../../domain/entities/product-variant.entity'
 import { VariantLookupResponse } from '../../read-models/pos-variant-response';
 import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
+import { normalizeSku } from '../../../domain/sku';
 
 @QueryHandler(GetVariantBySkuQuery)
 export class GetVariantBySkuHandler implements IQueryHandler<GetVariantBySkuQuery> {
@@ -24,7 +25,7 @@ export class GetVariantBySkuHandler implements IQueryHandler<GetVariantBySkuQuer
         'product.name'
       ])
       .where('variant.tenantId = :tenantId', { tenantId })
-      .andWhere('LOWER(variant.sku) = LOWER(:sku)', { sku: sku.trim() })
+      .andWhere('variant.sku = :sku', { sku: normalizeSku(sku) })
       .getOne();
 
     if (!variant) {

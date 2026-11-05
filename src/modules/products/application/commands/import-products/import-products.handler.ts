@@ -18,6 +18,7 @@ import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
 import { repeatedSkus } from './repeated-skus';
 import { translatingSkuConflict } from '../../services/sku-conflict';
+import { normalizeSku } from '../../../domain/sku';
 
 export interface ImportProductsResult {
   importedCount: number;
@@ -86,7 +87,7 @@ export class ImportProductsHandler implements ICommandHandler<ImportProductsComm
       }
 
       // Check if any SKU already exists in this Tenant (chunked to prevent Postgres param limits)
-      const skus = items.map((it) => it.sku.trim());
+      const skus = items.map((it) => normalizeSku(it.sku));
       const duplicateSkus: string[] = [];
       const CHUNK_QUERY_SIZE = 500;
 
@@ -134,7 +135,7 @@ export class ImportProductsHandler implements ICommandHandler<ImportProductsComm
           prod.name = item.name.trim();
           prod.description = '';
           prod.type = ProductType.SIMPLE;
-          prod.baseSku = item.sku ? item.sku.trim().toUpperCase() : null;
+          prod.baseSku = normalizeSku(item.sku) || null;
           return prod;
         });
         const savedProducts = await productRepo.save(productsToCreate);
@@ -144,7 +145,7 @@ export class ImportProductsHandler implements ICommandHandler<ImportProductsComm
           const variant = new ProductVariant();
           variant.productId = savedProducts[idx].id;
           variant.tenantId = tenantId;
-          variant.sku = item.sku.trim();
+          variant.sku = normalizeSku(item.sku);
           variant.barcode = item.barcode?.trim() || '';
           variant.purchasePrice = Number(item.purchasePrice) || 0;
           variant.salePrice = Number(item.salePrice) || 0;

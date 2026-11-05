@@ -9,8 +9,8 @@ describe('repeatedSkus', () => {
     expect(repeatedSkus(['A', ' A '])).toEqual(['A']);
   });
 
-  it('distingue mayúsculas, como el índice único de la base de datos', () => {
-    expect(repeatedSkus(['abc', 'ABC'])).toEqual([]);
+  it('no distingue mayúsculas: "abc" y "ABC" son el mismo SKU y se informa normalizado', () => {
+    expect(repeatedSkus(['abc', 'ABC'])).toEqual(['ABC']);
   });
 
   it('sin repetidos devuelve una lista vacía', () => {

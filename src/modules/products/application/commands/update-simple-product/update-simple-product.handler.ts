@@ -10,6 +10,7 @@ import { ProductType } from '../../../domain/enums/product-type.enum';
 import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
 import { translatingSkuConflict } from '../../services/sku-conflict';
+import { normalizeSku } from '../../../domain/sku';
 
 @CommandHandler(UpdateSimpleProductCommand)
 export class UpdateSimpleProductHandler implements ICommandHandler<UpdateSimpleProductCommand> {
@@ -30,12 +31,12 @@ export class UpdateSimpleProductHandler implements ICommandHandler<UpdateSimpleP
       description,
       categoryId,
       imageIds,
-      sku,
       barcode,
       purchasePrice,
       salePrice,
       wholesalePrice,
     } = command;
+    const sku = command.sku === undefined ? undefined : normalizeSku(command.sku);
 
     this.logger.log(`Updating simple product ID: ${id} for Tenant: ${tenantId}`);
 
@@ -118,7 +119,7 @@ export class UpdateSimpleProductHandler implements ICommandHandler<UpdateSimpleP
       }
       variant.sku = sku;
       // En un producto simple el SKU base es el SKU de su única variante
-      product.baseSku = sku.trim().toUpperCase();
+      product.baseSku = sku;
     }
 
     if (barcode !== undefined) variant.barcode = barcode;

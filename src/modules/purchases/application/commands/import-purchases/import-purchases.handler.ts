@@ -18,6 +18,7 @@ import { PurchaseOrderStatus } from '../../../../purchases/domain/enums/purchase
 import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
 import { InventoryMovementType } from '../../../../../common/enums/inventory-movement-type.enum';
+import { normalizeSku } from '../../../../products/domain/sku';
 
 @CommandHandler(ImportPurchasesCommand)
 export class ImportPurchasesHandler implements ICommandHandler<ImportPurchasesCommand> {
@@ -81,17 +82,17 @@ export class ImportPurchasesHandler implements ICommandHandler<ImportPurchasesCo
       }
 
       // Resolve all variants in batch to check existence
-      const skus = items.map((it) => it.sku.trim());
+      const skus = items.map((it) => normalizeSku(it.sku));
       const variants = await variantRepo.find({
         where: { sku: In(skus), tenantId },
       });
 
-      const variantMap = new Map(variants.map((v) => [v.sku.toLowerCase(), v]));
+      const variantMap = new Map(variants.map((v) => [normalizeSku(v.sku), v]));
 
       // Verify all SKUs exist
       const missingSkus: string[] = [];
       for (const sku of skus) {
-        if (!variantMap.has(sku.toLowerCase())) {
+        if (!variantMap.has(sku)) {
           missingSkus.push(sku);
         }
       }
@@ -109,7 +110,7 @@ export class ImportPurchasesHandler implements ICommandHandler<ImportPurchasesCo
 
       // Calculate total purchase amount
       const totalAmount = Money.sum(
-        items.map((item) => Money.ofLine(variantMap.get(item.sku.toLowerCase())!.purchasePrice || 0, item.quantity)),
+        items.map((item) => Money.ofLine(variantMap.get(normalizeSku(item.sku))!.purchasePrice || 0, item.quantity)),
       ).toNumber();
 
       // Create main PurchaseOrder
@@ -135,10 +136,10 @@ export class ImportPurchasesHandler implements ICommandHandler<ImportPurchasesCo
 
       // Siempre en el mismo orden (por variante) para no bloquear las filas de stock en orden cruzado
       const itemsInLockOrder = [...items].sort((a, b) =>
-        variantMap.get(a.sku.toLowerCase())!.id.localeCompare(variantMap.get(b.sku.toLowerCase())!.id),
+        variantMap.get(normalizeSku(a.sku))!.id.localeCompare(variantMap.get(normalizeSku(b.sku))!.id),
       );
       for (const itemDto of itemsInLockOrder) {
-        const variant = variantMap.get(itemDto.sku.toLowerCase())!;
+        const variant = variantMap.get(normalizeSku(itemDto.sku))!;
         const qty = Number(itemDto.quantity);
         const cost = Number(variant.purchasePrice || 0);
 

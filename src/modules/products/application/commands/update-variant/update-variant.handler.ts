@@ -10,6 +10,7 @@ import { translatingSkuConflict } from '../../services/sku-conflict';
 import { Product } from '../../../domain/entities/product.entity';
 import { ProductType } from '../../../domain/enums/product-type.enum';
 import { assertSkusDoNotShadowBaseSku } from '../../services/base-sku';
+import { normalizeSku } from '../../../domain/sku';
 
 @CommandHandler(UpdateVariantCommand)
 export class UpdateVariantHandler implements ICommandHandler<UpdateVariantCommand> {
@@ -25,13 +26,13 @@ export class UpdateVariantHandler implements ICommandHandler<UpdateVariantComman
     const {
       tenantId,
       variantId,
-      sku,
       barcode,
       purchasePrice,
       salePrice,
       wholesalePrice,
       imageIds,
     } = command;
+    const sku = command.sku === undefined ? undefined : normalizeSku(command.sku);
 
     this.logger.log(`Updating variant ID: ${variantId} for Tenant: ${tenantId}`);
 

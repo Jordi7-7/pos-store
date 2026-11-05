@@ -3,6 +3,7 @@ import { EntityManager } from 'typeorm';
 import { GetPosVariantBySkuQuery } from './get-pos-variant-by-sku.query';
 import { ProductVariant } from '../../../domain/entities/product-variant.entity';
 import { PosVariantResponse } from '../../read-models/pos-variant-response';
+import { normalizeSku } from '../../../domain/sku';
 
 @QueryHandler(GetPosVariantBySkuQuery)
 export class GetPosVariantBySkuHandler implements IQueryHandler<GetPosVariantBySkuQuery> {
@@ -21,8 +22,8 @@ export class GetPosVariantBySkuHandler implements IQueryHandler<GetPosVariantByS
       .leftJoinAndSelect('variant.stocks', 'stock', 'stock.branchId = :branchId', { branchId })
       .where('variant.tenantId = :tenantId', { tenantId })
       .andWhere(
-        '(variant.sku = :searchString OR variant.barcode = :searchString)',
-        { searchString }
+        '(variant.sku = :sku OR variant.barcode = :searchString)',
+        { sku: normalizeSku(sku), searchString }
       )
       .getMany();
 

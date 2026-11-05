@@ -16,6 +16,7 @@ import { ErrorCode } from '../../../../../common/errors/error-codes';
 import { translatingSkuConflict } from '../../services/sku-conflict';
 import { InventoryMovementType } from '../../../../../common/enums/inventory-movement-type.enum';
 import { assertSkusDoNotShadowBaseSku } from '../../services/base-sku';
+import { normalizeSku } from '../../../domain/sku';
 
 @CommandHandler(CreateVariantCommand)
 export class CreateVariantHandler implements ICommandHandler<CreateVariantCommand> {
@@ -28,7 +29,8 @@ export class CreateVariantHandler implements ICommandHandler<CreateVariantComman
   }
 
   private async run(command: CreateVariantCommand): Promise<ProductVariant> {
-    const { tenantId, productId, variantDto } = command;
+    const { tenantId, productId } = command;
+    const variantDto = { ...command.variantDto, sku: normalizeSku(command.variantDto.sku) };
     this.logger.log(`Creating variant for product ${productId} under Tenant: ${tenantId}`);
 
     return this.entityManager.transaction(async (transactionalManager) => {

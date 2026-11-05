@@ -19,6 +19,7 @@ import { ErrorCode } from '../../../../../common/errors/error-codes';
 import { translatingSkuConflict } from '../../services/sku-conflict';
 import { InventoryMovementType } from '../../../../../common/enums/inventory-movement-type.enum';
 import { assertBaseSkuAvailable, assertSkusDoNotShadowBaseSku } from '../../services/base-sku';
+import { normalizeSku } from '../../../domain/sku';
 
 
 @CommandHandler(CreateVariableProductCommand)
@@ -85,7 +86,7 @@ export class CreateVariableProductHandler implements ICommandHandler<CreateVaria
       }
 
       // Validate all SKU uniqueness per tenant
-      const skusToCheck = variants.map(v => v.sku);
+      const skusToCheck = variants.map((v) => normalizeSku(v.sku));
       const existingSkuCount = await variantRepo.count({
         where: { sku: In(skusToCheck), tenantId },
       });
@@ -137,7 +138,7 @@ export class CreateVariableProductHandler implements ICommandHandler<CreateVaria
         const variant = new ProductVariant();
         variant.product = savedProduct;
         variant.tenantId = tenantId;
-        variant.sku = variantDto.sku;
+        variant.sku = normalizeSku(variantDto.sku);
         variant.barcode = variantDto.barcode || '';
         variant.purchasePrice = Number(variantDto.purchasePrice) || 0;
         variant.salePrice = Number(variantDto.salePrice) || 0;
