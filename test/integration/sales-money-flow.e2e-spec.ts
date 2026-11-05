@@ -34,6 +34,9 @@ import { Expense } from '../../src/modules/sales/domain/entities/expense.entity'
 import { Refund } from '../../src/modules/sales/domain/entities/refund.entity';
 import { GetProductSalesReportHandler } from '../../src/modules/reports/application/queries/get-product-sales-report/get-product-sales-report.handler';
 import { GetProductSalesReportQuery } from '../../src/modules/reports/application/queries/get-product-sales-report/get-product-sales-report.query';
+import { CreateUserCommand } from '../../src/modules/users/application/commands/create-user/create-user.command';
+import { CreateUserHandler } from '../../src/modules/users/application/commands/create-user/create-user.handler';
+import { Role } from '../../src/modules/roles/domain/entities/role.entity';
 import { UpdateUserCommand } from '../../src/modules/users/application/commands/update-user/update-user.command';
 import { UpdateUserHandler } from '../../src/modules/users/application/commands/update-user/update-user.handler';
 import { HashService } from '../../src/modules/auth/services/hash.service';
@@ -414,6 +417,19 @@ describe('Flujo de dinero: venta, devolución y cierre de caja', () => {
       expect(await branchesOf(cashier.id)).toEqual([second.id]);
     });
 
+    it('la respuesta nunca incluye el hash de la contraseña ni del PIN', async () => {
+      const cashier = await db.getRepository(User).save(
+        db.getRepository(User).create({ tenantId, name: 'Rosa', username: 'rosa', password: 'x', isOwner: false }),
+      );
+
+      const updated = await handler().execute(
+        new UpdateUserCommand(tenantId, cashier.id, { password: 'clave-nueva-123', pin: '482915', branchIds: [branchId] }, userId),
+      );
+
+      expect(JSON.parse(JSON.stringify(updated))).not.toHaveProperty('password');
+      expect(JSON.parse(JSON.stringify(updated))).not.toHaveProperty('pin');
+    });
+
     it('una sucursal de otro tenant se rechaza y no deja cambios a medias', async () => {
       const cashier = await db.getRepository(User).save(
         db.getRepository(User).create({ tenantId, name: 'Luis', username: 'luis', password: 'x', isOwner: false }),
@@ -438,6 +454,75 @@ describe('Flujo de dinero: venta, devolución y cierre de caja', () => {
 
       expect(updated.isActive).toBe(false);
       expect(revoked).toEqual([cashier.id]);
+    });
+  });
+
+  describe('create-user', () => {
+    const create = (overrides: Partial<{ username: string; email: string; pin: string; roleId: string; branchIds: string[]; password: string }> = {}) =>
+      new CreateUserHandler(db.manager, new HashService()).execute(
+        new CreateUserCommand(
+          tenantId,
+          'Nuevo',
+          overrides.username ?? 'nuevo',
+          overrides.password ?? 'clave-segura-1',
+          overrides.email,
+          overrides.pin,
+          overrides.roleId,
+          undefined,
+          overrides.branchIds ?? [branchId],
+        ),
+      );
+    const exists = (username: string): Promise<boolean> => db.getRepository(User).existsBy({ tenantId, username });
+
+    let cashierRoleId: string;
+    beforeAll(async () => {
+      const role = await db.getRepository(Role).save(
+        db.getRepository(Role).create({ tenantId, name: 'Cajero', permissions: [], isSystem: true }),
+      );
+      cashierRoleId = role.id;
+    });
+
+    it('crea el usuario con sus sucursales, el rol Cajero por defecto y sin exponer hashes', async () => {
+      const created = await create({ username: '  Maria.Lopez ', email: ' Maria@Tienda.com ', pin: '735190' });
+
+      expect(created).toMatchObject({ username: 'maria.lopez', email: 'maria@tienda.com', isOwner: false, isActive: true, roleId: cashierRoleId });
+      expect(JSON.parse(JSON.stringify(created))).not.toHaveProperty('password');
+      expect(JSON.parse(JSON.stringify(created))).not.toHaveProperty('pin');
+
+      const stored = await db.getRepository(User).createQueryBuilder('user').addSelect(['user.password', 'user.pin']).where('user.id = :id', { id: created.id }).getOneOrFail();
+      expect(stored.password).not.toBe('clave-segura-1');
+      expect(await new HashService().compare('clave-segura-1', stored.password ?? '')).toBe(true);
+      expect(await new HashService().compare('735190', stored.pin ?? '')).toBe(true);
+      expect(await db.query<Array<{ branch_id: string }>>(`SELECT branch_id FROM user_branches WHERE user_id = $1`, [created.id])).toEqual([{ branch_id: branchId }]);
+    });
+
+    it('sin sucursales el usuario queda inactivo', async () => {
+      const created = await create({ username: 'sin.sucursal', branchIds: [] });
+      expect(created.isActive).toBe(false);
+    });
+
+    it('rechaza un nombre de usuario repetido y uno vacío', async () => {
+      await create({ username: 'repetido' });
+
+      await expect(create({ username: 'REPETIDO ' })).rejects.toMatchObject({ code: 'USERNAME_TAKEN' });
+      await expect(create({ username: '   ' })).rejects.toMatchObject({ code: 'USERNAME_REQUIRED' });
+    });
+
+    it('un PIN que ya usa otro usuario se rechaza y no se crea nada', async () => {
+      await create({ username: 'pin.uno', pin: '246810' });
+
+      await expect(create({ username: 'pin.dos', pin: '246810' })).rejects.toMatchObject({ code: 'PIN_ALREADY_IN_USE' });
+      expect(await exists('pin.dos')).toBe(false);
+    });
+
+    it('una sucursal de otro tenant se rechaza y no se crea el usuario', async () => {
+      await expect(create({ username: 'ajeno', branchIds: ['00000000-0000-4000-8000-000000000000'] })).rejects.toMatchObject({ code: 'INVALID_REFERENCE' });
+      expect(await exists('ajeno')).toBe(false);
+    });
+
+    it('un rol inexistente en la tienda se rechaza sin crear el usuario', async () => {
+      await expect(create({ username: 'sin.rol', roleId: '00000000-0000-4000-8000-000000000000' })).rejects.toMatchObject({ code: 'ROLE_NOT_FOUND' });
+      expect(await exists('sin.rol')).toBe(false);
     });
   });
 

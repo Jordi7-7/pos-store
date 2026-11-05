@@ -1,6 +1,6 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { HttpStatus, Logger } from '@nestjs/common';
-import { EntityManager, Not } from 'typeorm';
+import { EntityManager } from 'typeorm';
 import { UpdateUserCommand, UpdateUserInput } from './update-user.command';
 import { User } from '../../../domain/entities/user.entity';
 import { HashService } from '../../../../auth/services/hash.service';
@@ -8,10 +8,11 @@ import { AuthTokenService } from '../../../../auth/services/auth-token.service';
 import { RedisService } from '../../../../../common/redis/redis.service';
 import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
-import { isPinInUse } from '../../pin-uniqueness';
 import { assertBranchesBelongToTenant } from '../../../../../common/security/tenant-ownership';
 import { assertValidPermissions } from '../../../../../common/security/permissions.helper';
 import { invalidateUserBranchesCache } from '../../../../../common/security/branch-access.helper';
+import { normalizeEmail, normalizeUsername } from '../../user-fields';
+import { UserRules, replaceUserBranches } from '../../user-rules';
 
 interface UpdateOutcome {
   user: User;
@@ -32,8 +33,7 @@ export class UpdateUserHandler implements ICommandHandler<UpdateUserCommand> {
   ) {}
 
   async execute(command: UpdateUserCommand): Promise<User> {
-    const { tenantId, userId } = command;
-    this.logger.log(`Updating user: ${userId} for Tenant: ${tenantId}`);
+    this.logger.log(`Updating user: ${command.userId} for Tenant: ${command.tenantId}`);
 
     // Todo o nada: un fallo a mitad no puede dejar al usuario sin sucursales ni con datos a medias
     const outcome = await this.entityManager.transaction((manager) => this.applyUpdate(manager, command));
@@ -51,55 +51,26 @@ export class UpdateUserHandler implements ICommandHandler<UpdateUserCommand> {
   }
 
   private async applyUpdate(manager: EntityManager, command: UpdateUserCommand): Promise<UpdateOutcome> {
-    const { tenantId, userId, input } = command;
+    const { tenantId, input } = command;
+    const rules = new UserRules(manager, this.hashService, tenantId);
 
     const user = await this.loadEditableUser(manager, command);
     const wasActive = user.isActive;
-    let passwordChanged = false;
 
-    if (input.name !== undefined) {
-      user.name = input.name.trim();
-    }
-    if (input.username !== undefined) {
-      user.username = await this.cleanUsername(manager, tenantId, userId, input.username);
-    }
-    if (input.email !== undefined) {
-      user.email = await this.cleanEmail(manager, tenantId, userId, input.email);
-    }
-
-    if (input.password !== undefined && input.password.trim()) {
-      user.password = await this.hashService.hash(input.password);
-      passwordChanged = true;
-    }
-    if (input.pin !== undefined) {
-      user.pin = await this.hashedPinOrClear(manager, tenantId, userId, input.pin);
-    }
-
-    await this.applyAccess(manager, user, input);
-
-    if (input.isActive !== undefined) {
-      user.isActive = input.isActive;
-    }
-
-    const branchIds = input.branchIds;
-    if (branchIds !== undefined) {
-      await assertBranchesBelongToTenant(manager, tenantId, branchIds);
-      // Sin ninguna sucursal asignada el usuario no puede operar: se desactiva
-      if (branchIds.length === 0) {
-        user.isActive = false;
-      }
-    }
+    await this.applyIdentity(user, input, rules);
+    const passwordChanged = await this.applyCredentials(user, input, rules);
+    await this.applyAccess(user, input, rules);
+    await this.applyActivation(manager, user, input, tenantId);
 
     const saved = await manager.getRepository(User).save(user);
-
-    if (branchIds !== undefined) {
-      await this.replaceBranches(manager, saved.id, branchIds);
+    if (input.branchIds !== undefined) {
+      await replaceUserBranches(manager, saved.id, input.branchIds);
     }
 
     return {
       user: saved,
       mustRevokeSessions: passwordChanged || (wasActive && !saved.isActive),
-      branchesChanged: branchIds !== undefined,
+      branchesChanged: input.branchIds !== undefined,
     };
   }
 
@@ -124,58 +95,45 @@ export class UpdateUserHandler implements ICommandHandler<UpdateUserCommand> {
     return user;
   }
 
-  private async cleanUsername(manager: EntityManager, tenantId: string, userId: string, raw: string): Promise<string> {
-    const username = raw.toLowerCase().trim();
-    if (!username) {
-      throw new AppException(ErrorCode.UsernameRequired, 'El nombre de usuario no puede estar vacío.', HttpStatus.BAD_REQUEST);
+  /** Nombre, nombre de usuario y correo. */
+  private async applyIdentity(user: User, input: UpdateUserInput, rules: UserRules): Promise<void> {
+    if (input.name !== undefined) {
+      user.name = input.name.trim();
     }
-    const taken = await manager.getRepository(User).findOne({ where: { tenantId, username, id: Not(userId) } });
-    if (taken) {
-      throw new AppException(ErrorCode.UsernameTaken, `El nombre de usuario "${username}" ya está en uso.`, HttpStatus.CONFLICT, { username });
+    if (input.username !== undefined) {
+      const username = normalizeUsername(input.username);
+      await rules.assertUsernameAvailable(username, user.id);
+      user.username = username;
     }
-    return username;
+    if (input.email !== undefined) {
+      const email = normalizeEmail(input.email);
+      await rules.assertEmailAvailable(email, user.id);
+      user.email = email;
+    }
   }
 
-  private async cleanEmail(manager: EntityManager, tenantId: string, userId: string, raw: string): Promise<string | null> {
-    const email = raw.trim() ? raw.toLowerCase().trim() : null;
-    if (email) {
-      const taken = await manager.getRepository(User).findOne({ where: { tenantId, email, id: Not(userId) } });
-      if (taken) {
-        throw new AppException(ErrorCode.EmailTaken, `El correo "${email}" ya está en uso por otro usuario.`, HttpStatus.CONFLICT, { email });
-      }
+  /** Contraseña y PIN. Devuelve true si cambió la contraseña. */
+  private async applyCredentials(user: User, input: UpdateUserInput, rules: UserRules): Promise<boolean> {
+    let passwordChanged = false;
+    if (input.password !== undefined && input.password.trim()) {
+      user.password = await this.hashService.hash(input.password);
+      passwordChanged = true;
     }
-    return email;
-  }
-
-  /** Hash del PIN nuevo; un PIN vacío lo elimina (`undefined`). Rechaza PINs que ya usa otro usuario. */
-  private async hashedPinOrClear(manager: EntityManager, tenantId: string, userId: string, raw: string): Promise<string | undefined> {
-    const pin = raw ? raw.trim() : '';
-    if (!pin) {
-      return undefined;
+    if (input.pin !== undefined) {
+      user.pin = await rules.hashAvailablePin(input.pin, user.id);
     }
-    if (await isPinInUse(manager, this.hashService, tenantId, pin, userId)) {
-      this.logger.warn(`PIN already in use in Tenant ${tenantId}`);
-      throw new AppException(ErrorCode.PinAlreadyInUse, 'Ese PIN ya está en uso por otro usuario.', HttpStatus.CONFLICT);
-    }
-    return this.hashService.hash(pin);
+    return passwordChanged;
   }
 
   /** Rol y permisos personalizados. El propietario no usa rol: tiene acceso total por `isOwner`. */
-  private async applyAccess(manager: EntityManager, user: User, input: UpdateUserInput): Promise<void> {
+  private async applyAccess(user: User, input: UpdateUserInput, rules: UserRules): Promise<void> {
     if (user.isOwner) {
       user.roleId = null;
     } else if (input.roleId !== undefined) {
       if (!input.roleId) {
         throw new AppException(ErrorCode.RoleRequired, 'Un usuario debe tener un rol asignado.', HttpStatus.BAD_REQUEST);
       }
-      const roles: Array<{ id: string }> = await manager.query(
-        `SELECT id FROM "roles" WHERE "id" = $1 AND "tenant_id" = $2`,
-        [input.roleId, user.tenantId],
-      );
-      if (roles.length === 0) {
-        throw new AppException(ErrorCode.RoleNotFound, 'El rol especificado no existe para esta tienda.', HttpStatus.NOT_FOUND);
-      }
-      user.roleId = roles[0].id;
+      user.roleId = await rules.requireRoleId(input.roleId);
     }
 
     if (input.customPermissions !== undefined) {
@@ -183,15 +141,16 @@ export class UpdateUserHandler implements ICommandHandler<UpdateUserCommand> {
     }
   }
 
-  /** Reemplaza las sucursales del usuario con un único INSERT. */
-  private async replaceBranches(manager: EntityManager, userId: string, branchIds: string[]): Promise<void> {
-    await manager.query(`DELETE FROM "user_branches" WHERE "user_id" = $1`, [userId]);
-    if (branchIds.length > 0) {
-      await manager.query(
-        `INSERT INTO "user_branches" ("user_id", "branch_id")
-         SELECT $1::uuid, UNNEST($2::uuid[]) ON CONFLICT DO NOTHING`,
-        [userId, branchIds],
-      );
+  /** Estado activo y sucursales: sin ninguna sucursal asignada el usuario no puede operar y se desactiva. */
+  private async applyActivation(manager: EntityManager, user: User, input: UpdateUserInput, tenantId: string): Promise<void> {
+    if (input.isActive !== undefined) {
+      user.isActive = input.isActive;
+    }
+    if (input.branchIds !== undefined) {
+      await assertBranchesBelongToTenant(manager, tenantId, input.branchIds);
+      if (input.branchIds.length === 0) {
+        user.isActive = false;
+      }
     }
   }
 }

@@ -1,14 +1,13 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import { HttpStatus, Logger } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { CreateUserCommand } from './create-user.command';
 import { User } from '../../../domain/entities/user.entity';
 import { HashService } from '../../../../auth/services/hash.service';
-import { AppException } from '../../../../../common/errors/app.exception';
-import { ErrorCode } from '../../../../../common/errors/error-codes';
-import { isPinInUse } from '../../pin-uniqueness';
 import { assertBranchesBelongToTenant } from '../../../../../common/security/tenant-ownership';
 import { assertValidPermissions } from '../../../../../common/security/permissions.helper';
+import { normalizeEmail, normalizeUsername } from '../../user-fields';
+import { UserRules, replaceUserBranches } from '../../user-rules';
 
 @CommandHandler(CreateUserCommand)
 export class CreateUserHandler implements ICommandHandler<CreateUserCommand> {
@@ -20,102 +19,39 @@ export class CreateUserHandler implements ICommandHandler<CreateUserCommand> {
   ) {}
 
   async execute(command: CreateUserCommand): Promise<User> {
-    const { tenantId, name, username, password, email, pin, roleId, customPermissions, branchIds } = command;
-    const cleanUsername = username.toLowerCase().trim();
-    const cleanEmail = email && email.trim() ? email.toLowerCase().trim() : null;
+    const { tenantId, name, password, pin, roleId, customPermissions } = command;
+    const username = normalizeUsername(command.username);
+    const email = normalizeEmail(command.email);
+    const branchIds = command.branchIds ?? [];
 
-    this.logger.log(`Creating user: ${cleanUsername} for Tenant: ${tenantId}`);
+    this.logger.log(`Creating user: ${username} for Tenant: ${tenantId}`);
 
-    const userRepo = this.entityManager.getRepository(User);
+    // Todo o nada: el usuario y sus sucursales se confirman juntos
+    return this.entityManager.transaction(async (manager) => {
+      const rules = new UserRules(manager, this.hashService, tenantId);
 
-    // 1. Username is mandatory and must be unique per tenant
-    const usernameExists = await userRepo.findOne({
-      where: { tenantId, username: cleanUsername },
+      await rules.assertUsernameAvailable(username);
+      await rules.assertEmailAvailable(email);
+      await assertBranchesBelongToTenant(manager, tenantId, branchIds);
+
+      const user = new User();
+      user.tenantId = tenantId;
+      user.name = name.trim();
+      user.username = username;
+      user.email = email;
+      user.password = await this.hashService.hash(password);
+      user.pin = await rules.hashAvailablePin(pin);
+      user.isOwner = false;
+      user.roleId = roleId ? await rules.requireRoleId(roleId) : await rules.defaultRoleId();
+      user.customPermissions = customPermissions ? assertValidPermissions(customPermissions) : null;
+      // Sin ninguna sucursal asignada el usuario no puede operar: queda inactivo
+      user.isActive = branchIds.length > 0;
+
+      const saved = await manager.getRepository(User).save(user);
+      await replaceUserBranches(manager, saved.id, branchIds);
+
+      this.logger.log(`User created successfully: ID ${saved.id}`);
+      return saved;
     });
-    if (usernameExists) {
-      this.logger.warn(`User creation failed: username ${cleanUsername} is already in use for tenant ${tenantId}`);
-      throw new AppException(ErrorCode.UsernameTaken, `El nombre de usuario "${cleanUsername}" ya está registrado en esta tienda.`, HttpStatus.CONFLICT, { username: cleanUsername });
-    }
-
-    // 2. Email is optional; if provided, must be unique per tenant
-    if (cleanEmail) {
-      const emailExists = await userRepo.findOne({
-        where: { tenantId, email: cleanEmail },
-      });
-      if (emailExists) {
-        this.logger.warn(`User creation failed: email ${cleanEmail} is already in use for tenant ${tenantId}`);
-        throw new AppException(ErrorCode.EmailTaken, `El correo "${cleanEmail}" ya está registrado en esta tienda.`, HttpStatus.CONFLICT, { email: cleanEmail });
-      }
-    }
-
-    await assertBranchesBelongToTenant(this.entityManager, tenantId, branchIds ?? []);
-
-    // Resolve Role entity: roleId is strictly used
-    let resolvedRoleId: string | null = null;
-
-    if (roleId) {
-      const roleEntity = await this.entityManager.query(
-        `SELECT id, name FROM "roles" WHERE "id" = $1 AND "tenant_id" = $2`,
-        [roleId, tenantId],
-      );
-      if (roleEntity.length === 0) {
-        throw new AppException(ErrorCode.RoleNotFound, 'El rol especificado no existe para esta tienda.', HttpStatus.NOT_FOUND);
-      }
-      resolvedRoleId = roleEntity[0].id;
-    } else {
-      // Default to first system role (e.g. Cajero) if none provided
-      const defaultRole = await this.entityManager.query(
-        `SELECT id, name FROM "roles" WHERE "tenant_id" = $1 AND "name" ILIKE '%Cajero%' LIMIT 1`,
-        [tenantId],
-      );
-      if (defaultRole.length > 0) {
-        resolvedRoleId = defaultRole[0].id;
-      }
-    }
-
-    const hashedPassword = await this.hashService.hash(password);
-
-    const user = new User();
-    user.tenantId = tenantId;
-    user.name = name.trim();
-    user.username = cleanUsername;
-    user.email = cleanEmail;
-    user.password = hashedPassword;
-    user.isOwner = false;
-    user.roleId = resolvedRoleId;
-    user.customPermissions = customPermissions ? assertValidPermissions(customPermissions) : null;
-    user.isActive = true;
-
-    if (pin && pin.trim()) {
-      if (await isPinInUse(this.entityManager, this.hashService, tenantId, pin.trim())) {
-        this.logger.warn(`PIN already in use in Tenant ${tenantId}`);
-        throw new AppException(ErrorCode.PinAlreadyInUse, 'Ese PIN ya está en uso por otro usuario.', HttpStatus.CONFLICT);
-      }
-      user.pin = await this.hashService.hash(pin.trim());
-    } else {
-      user.pin = undefined;
-    }
-
-    // Save assigned branches (if none provided, user is inactive)
-    const finalBranchIds = branchIds || [];
-
-    if (finalBranchIds.length === 0) {
-      user.isActive = false;
-    }
-
-    const savedUser = await userRepo.save(user);
-
-    if (finalBranchIds.length > 0) {
-      for (const bId of finalBranchIds) {
-        await this.entityManager.query(
-          `INSERT INTO "user_branches" ("user_id", "branch_id") VALUES ($1, $2) ON CONFLICT DO NOTHING`,
-          [savedUser.id, bId],
-        );
-      }
-    }
-
-    this.logger.log(`User created successfully: ${savedUser.email} (ID: ${savedUser.id})`);
-
-    return savedUser;
   }
 }

@@ -343,14 +343,6 @@
       "count": 4
     }
   },
-  "src/modules/users/application/commands/create-user/create-user.handler.ts": {
-    "@typescript-eslint/no-unsafe-assignment": {
-      "count": 4
-    },
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 4
-    }
-  },
   "src/modules/users/application/commands/generate-pin/generate-pin.handler.spec.ts": {
     "@typescript-eslint/no-unnecessary-type-assertion": {
       "count": 3
