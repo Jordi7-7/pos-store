@@ -1,9 +1,11 @@
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
-import { EntityManager, Between, In } from 'typeorm';
+import { EntityManager, Between, FindOptionsWhere, In } from 'typeorm';
 import { GetSalesCostReportQuery } from './get-sales-cost-report.query';
 import { Sale } from '../../../../sales/domain/entities/sale.entity';
 import { parseReportDates } from '../parse-dates.helper';
 import { SaleStatus } from '../../../../../common/enums/sale-status.enum';
+import { Money } from '../../../../../common/domain/money';
+import { CONSUMER_FINAL_NAME } from '../../../../customers/domain/consumer-final';
 
 import { RedisService } from '../../../../../common/redis/redis.service';
 import { assertUserCanAccessBranch } from '../../../../../common/security/branch-access.helper';
@@ -32,7 +34,7 @@ export class GetSalesCostReportHandler implements IQueryHandler<GetSalesCostRepo
 
     const saleRepository = this.entityManager.getRepository(Sale);
 
-    const whereClause: any = {
+    const whereClause: FindOptionsWhere<Sale> = {
       tenantId: query.tenantId,
       createdAt: Between(start, end),
       status: In([SaleStatus.COMPLETED, SaleStatus.PARTIALLY_REFUNDED]),
@@ -57,8 +59,8 @@ export class GetSalesCostReportHandler implements IQueryHandler<GetSalesCostRepo
 
     return sales.map((sale) => {
       let pieces = 0;
-      let costPrice = 0;
-      let salePrice = 0;
+      let costPrice = Money.ZERO;
+      let salePrice = Money.ZERO;
       const itemsDetail: Array<{
         id: string;
         variantId: string;
@@ -75,56 +77,50 @@ export class GetSalesCostReportHandler implements IQueryHandler<GetSalesCostRepo
         profit: number;
       }> = [];
 
-      if (sale.items) {
-        for (const item of sale.items) {
-          const qty = Number(item.quantity || 0);
-          const refundedQty = Number(item.refundedQuantity || 0);
-          const netQty = Math.max(0, qty - refundedQty);
-          const unitCost = Number(item.cost || 0);
-          const unitPrice = Number(item.price || 0);
+      for (const item of sale.items ?? []) {
+        const qty = Number(item.quantity || 0);
+        const refundedQty = Number(item.refundedQuantity || 0);
+        const netQty = Math.max(0, qty - refundedQty);
+        const unitCost = Number(item.cost || 0);
+        const unitPrice = Number(item.price || 0);
 
-          // Costo y venta netos (descontando piezas devueltas y prorrateo global)
-          const lineCost = unitCost * netQty;
-          const soldQty = qty || 1;
-          const totalItemDiscount = Number(item.discountAmount || 0) + Number(item.globalDiscountAmount || 0);
-          const discountPerUnit = totalItemDiscount / soldQty;
-          const netLineDiscount = discountPerUnit * netQty;
-          const lineSale = unitPrice * netQty - netLineDiscount;
-          const lineProfit = lineSale - lineCost;
+        // Costo y venta netos (descontando piezas devueltas y la parte proporcional de los descuentos)
+        const lineCost = Money.ofLine(unitCost, netQty);
+        const totalItemDiscount = Money.of(item.discountAmount || 0).plus(Money.of(item.globalDiscountAmount || 0));
+        const netLineDiscount = totalItemDiscount.fraction(netQty, qty || 1);
+        const lineSale = Money.ofLine(unitPrice, netQty).minus(netLineDiscount);
+        const lineProfit = lineSale.minus(lineCost);
 
-          pieces += netQty;
-          costPrice += lineCost;
-          salePrice += lineSale;
+        pieces += netQty;
+        costPrice = costPrice.plus(lineCost);
+        salePrice = salePrice.plus(lineSale);
 
-          itemsDetail.push({
-            id: item.id,
-            variantId: item.variantId,
-            productName: item.variant?.product?.name || 'Producto sin nombre',
-            sku: item.variant?.sku || '',
-            quantity: qty,
-            refundedQuantity: refundedQty,
-            netQuantity: netQty,
-            unitCost,
-            totalCost: lineCost,
-            unitPrice,
-            discountAmount: Number(netLineDiscount.toFixed(2)),
-            totalPrice: Number(lineSale.toFixed(2)),
-            profit: Number(lineProfit.toFixed(2)),
-          });
-        }
+        itemsDetail.push({
+          id: item.id,
+          variantId: item.variantId,
+          productName: item.variant?.product?.name || 'Producto sin nombre',
+          sku: item.variant?.sku || '',
+          quantity: qty,
+          refundedQuantity: refundedQty,
+          netQuantity: netQty,
+          unitCost,
+          totalCost: lineCost.toNumber(),
+          unitPrice,
+          discountAmount: netLineDiscount.toNumber(),
+          totalPrice: lineSale.toNumber(),
+          profit: lineProfit.toNumber(),
+        });
       }
-
-      const difference = salePrice - costPrice;
 
       return {
         id: sale.id,
         invoiceNumber: sale.invoiceNumber,
         createdAt: sale.createdAt,
-        clientName: sale.customer?.name || 'PUBLICO VENTA DE MOSTRADOR',
+        clientName: sale.customer?.name || CONSUMER_FINAL_NAME,
         pieces,
-        salePrice,
-        costPrice,
-        difference,
+        salePrice: salePrice.toNumber(),
+        costPrice: costPrice.toNumber(),
+        difference: salePrice.minus(costPrice).toNumber(),
         status: sale.status,
         items: itemsDetail,
       };

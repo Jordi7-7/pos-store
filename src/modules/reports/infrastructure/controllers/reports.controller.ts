@@ -1,6 +1,8 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { QueryBus } from '@nestjs/cqrs';
 import { GetReportDto } from '../dtos/get-report.dto';
+import { GetValuedInventoryDto } from '../dtos/get-valued-inventory.dto';
+import { parseLimit } from '../../../../common/utils/pagination';
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
 import { GetSalesCostReportQuery } from '../../application/queries/get-sales-cost-report/get-sales-cost-report.query';
 import { GetValuedInventoryQuery } from '../../application/queries/get-valued-inventory/get-valued-inventory.query';
@@ -38,16 +40,14 @@ export class ReportsController {
     @CurrentUser('tenantId') tenantId: string,
     @CurrentUser('sub') userId: string,
     @CurrentUser('isOwner') isOwner: boolean,
-    @Query('page') page?: number,
-    @Query('limit') limit?: number,
-    @Query('branchId') branchId?: string,
+    @Query() query: GetValuedInventoryDto,
   ) {
     return this.queryBus.execute(
       new GetValuedInventoryQuery(
         tenantId,
-        page ? Number(page) : undefined,
-        limit ? Number(limit) : undefined,
-        branchId || undefined,
+        query.page,
+        query.limit === undefined ? undefined : parseLimit(query.limit),
+        query.branchId,
         userId,
         isOwner,
       ),

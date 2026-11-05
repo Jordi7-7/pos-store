@@ -1,4 +1,6 @@
-import { IsString, IsOptional, IsISO8601 } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsOptional, IsISO8601, IsUUID } from 'class-validator';
+import { blankToUndefined } from '../../../../common/utils/query-values';
 
 export class GetReportDto {
   @IsOptional()
@@ -9,7 +11,8 @@ export class GetReportDto {
   @IsISO8601()
   endDate?: string;
 
+  @Transform(({ value }: { value: unknown }) => blankToUndefined(value))
   @IsOptional()
-  @IsString()
+  @IsUUID()
   branchId?: string;
 }

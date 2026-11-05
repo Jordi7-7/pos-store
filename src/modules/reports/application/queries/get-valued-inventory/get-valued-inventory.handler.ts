@@ -2,6 +2,8 @@ import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
 import { EntityManager } from 'typeorm';
 import { GetValuedInventoryQuery } from './get-valued-inventory.query';
 import { ProductVariant } from '../../../../products/domain/entities/product-variant.entity';
+import { PurchaseOrderStatus } from '../../../../purchases/domain/enums/purchase-order-status.enum';
+import { Money } from '../../../../../common/domain/money';
 import { PurchaseOrderItem } from '../../../../purchases/domain/entities/purchase-order-item.entity';
 
 import { RedisService } from '../../../../../common/redis/redis.service';
@@ -32,6 +34,8 @@ export class GetValuedInventoryHandler implements IQueryHandler<GetValuedInvento
       .addSelect('poi.purchasePrice', 'purchasePrice')
       .distinctOn(['poi.variantId'])
       .where('po.tenantId = :tenantId', { tenantId })
+      // Una compra anulada ya no es el último costo de nada
+      .andWhere('po.status = :completed', { completed: PurchaseOrderStatus.COMPLETED })
       .orderBy('poi.variantId')
       .addOrderBy('po.createdAt', 'DESC');
 
@@ -51,10 +55,7 @@ export class GetValuedInventoryHandler implements IQueryHandler<GetValuedInvento
       ? `COALESCE((SELECT SUM(quantity) FROM product_stocks WHERE variant_id = variant.id AND branch_id = :branchId), 0) <> 0`
       : `COALESCE((SELECT SUM(quantity) FROM product_stocks WHERE variant_id = variant.id), 0) <> 0`;
 
-    const stockParams: Record<string, any> = { tenantId };
-    if (branchId) {
-      stockParams.branchId = branchId;
-    }
+    const stockParams: { tenantId: string; branchId?: string } = branchId ? { tenantId, branchId } : { tenantId };
 
     // 2. Build QueryBuilder on ProductVariant to filter stock !== 0 and apply pagination
     const variantRepository = this.entityManager.getRepository(ProductVariant);
@@ -90,7 +91,7 @@ export class GetValuedInventoryHandler implements IQueryHandler<GetValuedInvento
       .getMany();
 
     let globalTotalQuantity = 0;
-    let globalTotalValue = 0;
+    let globalTotalValue = Money.ZERO;
 
     for (const v of allVariants) {
       const qty = (v.stocks || []).reduce((sum, s) => sum + Number(s.quantity || 0), 0);
@@ -99,7 +100,7 @@ export class GetValuedInventoryHandler implements IQueryHandler<GetValuedInvento
         : Number(v.purchasePrice || 0);
       
       globalTotalQuantity += qty;
-      globalTotalValue += qty * purchasePrice;
+      globalTotalValue = globalTotalValue.plus(Money.ofLine(purchasePrice, qty));
     }
 
     const [variants, total] = await queryBuilder.getManyAndCount();
@@ -112,7 +113,7 @@ export class GetValuedInventoryHandler implements IQueryHandler<GetValuedInvento
         ? priceMap.get(variant.id)! 
         : Number(variant.purchasePrice || 0);
 
-      const totalValue = quantity * purchasePrice;
+      const totalValue = Money.ofLine(purchasePrice, quantity).toNumber();
 
       const attrsStr = (variant.attributeValues || [])
         .map((av) => av.value)
@@ -136,7 +137,7 @@ export class GetValuedInventoryHandler implements IQueryHandler<GetValuedInvento
         limit: limit || total,
         totalPages: limit ? Math.ceil(total / limit) : 1,
         totalQuantity: globalTotalQuantity,
-        totalValue: globalTotalValue,
+        totalValue: globalTotalValue.toNumber(),
       }
     };
   }
