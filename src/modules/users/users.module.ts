@@ -5,6 +5,7 @@ import { User } from './domain/entities/user.entity';
 import { CreateUserHandler } from './application/commands/create-user/create-user.handler';
 import { UpdateUserHandler } from './application/commands/update-user/update-user.handler';
 import { GeneratePinHandler } from './application/commands/generate-pin/generate-pin.handler';
+import { ListUsersHandler } from './application/queries/list-users/list-users.handler';
 import { UsersController } from './infrastructure/controllers/users.controller';
 import { AuthModule } from '../auth/auth.module';
 
@@ -15,7 +16,7 @@ import { AuthModule } from '../auth/auth.module';
     AuthModule,
   ],
   controllers: [UsersController],
-  providers: [CreateUserHandler, UpdateUserHandler, GeneratePinHandler],
+  providers: [CreateUserHandler, UpdateUserHandler, GeneratePinHandler, ListUsersHandler],
   exports: [TypeOrmModule],
 })
 export class UsersModule {}

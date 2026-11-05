@@ -1,6 +1,5 @@
 import { Controller, Post, Put, Body, Param, Get } from '@nestjs/common';
-import { CommandBus } from '@nestjs/cqrs';
-import { EntityManager } from 'typeorm';
+import { CommandBus, QueryBus } from '@nestjs/cqrs';
 import { CreateUserDto } from '../dtos/create-user.dto';
 import { CreateUserCommand } from '../../application/commands/create-user/create-user.command';
 import { UpdateUserDto } from '../dtos/update-user.dto';
@@ -9,13 +8,14 @@ import { GeneratePinCommand } from '../../application/commands/generate-pin/gene
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
 import { RequirePermissions } from '../../../auth/decorators/permissions.decorator';
 import { APP_PERMISSIONS } from '../../../../common/enums/permissions.enum';
-import { User } from '../../domain/entities/user.entity';
+import { ListUsersQuery } from '../../application/queries/list-users/list-users.query';
+import { UserListItem } from '../../application/queries/list-users/list-users.handler';
 
 @Controller('users')
 export class UsersController {
   constructor(
     private readonly commandBus: CommandBus,
-    private readonly entityManager: EntityManager,
+    private readonly queryBus: QueryBus,
   ) {}
 
   @Post()
@@ -66,43 +66,6 @@ export class UsersController {
   @Get()
   @RequirePermissions(APP_PERMISSIONS.USERS_GET)
   async list(@CurrentUser('tenantId') tenantId: string) {
-    const rawUsers = await this.entityManager
-      .getRepository(User)
-      .createQueryBuilder('user')
-      .leftJoinAndSelect('user.roleEntity', 'roleEntity')
-      .leftJoinAndSelect('user.branches', 'branches')
-      .addSelect('CASE WHEN user.pin IS NOT NULL AND user.pin != \'\' THEN true ELSE false END', 'hasPin')
-      .where('user.tenantId = :tenantId', { tenantId })
-      .orderBy('user.createdAt', 'ASC')
-      .getRawAndEntities();
-
-    return rawUsers.entities.map((user, idx) => {
-      const role = user.isOwner
-        ? { id: 'owner', name: 'Propietario' }
-        : user.roleEntity
-        ? { id: user.roleEntity.id, name: user.roleEntity.name }
-        : null;
-
-      const branches = (user.branches || []).map((b: any) => ({
-        id: b.id,
-        name: b.name,
-        address: b.address || null,
-      }));
-
-      return {
-        id: user.id,
-        name: user.name,
-        username: user.username || null,
-        email: user.email,
-        isOwner: user.isOwner,
-        isActive: user.isActive,
-        role,
-        hasPin: rawUsers.raw[idx]?.hasPin === true || rawUsers.raw[idx]?.hasPin === 'true',
-        branches,
-        customPermissions: user.customPermissions || null,
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt,
-      };
-    });
+    return this.queryBus.execute<ListUsersQuery, UserListItem[]>(new ListUsersQuery(tenantId));
   }
 }

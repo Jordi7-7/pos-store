@@ -1,6 +1,5 @@
 import { Controller, Post, Body, Param, Get, Query } from '@nestjs/common';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
-import { EntityManager } from 'typeorm';
 import { ProcessSaleDto } from '../dtos/process-sale.dto';
 import { ProcessSaleCommand } from '../../application/commands/process-sale/process-sale.command';
 import { OpenCashSessionDto } from '../dtos/open-cash-session.dto';
@@ -16,6 +15,8 @@ import { GetCashSessionDetailsQuery } from '../../application/queries/get-cash-s
 import { GetSaleByInvoiceQuery } from '../../application/queries/get-sale-by-invoice/get-sale-by-invoice.query';
 import { GetSalesByVariantQuery } from '../../application/queries/get-sales-by-variant/get-sales-by-variant.query';
 import { GetSalesPaginatedQuery } from '../../application/queries/get-sales-paginated/get-sales-paginated.query';
+import { GetExpensesQuery } from '../../application/queries/get-expenses/get-expenses.query';
+import { GetRefundsQuery } from '../../application/queries/get-refunds/get-refunds.query';
 import { GetActiveCashSessionQuery } from '../../application/queries/get-active-cash-session/get-active-cash-session.query';
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
 import { CashSession } from '../../domain/entities/cash-session.entity';
@@ -23,13 +24,13 @@ import { Expense } from '../../domain/entities/expense.entity';
 import { Refund } from '../../domain/entities/refund.entity';
 import { RequirePermissions, RequireAnyPermissions } from '../../../auth/decorators/permissions.decorator';
 import { APP_PERMISSIONS } from '../../../../common/enums/permissions.enum';
+import { parseLimit, parsePage } from '../../../../common/utils/pagination';
 
 @Controller('sales')
 export class SalesController {
   constructor(
     private readonly commandBus: CommandBus,
     private readonly queryBus: QueryBus,
-    private readonly entityManager: EntityManager,
   ) {}
 
   @Get('cash-sessions/active')
@@ -89,8 +90,8 @@ export class SalesController {
       tenantId,
       startDate,
       endDate,
-      page ? Number(page) : 1,
-      limit ? Number(limit) : 10,
+      parsePage(page),
+      parseLimit(limit),
       branchId || undefined,
       userId,
       isOwner,
@@ -111,8 +112,8 @@ export class SalesController {
     return this.queryBus.execute(new GetSalesByVariantQuery(
       tenantId,
       variantId,
-      page ? Number(page) : 1,
-      limit ? Number(limit) : 10,
+      parsePage(page),
+      parseLimit(limit),
       branchId || undefined,
       userId,
       isOwner,
@@ -177,15 +178,9 @@ export class SalesController {
   @RequirePermissions(APP_PERMISSIONS.CASH_SESSIONS_GET)
   async findExpenses(
     @CurrentUser('tenantId') tenantId: string,
-    @Query('cashSessionId') cashSessionId: string,
+    @Query('cashSessionId') cashSessionId?: string,
   ) {
-    if (!cashSessionId) {
-      return [];
-    }
-    return this.entityManager.getRepository(Expense).find({
-      where: { tenantId, cashSessionId },
-      order: { createdAt: 'DESC' },
-    });
+    return this.queryBus.execute<GetExpensesQuery, Expense[]>(new GetExpensesQuery(tenantId, cashSessionId));
   }
 
   @Post('refunds')
@@ -215,14 +210,7 @@ export class SalesController {
     @Query('cashSessionId') cashSessionId?: string,
     @Query('saleId') saleId?: string,
   ) {
-    const whereClause: any = { tenantId };
-    if (cashSessionId) whereClause.cashSessionId = cashSessionId;
-    if (saleId) whereClause.saleId = saleId;
-    return this.entityManager.getRepository(Refund).find({
-      where: whereClause,
-      relations: { items: { variant: { product: true } } },
-      order: { createdAt: 'DESC' },
-    });
+    return this.queryBus.execute<GetRefundsQuery, Refund[]>(new GetRefundsQuery(tenantId, cashSessionId, saleId));
   }
 
   @Get('cash-sessions')
