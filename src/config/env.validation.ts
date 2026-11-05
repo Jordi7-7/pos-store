@@ -7,6 +7,11 @@ export interface ValidatedEnv {
 const MIN_SECRET_LENGTH = 16;
 const INSECURE_VALUES: ReadonlySet<string> = new Set(['fallback_secret', 'postgres', 'changeme', 'secret']);
 
+/** Marcador de la plantilla `.env.example` que nadie rellenó (p. ej. `<secreto-aleatorio-1>`). */
+function isUnfilledPlaceholder(value: string): boolean {
+  return /^<.*>$/.test(value.trim());
+}
+
 function requireString(env: Record<string, unknown>, key: string, errors: string[]): string {
   const value = env[key];
   if (typeof value !== 'string' || value.trim() === '') {
@@ -32,9 +37,15 @@ export function validateEnv(env: Record<string, unknown>): Record<string, unknow
     if (value && INSECURE_VALUES.has(value)) {
       errors.push(`${key} usa un valor inseguro conocido.`);
     }
+    if (value && isUnfilledPlaceholder(value)) {
+      errors.push(`${key} sigue con el marcador de la plantilla: genera un secreto real (openssl rand -base64 48).`);
+    }
   }
 
   const dbPassword = requireString(env, 'DB_PASSWORD', errors);
+  if (dbPassword && isUnfilledPlaceholder(dbPassword)) {
+    errors.push('DB_PASSWORD sigue con el marcador de la plantilla.');
+  }
   if (dbPassword && env.NODE_ENV === 'production' && INSECURE_VALUES.has(dbPassword)) {
     errors.push('DB_PASSWORD usa un valor inseguro conocido en producción.');
   }

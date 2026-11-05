@@ -23,6 +23,12 @@ describe('validateEnv', () => {
     expect(() => validateEnv({ ...validEnv, JWT_SECRET: 'fallback_secret' })).toThrow(/inseguro/);
   });
 
+  it('rechaza los marcadores de la plantilla .env.example sin rellenar, aunque tengan longitud suficiente', () => {
+    expect(() => validateEnv({ ...validEnv, JWT_SECRET: '<secreto-aleatorio-1>' })).toThrow(/marcador de la plantilla/);
+    expect(() => validateEnv({ ...validEnv, REFRESH_TOKEN_SECRET: '<secreto-aleatorio-2-distinto-del-anterior>' })).toThrow(/marcador de la plantilla/);
+    expect(() => validateEnv({ ...validEnv, DB_PASSWORD: '<contraseña-de-postgres>' })).toThrow(/marcador de la plantilla/);
+  });
+
   it('exige DB_PASSWORD y prohíbe contraseñas por defecto en producción', () => {
     expect(() => validateEnv({ ...validEnv, DB_PASSWORD: '' })).toThrow(/DB_PASSWORD es obligatoria/);
     expect(() => validateEnv({ ...validEnv, DB_PASSWORD: 'postgres', NODE_ENV: 'production', CORS_ORIGINS: 'https://a.com' })).toThrow(
