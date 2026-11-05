@@ -15,7 +15,7 @@ export class UpdateSupplierHandler implements ICommandHandler<UpdateSupplierComm
   ) {}
 
   async execute(command: UpdateSupplierCommand): Promise<Supplier> {
-    const { tenantId, id, dto } = command;
+    const { tenantId, id, input } = command;
 
     const supplier = await this.supplierRepository.findOne({
       where: { id, tenantId },
@@ -24,27 +24,27 @@ export class UpdateSupplierHandler implements ICommandHandler<UpdateSupplierComm
       throw new NotFoundException(`Supplier with ID ${id} not found`);
     }
 
-    if (dto.identityNumber !== undefined) {
+    if (input.identityNumber !== undefined) {
       const existing = await this.supplierRepository.findOne({
-        where: { tenantId, identityNumber: dto.identityNumber, id: Not(id) },
+        where: { tenantId, identityNumber: input.identityNumber, id: Not(id) },
       });
       if (existing) {
-        throw new BadRequestException(`Supplier with identity number "${dto.identityNumber}" already exists`);
+        throw new BadRequestException(`Supplier with identity number "${input.identityNumber}" already exists`);
       }
-      supplier.identityNumber = dto.identityNumber;
+      supplier.identityNumber = input.identityNumber;
     }
 
-    if (dto.name !== undefined) {
-      supplier.name = dto.name;
+    if (input.name !== undefined) {
+      supplier.name = input.name;
     }
-    if (dto.email !== undefined) {
-      supplier.email = dto.email || null;
+    if (input.email !== undefined) {
+      supplier.email = input.email || null;
     }
-    if (dto.phone !== undefined) {
-      supplier.phone = dto.phone || null;
+    if (input.phone !== undefined) {
+      supplier.phone = input.phone || null;
     }
-    if (dto.address !== undefined) {
-      supplier.address = dto.address || null;
+    if (input.address !== undefined) {
+      supplier.address = input.address || null;
     }
 
     const saved = await this.supplierRepository.save(supplier);

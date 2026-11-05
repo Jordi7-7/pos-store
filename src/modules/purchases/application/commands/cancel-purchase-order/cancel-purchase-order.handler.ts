@@ -6,6 +6,8 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
+import { RedisService } from '../../../../../common/redis/redis.service';
+import { assertUserCanOperateInBranch } from '../../../../../common/security/branch-access.helper';
 import { CancelPurchaseOrderCommand } from './cancel-purchase-order.command';
 import { PurchaseOrder } from '../../../domain/entities/purchase-order.entity';
 import { PurchaseOrderItem } from '../../../domain/entities/purchase-order-item.entity';
@@ -21,10 +23,13 @@ export class CancelPurchaseOrderHandler
 {
   private readonly logger = new Logger(CancelPurchaseOrderHandler.name);
 
-  constructor(private readonly entityManager: EntityManager) {}
+  constructor(
+    private readonly entityManager: EntityManager,
+    private readonly redisService: RedisService,
+  ) {}
 
   async execute(command: CancelPurchaseOrderCommand): Promise<void> {
-    const { tenantId, purchaseOrderId } = command;
+    const { tenantId, userId, purchaseOrderId } = command;
 
     this.logger.log(
       `Cancelling purchase order ${purchaseOrderId} for tenant ${tenantId}`,
@@ -38,6 +43,9 @@ export class CancelPurchaseOrderHandler
       const movementRepo = tm.getRepository(InventoryMovement);
       const batchHeaderRepo = tm.getRepository(Batch);
 
+      // Bloquea la orden: dos cancelaciones simultáneas no pueden revertir el stock dos veces
+      await tm.query(`SELECT "id" FROM "purchase_orders" WHERE "id" = $1 AND "tenant_id" = $2 FOR UPDATE`, [purchaseOrderId, tenantId]);
+
       // 1. Find and validate the purchase order
       const order = await purchaseRepo.findOne({
         where: { id: purchaseOrderId, tenantId },
@@ -49,6 +57,13 @@ export class CancelPurchaseOrderHandler
           `Purchase order with ID ${purchaseOrderId} not found`,
         );
       }
+
+      await assertUserCanOperateInBranch(tm, this.redisService, {
+        tenantId,
+        userId,
+        branchId: order.branchId,
+        actionDescription: 'cancelar compras',
+      });
 
       if (order.status === 'CANCELLED') {
         throw new BadRequestException(

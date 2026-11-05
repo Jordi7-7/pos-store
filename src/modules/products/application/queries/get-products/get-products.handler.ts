@@ -3,7 +3,7 @@ import { EntityManager } from 'typeorm';
 import { GetProductsQuery } from './get-products.query';
 import { Product } from '../../../domain/entities/product.entity';
 import { ProductType } from '../../../domain/enums/product-type.enum';
-import { PaginatedProductsResponseDto, ProductListItemResponseDto } from '../../dtos/product-response.dto';
+import { PaginatedProductsResponseDto, ProductListItemResponseDto } from '../../read-models/product-response';
 
 @QueryHandler(GetProductsQuery)
 export class GetProductsHandler implements IQueryHandler<GetProductsQuery> {

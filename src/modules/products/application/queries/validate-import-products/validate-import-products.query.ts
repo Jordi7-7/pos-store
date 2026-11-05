@@ -1,8 +1,11 @@
-import { ValidateProductItemDto } from '../../commands/import-products/import-products.dto';
+export interface ValidateProductItemInput {
+  sku: string;
+  name: string;
+}
 
 export class ValidateImportProductsQuery {
   constructor(
     public readonly tenantId: string,
-    public readonly items: ValidateProductItemDto[],
+    public readonly items: ValidateProductItemInput[],
   ) {}
 }

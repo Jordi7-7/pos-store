@@ -1,6 +1,8 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { Logger, BadRequestException, NotFoundException } from '@nestjs/common';
 import { EntityManager, MoreThan } from 'typeorm';
+import { RedisService } from '../../../../../common/redis/redis.service';
+import { assertUserCanOperateInBranch } from '../../../../../common/security/branch-access.helper';
 import { AdjustStockCommand } from './adjust-stock.command';
 import { ProductVariant } from '../../../domain/entities/product-variant.entity';
 import { ProductStock } from '../../../domain/entities/product-stock.entity';
@@ -15,10 +17,13 @@ import { InventoryMovementType } from '../../../../../common/enums/inventory-mov
 export class AdjustStockHandler implements ICommandHandler<AdjustStockCommand> {
   private readonly logger = new Logger(AdjustStockHandler.name);
 
-  constructor(private readonly entityManager: EntityManager) {}
+  constructor(
+    private readonly entityManager: EntityManager,
+    private readonly redisService: RedisService,
+  ) {}
 
   async execute(command: AdjustStockCommand): Promise<any> {
-    const { tenantId, branchId, variantId, quantity, type, comment } = command;
+    const { tenantId, userId, branchId, variantId, quantity, type, comment } = command;
     this.logger.log(
       `Executing stock adjustment: Type ${type}, Qty ${quantity} for Variant ${variantId} on Branch ${branchId}`,
     );
@@ -28,6 +33,13 @@ export class AdjustStockHandler implements ICommandHandler<AdjustStockCommand> {
     }
 
     return this.entityManager.transaction(async (transactionalManager) => {
+      await assertUserCanOperateInBranch(transactionalManager, this.redisService, {
+        tenantId,
+        userId,
+        branchId,
+        actionDescription: 'ajustar stock',
+      });
+
       const variantRepo = transactionalManager.getRepository(ProductVariant);
       const stockRepo = transactionalManager.getRepository(ProductStock);
       const batchRepo = transactionalManager.getRepository(ProductBatch);

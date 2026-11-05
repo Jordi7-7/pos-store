@@ -1,14 +1,14 @@
 import { Controller, Post, Get, Put, Delete, Body, Param, Query } from '@nestjs/common';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
-import { CreateVariableProductDto, ProductVariantDto, CreateSimpleProductDto } from '../../application/dtos/create-product.dto';
+import { CreateVariableProductDto, ProductVariantDto, CreateSimpleProductDto } from '../dtos/create-product.dto';
 import { CreateSimpleProductCommand } from '../../application/commands/create-simple-product/create-simple-product.command';
 import { CreateVariableProductCommand } from '../../application/commands/create-variable-product/create-variable-product.command';
 import { CreateVariantCommand } from '../../application/commands/create-variant/create-variant.command';
-import { CreateAttributeDto } from '../../application/commands/create-attribute/create-attribute.dto';
+import { CreateAttributeDto } from '../dtos/create-attribute.dto';
 import { CreateAttributeCommand } from '../../application/commands/create-attribute/create-attribute.command';
-import { CreateAttributeValueDto } from '../../application/commands/create-attribute-value/create-attribute-value.dto';
+import { CreateAttributeValueDto } from '../dtos/create-attribute-value.dto';
 import { CreateAttributeValueCommand } from '../../application/commands/create-attribute-value/create-attribute-value.command';
-import { CreateCategoryDto } from '../../application/commands/create-category/create-category.dto';
+import { CreateCategoryDto } from '../dtos/create-category.dto';
 import { CreateCategoryCommand } from '../../application/commands/create-category/create-category.command';
 import { GetCategoriesQuery } from '../../application/queries/get-categories/get-categories.query';
 import { GetProductsQuery } from '../../application/queries/get-products/get-products.query';
@@ -17,18 +17,18 @@ import { GetVariantBySkuQuery } from '../../application/queries/get-variant-by-s
 import { GetPosVariantBySkuQuery } from '../../application/queries/get-pos-variant-by-sku/get-pos-variant-by-sku.query';
 import { GetPosVariantsByBaseSkuQuery } from '../../application/queries/get-pos-variants-by-base-sku/get-pos-variants-by-base-sku.query';
 import { GetPosVariantsQuery } from '../../application/queries/get-pos-variants/get-pos-variants.query';
-import { UpdateProductDto } from '../../application/commands/update-product/update-product.dto';
+import { UpdateProductDto } from '../dtos/update-product.dto';
 import { UpdateProductCommand } from '../../application/commands/update-product/update-product.command';
-import { UpdateSimpleProductDto } from '../../application/commands/update-simple-product/update-simple-product.dto';
+import { UpdateSimpleProductDto } from '../dtos/update-simple-product.dto';
 import { UpdateSimpleProductCommand } from '../../application/commands/update-simple-product/update-simple-product.command';
-import { UpdateVariantDto } from '../../application/commands/update-variant/update-variant.dto';
+import { UpdateVariantDto } from '../dtos/update-variant.dto';
 import { UpdateVariantCommand } from '../../application/commands/update-variant/update-variant.command';
 import { DeleteProductCommand } from '../../application/commands/delete-product/delete-product.command';
 import { DeleteVariantCommand } from '../../application/commands/delete-variant/delete-variant.command';
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
-import { AdjustStockDto } from '../../application/commands/adjust-stock/adjust-stock.dto';
+import { AdjustStockDto } from '../dtos/adjust-stock.dto';
 import { AdjustStockCommand } from '../../application/commands/adjust-stock/adjust-stock.command';
-import { ValidateImportProductsDto, ImportProductsDto } from '../../application/commands/import-products/import-products.dto';
+import { ValidateImportProductsDto, ImportProductsDto } from '../dtos/import-products.dto';
 import { ImportProductsCommand } from '../../application/commands/import-products/import-products.command';
 import { ValidateImportProductsQuery } from '../../application/queries/validate-import-products/validate-import-products.query';
 import { GetAttributesQuery } from '../../application/queries/get-attributes/get-attributes.query';
@@ -170,6 +170,7 @@ export class ProductsController {
   }
 
   @Get('inventory-movements-by-variant')
+  @RequirePermissions(APP_PERMISSIONS.PRODUCTS_GET)
   async getMovementsByVariant(
     @CurrentUser('tenantId') tenantId: string,
     @CurrentUser('sub') userId: string,
@@ -194,11 +195,13 @@ export class ProductsController {
   @RequirePermissions(APP_PERMISSIONS.PRODUCTS_ADJUST_STOCK)
   async adjustStock(
     @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser('sub') userId: string,
     @Body() dto: AdjustStockDto,
   ) {
     return this.commandBus.execute(
       new AdjustStockCommand(
         tenantId,
+        userId,
         dto.branchId,
         dto.variantId,
         dto.quantity,
@@ -211,6 +214,7 @@ export class ProductsController {
   // ── Tags ──────────────────────────────────────────────────────────────────
 
   @Get('tags')
+  @RequirePermissions(APP_PERMISSIONS.PRODUCTS_GET)
   async findTags(@CurrentUser('tenantId') tenantId: string) {
     return this.queryBus.execute(new GetTagsQuery(tenantId));
   }
@@ -381,10 +385,11 @@ export class ProductsController {
   @RequirePermissions(APP_PERMISSIONS.PRODUCTS_IMPORT)
   async importProducts(
     @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser('sub') userId: string,
     @Body() dto: ImportProductsDto,
   ) {
     return this.commandBus.execute(
-      new ImportProductsCommand(tenantId, dto.branchId, dto.items),
+      new ImportProductsCommand(tenantId, userId, dto.branchId, dto.items),
     );
   }
 }

@@ -3,7 +3,7 @@ import { EntityManager } from 'typeorm';
 import { GetProductsBySkuAndBarcodeQuery } from './get-products-by-sku-and-barcode.query';
 import { Product } from '../../../domain/entities/product.entity';
 import { ProductType } from '../../../domain/enums/product-type.enum';
-import { PaginatedProductsResponseDto, ProductListItemResponseDto } from '../../dtos/product-response.dto';
+import { PaginatedProductsResponseDto, ProductListItemResponseDto } from '../../read-models/product-response';
 
 @QueryHandler(GetProductsBySkuAndBarcodeQuery)
 export class GetProductsBySkuAndBarcodeHandler implements IQueryHandler<GetProductsBySkuAndBarcodeQuery> {

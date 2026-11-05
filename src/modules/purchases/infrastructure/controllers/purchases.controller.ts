@@ -1,16 +1,16 @@
 import { Controller, Post, Put, Delete, Body, Get, Patch, Param, Query } from '@nestjs/common';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
-import { CreateSupplierDto } from '../../application/commands/create-supplier/create-supplier.dto';
+import { CreateSupplierDto } from '../dtos/create-supplier.dto';
 import { CreateSupplierCommand } from '../../application/commands/create-supplier/create-supplier.command';
-import { UpdateSupplierDto } from '../../application/commands/update-supplier/update-supplier.dto';
+import { UpdateSupplierDto } from '../dtos/update-supplier.dto';
 import { UpdateSupplierCommand } from '../../application/commands/update-supplier/update-supplier.command';
 import { DeleteSupplierCommand } from '../../application/commands/delete-supplier/delete-supplier.command';
-import { RegisterPurchaseDto } from '../../application/commands/register-purchase/register-purchase.dto';
+import { RegisterPurchaseDto } from '../dtos/register-purchase.dto';
 import { RegisterPurchaseCommand } from '../../application/commands/register-purchase/register-purchase.command';
 import { CancelPurchaseOrderCommand } from '../../application/commands/cancel-purchase-order/cancel-purchase-order.command';
 import { GetSuppliersQuery } from '../../application/queries/get-suppliers/get-suppliers.query';
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
-import { ValidateImportPurchasesDto, ImportPurchasesDto } from '../../application/commands/import-purchases/import-purchases.dto';
+import { ValidateImportPurchasesDto, ImportPurchasesDto } from '../dtos/import-purchases.dto';
 import { ImportPurchasesCommand } from '../../application/commands/import-purchases/import-purchases.command';
 import { ValidateImportPurchasesQuery } from '../../application/queries/validate-import-purchases/validate-import-purchases.query';
 import { GetPurchasesQuery } from '../../application/queries/get-purchases/get-purchases.query';
@@ -72,11 +72,13 @@ export class PurchasesController {
   @RequirePermissions(APP_PERMISSIONS.PURCHASES_CREATE)
   async registerPurchase(
     @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser('sub') userId: string,
     @Body() dto: RegisterPurchaseDto,
   ) {
     return this.commandBus.execute(
       new RegisterPurchaseCommand(
         tenantId,
+        userId,
         dto.supplierId,
         dto.branchId,
         dto.invoiceNumber || null,
@@ -139,10 +141,11 @@ export class PurchasesController {
   @RequirePermissions(APP_PERMISSIONS.PURCHASES_CANCEL)
   async cancelPurchase(
     @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser('sub') userId: string,
     @Param('id') purchaseOrderId: string,
   ) {
     await this.commandBus.execute(
-      new CancelPurchaseOrderCommand(tenantId, purchaseOrderId),
+      new CancelPurchaseOrderCommand(tenantId, userId, purchaseOrderId),
     );
     return { message: 'Purchase order cancelled successfully' };
   }
@@ -162,10 +165,11 @@ export class PurchasesController {
   @RequirePermissions(APP_PERMISSIONS.PURCHASES_IMPORT)
   async importPurchases(
     @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser('sub') userId: string,
     @Body() dto: ImportPurchasesDto,
   ) {
     return this.commandBus.execute(
-      new ImportPurchasesCommand(tenantId, dto.branchId, dto.items, dto.invoiceNumber, dto.supplierId),
+      new ImportPurchasesCommand(tenantId, userId, dto.branchId, dto.items, dto.invoiceNumber, dto.supplierId),
     );
   }
 }

@@ -1,6 +1,7 @@
 export class AdjustStockCommand {
   constructor(
     public readonly tenantId: string,
+    public readonly userId: string | null,
     public readonly branchId: string,
     public readonly variantId: string,
     public readonly quantity: number,

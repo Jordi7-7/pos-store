@@ -1,6 +1,8 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { Logger, BadRequestException, NotFoundException } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
+import { RedisService } from '../../../../../common/redis/redis.service';
+import { assertUserCanOperateInBranch } from '../../../../../common/security/branch-access.helper';
 import { RegisterPurchaseCommand } from './register-purchase.command';
 import { PurchaseOrder } from '../../../domain/entities/purchase-order.entity';
 import { Supplier } from '../../../domain/entities/supplier.entity';
@@ -17,13 +19,23 @@ import { InventoryMovementReason } from '../../../../../common/enums/inventory-m
 export class RegisterPurchaseHandler implements ICommandHandler<RegisterPurchaseCommand> {
   private readonly logger = new Logger(RegisterPurchaseHandler.name);
 
-  constructor(private readonly entityManager: EntityManager) {}
+  constructor(
+    private readonly entityManager: EntityManager,
+    private readonly redisService: RedisService,
+  ) {}
 
   async execute(command: RegisterPurchaseCommand): Promise<PurchaseOrder> {
-    const { tenantId, supplierId, branchId, invoiceNumber, items } = command;
+    const { tenantId, userId, supplierId, branchId, invoiceNumber, items } = command;
     this.logger.log(`Registering purchase order from Supplier: ${supplierId} in Branch: ${branchId} for Tenant: ${tenantId}`);
 
     return this.entityManager.transaction(async (transactionalManager) => {
+      await assertUserCanOperateInBranch(transactionalManager, this.redisService, {
+        tenantId,
+        userId,
+        branchId,
+        actionDescription: 'registrar compras',
+      });
+
       // 1. Grouped Repository Initialization (Pattern 3)
       const supplierRepo = transactionalManager.getRepository(Supplier);
       const branchRepo = transactionalManager.getRepository(Branch);
@@ -124,7 +136,8 @@ export class RegisterPurchaseHandler implements ICommandHandler<RegisterPurchase
         const newQty = itemDto.quantity;
         const newPrice = itemDto.purchasePrice;
 
-        const newCost = (currentStock * currentCost + newQty * newPrice) / (currentStock + newQty);
+        const totalQty = currentStock + newQty;
+        const newCost = totalQty > 0 ? (currentStock * currentCost + newQty * newPrice) / totalQty : newPrice;
         
         // Update variant purchase price
         variant.purchasePrice = Number(newCost.toFixed(2));

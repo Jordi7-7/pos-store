@@ -1,6 +1,8 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { Logger, BadRequestException, NotFoundException } from '@nestjs/common';
 import { EntityManager, In } from 'typeorm';
+import { RedisService } from '../../../../../common/redis/redis.service';
+import { assertUserCanOperateInBranch } from '../../../../../common/security/branch-access.helper';
 import { ImportPurchasesCommand } from './import-purchases.command';
 import { PurchaseOrder } from '../../../domain/entities/purchase-order.entity';
 import { PurchaseOrderItem } from '../../../domain/entities/purchase-order-item.entity';
@@ -17,10 +19,13 @@ import { InventoryMovementReason } from '../../../../../common/enums/inventory-m
 export class ImportPurchasesHandler implements ICommandHandler<ImportPurchasesCommand> {
   private readonly logger = new Logger(ImportPurchasesHandler.name);
 
-  constructor(private readonly entityManager: EntityManager) {}
+  constructor(
+    private readonly entityManager: EntityManager,
+    private readonly redisService: RedisService,
+  ) {}
 
   async execute(command: ImportPurchasesCommand): Promise<PurchaseOrder> {
-    const { tenantId, branchId, items, invoiceNumber } = command;
+    const { tenantId, userId, branchId, items, invoiceNumber } = command;
     const cleanInvoiceNumber = invoiceNumber?.trim() || null;
     this.logger.log(`Executing bulk purchase import: ${items.length} items for Branch: ${branchId}`);
 
@@ -35,6 +40,13 @@ export class ImportPurchasesHandler implements ICommandHandler<ImportPurchasesCo
     }
 
     return this.entityManager.transaction(async (tm) => {
+      await assertUserCanOperateInBranch(tm, this.redisService, {
+        tenantId,
+        userId,
+        branchId,
+        actionDescription: 'importar compras',
+      });
+
       const purchaseRepo = tm.getRepository(PurchaseOrder);
       const itemRepo = tm.getRepository(PurchaseOrderItem);
       const supplierRepo = tm.getRepository(Supplier);

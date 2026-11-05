@@ -1,6 +1,8 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { Logger, BadRequestException, NotFoundException } from '@nestjs/common';
 import { EntityManager, In } from 'typeorm';
+import { RedisService } from '../../../../../common/redis/redis.service';
+import { assertUserCanOperateInBranch } from '../../../../../common/security/branch-access.helper';
 import { ImportProductsCommand } from './import-products.command';
 import { Product } from '../../../domain/entities/product.entity';
 import { ProductVariant } from '../../../domain/entities/product-variant.entity';
@@ -18,10 +20,13 @@ import { ProductType } from '../../../domain/enums/product-type.enum';
 export class ImportProductsHandler implements ICommandHandler<ImportProductsCommand> {
   private readonly logger = new Logger(ImportProductsHandler.name);
 
-  constructor(private readonly entityManager: EntityManager) {}
+  constructor(
+    private readonly entityManager: EntityManager,
+    private readonly redisService: RedisService,
+  ) {}
 
   async execute(command: ImportProductsCommand): Promise<{ importedCount: number }> {
-    const { tenantId, branchId, items } = command;
+    const { tenantId, userId, branchId, items } = command;
     this.logger.log(`Executing bulk product import: ${items.length} items for Tenant: ${tenantId}`);
 
     if (items.length === 0) {
@@ -35,6 +40,15 @@ export class ImportProductsHandler implements ICommandHandler<ImportProductsComm
     }
 
     return this.entityManager.transaction(async (tm) => {
+      if (branchId) {
+        await assertUserCanOperateInBranch(tm, this.redisService, {
+          tenantId,
+          userId,
+          branchId,
+          actionDescription: 'importar productos',
+        });
+      }
+
       const productRepo = tm.getRepository(Product);
       const variantRepo = tm.getRepository(ProductVariant);
       const stockRepo = tm.getRepository(ProductStock);

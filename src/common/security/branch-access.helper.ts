@@ -106,3 +106,41 @@ export async function assertUserCanAccessBranch(
     );
   }
 }
+
+export interface AssertUserOperatesInBranchOptions {
+  tenantId: string;
+  userId: string | null | undefined;
+  branchId: string;
+  actionDescription: string;
+}
+
+/**
+ * Variante para comandos que solo reciben `userId`: resuelve si el usuario es propietario
+ * (dentro del mismo tenant) y delega en `assertUserCanAccessBranch`.
+ */
+export async function assertUserCanOperateInBranch(
+  entityManager: EntityManager,
+  redisService: RedisService,
+  options: AssertUserOperatesInBranchOptions,
+): Promise<void> {
+  const { tenantId, userId, branchId, actionDescription } = options;
+
+  if (!userId) {
+    throw new ForbiddenException(`Usuario no autenticado o no válido para ${actionDescription}.`);
+  }
+
+  const rows: Array<{ is_owner: boolean }> = await entityManager.query(
+    `SELECT "is_owner" FROM "users" WHERE "id" = $1 AND "tenant_id" = $2 AND "is_active" = true`,
+    [userId, tenantId],
+  );
+  if (rows.length === 0) {
+    throw new ForbiddenException(`Usuario no válido para ${actionDescription}.`);
+  }
+
+  await assertUserCanAccessBranch(entityManager, redisService, {
+    userId,
+    isOwner: rows[0].is_owner === true,
+    branchId,
+    actionDescription,
+  });
+}
