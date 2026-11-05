@@ -179,9 +179,11 @@ export class SalesController {
   @RequirePermissions(APP_PERMISSIONS.CASH_SESSIONS_GET)
   async findExpenses(
     @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser('sub') userId: string,
+    @CurrentUser('isOwner') isOwner: boolean,
     @Query('cashSessionId') cashSessionId?: string,
   ) {
-    return this.queryBus.execute<GetExpensesQuery, Expense[]>(new GetExpensesQuery(tenantId, cashSessionId));
+    return this.queryBus.execute<GetExpensesQuery, Expense[]>(new GetExpensesQuery(tenantId, cashSessionId, userId, isOwner));
   }
 
   @Post('refunds')
@@ -208,10 +210,12 @@ export class SalesController {
   @RequirePermissions(APP_PERMISSIONS.SALES_GET)
   async getRefunds(
     @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser('sub') userId: string,
+    @CurrentUser('isOwner') isOwner: boolean,
     @Query('cashSessionId') cashSessionId?: string,
     @Query('saleId') saleId?: string,
   ) {
-    return this.queryBus.execute<GetRefundsQuery, Refund[]>(new GetRefundsQuery(tenantId, cashSessionId, saleId));
+    return this.queryBus.execute<GetRefundsQuery, Refund[]>(new GetRefundsQuery(tenantId, cashSessionId, saleId, userId, isOwner));
   }
 
   @Get('cash-sessions')
@@ -229,17 +233,21 @@ export class SalesController {
   @RequirePermissions(APP_PERMISSIONS.CASH_SESSIONS_GET)
   async getCashSessionDetails(
     @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser('sub') userId: string,
+    @CurrentUser('isOwner') isOwner: boolean,
     @Param('id') id: string,
   ) {
-    return this.queryBus.execute(new GetCashSessionDetailsQuery(tenantId, id));
+    return this.queryBus.execute(new GetCashSessionDetailsQuery(tenantId, id, userId, isOwner));
   }
 
   @Get('invoice/:invoiceNumber')
   @RequirePermissions(APP_PERMISSIONS.SALES_GET)
   async getSaleByInvoice(
     @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser('sub') userId: string,
+    @CurrentUser('isOwner') isOwner: boolean,
     @Param('invoiceNumber') invoiceNumber: string,
   ) {
-    return this.queryBus.execute(new GetSaleByInvoiceQuery(tenantId, invoiceNumber));
+    return this.queryBus.execute(new GetSaleByInvoiceQuery(tenantId, invoiceNumber, userId, isOwner));
   }
 }

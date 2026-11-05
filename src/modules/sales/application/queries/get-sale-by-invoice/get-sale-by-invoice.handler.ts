@@ -8,6 +8,8 @@ import { Refund } from '../../../domain/entities/refund.entity';
 import { SaleStatus } from '../../../../../common/enums/sale-status.enum';
 import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
+import { RedisService } from '../../../../../common/redis/redis.service';
+import { assertUserCanAccessBranch } from '../../../../../common/security/branch-access.helper';
 
 @QueryHandler(GetSaleByInvoiceQuery)
 export class GetSaleByInvoiceHandler implements IQueryHandler<GetSaleByInvoiceQuery> {
@@ -16,6 +18,7 @@ export class GetSaleByInvoiceHandler implements IQueryHandler<GetSaleByInvoiceQu
     private readonly saleRepo: Repository<Sale>,
     @InjectRepository(Refund)
     private readonly refundRepo: Repository<Refund>,
+    private readonly redisService: RedisService,
   ) {}
 
   async execute(query: GetSaleByInvoiceQuery) {
@@ -43,6 +46,13 @@ export class GetSaleByInvoiceHandler implements IQueryHandler<GetSaleByInvoiceQu
     if (!sale) {
       throw new AppException(ErrorCode.SaleNotFound, `No se encontró la venta con folio "${invoiceNumber}"`, HttpStatus.NOT_FOUND, { invoiceNumber });
     }
+
+    await assertUserCanAccessBranch(this.saleRepo.manager, this.redisService, {
+      userId: query.userId,
+      isOwner: query.isOwner,
+      branchId: sale.branchId,
+      actionDescription: 'consultar esta venta',
+    });
 
     // Load all refunds for this sale to know already-refunded quantities per variant
     const existingRefunds = await this.refundRepo.find({

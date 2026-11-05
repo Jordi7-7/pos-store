@@ -222,14 +222,6 @@
       "count": 9
     }
   },
-  "src/modules/reports/application/queries/get-valued-inventory/get-valued-inventory.handler.ts": {
-    "@typescript-eslint/no-unsafe-argument": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 2
-    }
-  },
   "src/modules/reports/infrastructure/controllers/reports.controller.ts": {
     "@typescript-eslint/no-unsafe-return": {
       "count": 3

@@ -140,3 +140,17 @@ export async function assertUserCanOperateInBranch(
     actionDescription,
   });
 }
+
+/**
+ * Sucursales cuyos datos puede ver el usuario en un listado: `null` si son todas (propietario), o las
+ * suyas. Los listados filtran con esto en vez de fallar, para no revelar si lo ajeno existe.
+ */
+export async function visibleBranchIds(
+  entityManager: EntityManager,
+  redisService: RedisService,
+  options: { userId?: string; isOwner?: boolean },
+): Promise<string[] | null> {
+  if (options.isOwner) return null;
+  if (!options.userId) return [];
+  return getUserAssignedBranchIds(entityManager, redisService, options.userId);
+}

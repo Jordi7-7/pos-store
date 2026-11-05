@@ -288,8 +288,8 @@ describe('Flujo de dinero: venta, devolución y cierre de caja', () => {
 
   describe('efectivo esperado en caja', () => {
     const details = (sessionId: string) =>
-      new GetCashSessionDetailsHandler(db.getRepository(CashSession), db.getRepository(Sale), db.getRepository(Expense), db.getRepository(Refund)).execute(
-        new GetCashSessionDetailsQuery(tenantId, sessionId),
+      new GetCashSessionDetailsHandler(db.getRepository(CashSession), db.getRepository(Sale), db.getRepository(Expense), db.getRepository(Refund), redis).execute(
+        new GetCashSessionDetailsQuery(tenantId, sessionId, userId, true),
       );
     const sellWith = (sessionId: string, quantity: number, payments: Array<{ paymentMethod: PaymentMethod; amount: number }>) =>
       new ProcessSaleHandler(db.manager, redis).execute(
@@ -341,13 +341,8 @@ describe('Flujo de dinero: venta, devolución y cierre de caja', () => {
         db.getRepository(Expense).create({ tenantId, branchId, cashSessionId: sessionId, userId, description: 'Bolsas', amount: 5, category: 'OTROS' }),
       );
 
-      const handler = new GetCashSessionDetailsHandler(
-        db.getRepository(CashSession),
-        db.getRepository(Sale),
-        db.getRepository(Expense),
-        db.getRepository(Refund),
-      );
-      const details = await handler.execute(new GetCashSessionDetailsQuery(tenantId, sessionId));
+      const handler = new GetCashSessionDetailsHandler(db.getRepository(CashSession), db.getRepository(Sale), db.getRepository(Expense), db.getRepository(Refund), redis);
+      const details = await handler.execute(new GetCashSessionDetailsQuery(tenantId, sessionId, userId, true));
 
       expect(details.kpis).toEqual({
         grossSales: 30,
@@ -417,13 +412,8 @@ describe('Flujo de dinero: venta, devolución y cierre de caja', () => {
         ),
       );
 
-      const handler = new GetCashSessionDetailsHandler(
-        db.getRepository(CashSession),
-        db.getRepository(Sale),
-        db.getRepository(Expense),
-        db.getRepository(Refund),
-      );
-      const details = await handler.execute(new GetCashSessionDetailsQuery(tenantId, sessionId));
+      const handler = new GetCashSessionDetailsHandler(db.getRepository(CashSession), db.getRepository(Sale), db.getRepository(Expense), db.getRepository(Refund), redis);
+      const details = await handler.execute(new GetCashSessionDetailsQuery(tenantId, sessionId, userId, true));
       const detail = details.sales.find((item) => item.id === sale.id);
 
       expect(detail?.items).toHaveLength(2);

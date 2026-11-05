@@ -26,6 +26,8 @@ import {
   toSaleDetail,
   toSessionHeader,
 } from './cash-session-details.mapper';
+import { RedisService } from '../../../../../common/redis/redis.service';
+import { assertUserCanAccessBranch } from '../../../../../common/security/branch-access.helper';
 
 @QueryHandler(GetCashSessionDetailsQuery)
 export class GetCashSessionDetailsHandler implements IQueryHandler<GetCashSessionDetailsQuery> {
@@ -38,12 +40,19 @@ export class GetCashSessionDetailsHandler implements IQueryHandler<GetCashSessio
     private readonly expenses: Repository<Expense>,
     @InjectRepository(Refund)
     private readonly refunds: Repository<Refund>,
+    private readonly redisService: RedisService,
   ) {}
 
   async execute(query: GetCashSessionDetailsQuery) {
     const { tenantId, sessionId } = query;
 
     const session = await this.findSession(tenantId, sessionId);
+    await assertUserCanAccessBranch(this.cashSessions.manager, this.redisService, {
+      userId: query.userId,
+      isOwner: query.isOwner,
+      branchId: session.branchId,
+      actionDescription: 'consultar este turno de caja',
+    });
 
     const [sales, expenses, refunds] = await Promise.all([
       this.sales.find({
