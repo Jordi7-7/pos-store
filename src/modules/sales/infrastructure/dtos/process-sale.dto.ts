@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsArray, ArrayMinSize, ArrayMaxSize, ValidateNested, IsNumber, IsPositive, IsUUID, IsEnum, Max, MaxLength, Min } from 'class-validator';
+import { IsString, IsOptional, IsArray, ArrayMinSize, ArrayMaxSize, ValidateNested, IsNumber, IsPositive, IsUUID, IsEnum, Matches, Max, MaxLength, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 import { PaymentMethod } from '../../domain/entities/sale-payment.entity';
 
@@ -55,6 +55,12 @@ export class ProcessSaleDto {
   @IsUUID()
   @IsOptional()
   customerId?: string;
+
+  /** Idempotencia: un valor único por intento de cobro (UUID u otro texto de 8 a 64 caracteres). Hoy opcional. */
+  @IsString()
+  @IsOptional()
+  @Matches(/^[A-Za-z0-9_-]{8,64}$/, { message: 'clientRequestId debe tener de 8 a 64 caracteres (letras, números, guion o guion bajo).' })
+  clientRequestId?: string;
 
   @IsString()
   @IsOptional()

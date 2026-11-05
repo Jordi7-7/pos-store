@@ -53,4 +53,12 @@ describe('ProcessSaleDto (ValidationPipe global)', () => {
   it('rechaza ids que no son UUID', async () => {
     await reject({ ...validBody(), branchId: 'no-uuid' });
   });
+
+  it('clientRequestId es opcional y, si llega, debe ser un identificador de 8 a 64 caracteres seguros', async () => {
+    await expect(pipe.transform(validBody(), metadata)).resolves.toBeDefined();
+    await expect(pipe.transform({ ...validBody(), clientRequestId: UUID }, metadata)).resolves.toMatchObject({ clientRequestId: UUID });
+    await reject({ ...validBody(), clientRequestId: 'corto' });
+    await reject({ ...validBody(), clientRequestId: 'a'.repeat(65) });
+    await reject({ ...validBody(), clientRequestId: "no vale; DROP TABLE sales" });
+  });
 });

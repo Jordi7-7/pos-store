@@ -27,5 +27,7 @@ export class ProcessSaleCommand {
     public readonly discountType?: string,
     public readonly discountRate?: number,
     public readonly discountAmount?: number,
+    /** Identificador de este intento de cobro, generado por la aplicación: un reintento con el mismo valor no duplica la venta. */
+    public readonly clientRequestId?: string,
   ) {}
 }

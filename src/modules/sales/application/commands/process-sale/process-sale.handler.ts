@@ -2,7 +2,7 @@ import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { Logger, HttpStatus } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { ProcessSaleCommand, SalePaymentInput } from './process-sale.command';
-import { Sale } from '../../../domain/entities/sale.entity';
+import { Sale, SALE_CLIENT_REQUEST_INDEX } from '../../../domain/entities/sale.entity';
 import { SaleItem } from '../../../domain/entities/sale-item.entity';
 import { SalePayment } from '../../../domain/entities/sale-payment.entity';
 import { ProductVariant } from '../../../../products/domain/entities/product-variant.entity';
@@ -10,6 +10,7 @@ import { InventoryMovement } from '../../../../products/domain/entities/inventor
 import { CashSession } from '../../../domain/entities/cash-session.entity';
 import { CashSessionStatus } from '../../../domain/enums/cash-session-status.enum';
 import { Customer } from '../../../../customers/domain/entities/customer.entity';
+import { findOrCreateConsumerFinal } from '../../../../customers/domain/consumer-final';
 import { InventoryMovementReason } from '../../../../../common/enums/inventory-movement-reason.enum';
 import { InventoryMovementType } from '../../../../../common/enums/inventory-movement-type.enum';
 import { RedisService } from '../../../../../common/redis/redis.service';
@@ -22,6 +23,8 @@ import { reserveInvoiceNumber } from '../shared/invoice-number';
 import { SaleStatus } from '../../../../../common/enums/sale-status.enum';
 import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
+import { isUniqueViolation } from '../../../../../common/errors/database-errors';
+import { Money } from '../../../../../common/domain/money';
 
 interface PricedSale {
   pricing: SalePricing;
@@ -46,7 +49,45 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
     }
 
     const priced = this.priceAndAllocate(command);
-    return this.entityManager.transaction((manager) => this.register(manager, command, cashSessionId, priced));
+
+    // Reintento de una venta ya registrada: se devuelve la misma, sin descontar stock ni cobrar otra vez
+    const replay = await this.findReplay(command, cashSessionId, priced);
+    if (replay) return replay;
+
+    try {
+      return await this.entityManager.transaction((manager) => this.register(manager, command, cashSessionId, priced));
+    } catch (error) {
+      // Dos reintentos simultáneos con el mismo identificador: el segundo choca con el índice único y se revierte entero
+      if (command.clientRequestId && isUniqueViolation(error, SALE_CLIENT_REQUEST_INDEX)) {
+        const winner = await this.findReplay(command, cashSessionId, priced);
+        if (winner) return winner;
+      }
+      throw error;
+    }
+  }
+
+  /** La venta ya registrada con este `clientRequestId`, si existe. Reutilizarlo para otra venta distinta es un error. */
+  private async findReplay(command: ProcessSaleCommand, cashSessionId: string, priced: PricedSale): Promise<Sale | null> {
+    const { tenantId, branchId, userId, clientRequestId } = command;
+    if (!clientRequestId) return null;
+
+    const existing = await this.entityManager.getRepository(Sale).findOne({
+      where: { tenantId, clientRequestId },
+      relations: { items: { variant: true }, payments: true },
+    });
+    if (!existing) return null;
+
+    const sameSale =
+      existing.branchId === branchId &&
+      existing.cashSessionId === cashSessionId &&
+      (existing.userId ?? null) === (userId ?? null) &&
+      Money.of(existing.total).toNumber() === priced.pricing.total;
+    if (!sameSale) {
+      this.logger.warn(`Sale rejected: clientRequestId already used by a different sale in Tenant ${tenantId}`);
+      throw new AppException(ErrorCode.IdempotencyKeyReused, 'Ese identificador ya se usó en otra venta distinta.', HttpStatus.CONFLICT);
+    }
+    this.logger.log(`Sale replay: returning existing sale ${existing.id} for clientRequestId`);
+    return existing;
   }
 
   /** Importes e invariantes monetarias (sin tocar la base de datos): falla rápido ante datos manipulados. */
@@ -80,13 +121,11 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
     });
 
     const invoiceNumber = await reserveInvoiceNumber(manager, { tenantId, branchId, cashSession });
-    if (customerId) {
-      await this.assertCustomerBelongsToTenant(manager, tenantId, customerId);
-    }
+    const buyerId = await this.resolveBuyerId(manager, tenantId, customerId);
 
     const { items, movements } = await this.sellItems(manager, command, priced.pricing);
 
-    const sale = this.buildSale(command, cashSessionId, invoiceNumber, priced, items);
+    const sale = this.buildSale(command, cashSessionId, invoiceNumber, buyerId, priced, items);
     const savedSale = await manager.getRepository(Sale).save(sale);
     await manager.getRepository(InventoryMovement).save(movements); // kardex
 
@@ -107,12 +146,17 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
     return cashSession;
   }
 
-  private async assertCustomerBelongsToTenant(manager: EntityManager, tenantId: string, customerId: string): Promise<void> {
+  /** El comprador de la venta: el indicado (debe ser de la tienda) o, si no se indica, el CONSUMIDOR FINAL de la tienda. */
+  private async resolveBuyerId(manager: EntityManager, tenantId: string, customerId: string | undefined): Promise<string> {
+    if (!customerId) {
+      return (await findOrCreateConsumerFinal(manager, tenantId)).id;
+    }
     const customer = await manager.getRepository(Customer).findOne({ where: { id: customerId, tenantId } });
     if (!customer) {
       this.logger.warn(`Sale failed: Customer ID ${customerId} not found for Tenant ${tenantId}`);
       throw new AppException(ErrorCode.CustomerNotFound, 'Cliente no encontrado.', HttpStatus.NOT_FOUND, { customerId });
     }
+    return customer.id;
   }
 
   /**
@@ -174,7 +218,7 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
     return { items: saleItems, movements };
   }
 
-  private buildSale(command: ProcessSaleCommand, cashSessionId: string, invoiceNumber: string, priced: PricedSale, items: SaleItem[]): Sale {
+  private buildSale(command: ProcessSaleCommand, cashSessionId: string, invoiceNumber: string, buyerId: string, priced: PricedSale, items: SaleItem[]): Sale {
     const { pricing, payments } = priced;
     const hasSaleDiscount = pricing.globalDiscountAmount > 0;
 
@@ -183,7 +227,8 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
     sale.branchId = command.branchId;
     sale.cashSessionId = cashSessionId;
     sale.invoiceNumber = invoiceNumber;
-    sale.customerId = command.customerId || null;
+    sale.customerId = buyerId;
+    sale.clientRequestId = command.clientRequestId ?? null;
     sale.subtotal = pricing.subtotal;
     sale.total = pricing.total;
     sale.itemsDiscountAmount = pricing.itemsDiscountAmount;

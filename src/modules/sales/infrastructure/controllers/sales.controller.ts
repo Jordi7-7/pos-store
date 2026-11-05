@@ -70,6 +70,7 @@ export class SalesController {
         dto.discountType,
         dto.discountRate,
         dto.discountAmount,
+        dto.clientRequestId,
       ),
     );
   }

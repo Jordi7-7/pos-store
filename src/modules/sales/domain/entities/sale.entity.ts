@@ -1,4 +1,4 @@
-import { Entity, Column, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
+import { Entity, Column, ManyToOne, JoinColumn, OneToMany, Index } from 'typeorm';
 import { BaseEntity } from '../../../../common/database/base.entity';
 import { Tenant } from '../../../tenants/domain/entities/tenant.entity';
 import { Branch } from '../../../branches/domain/entities/branch.entity';
@@ -10,7 +10,11 @@ import { SaleItem } from './sale-item.entity';
 import { SalePayment } from './sale-payment.entity';
 import { SaleStatus } from '../../../../common/enums/sale-status.enum';
 
+/** Índice único que impide registrar dos veces la misma venta reintentada por el cliente. */
+export const SALE_CLIENT_REQUEST_INDEX = 'UQ_sales_tenant_client_request';
+
 @Entity('sales')
+@Index(SALE_CLIENT_REQUEST_INDEX, ['tenantId', 'clientRequestId'], { unique: true, where: '"client_request_id" IS NOT NULL' })
 export class Sale extends BaseEntity {
   @Column({ name: 'tenant_id', type: 'uuid' })
   tenantId: string;
@@ -32,6 +36,9 @@ export class Sale extends BaseEntity {
   @ManyToOne(() => CashSession)
   @JoinColumn({ name: 'cash_session_id' })
   cashSession: CashSession;
+
+  @Column({ name: 'client_request_id', type: 'varchar', length: 64, nullable: true })
+  clientRequestId: string | null;
 
   @Column({ name: 'customer_id', type: 'uuid', nullable: true })
   customerId: string | null;
