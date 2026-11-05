@@ -8,6 +8,13 @@ import { assertUserCanAccessBranch } from '../../../../../common/security/branch
 import { parseReportDates } from '../../../../reports/application/queries/parse-dates.helper';
 import { PurchaseOrderStatus } from '../../../../purchases/domain/enums/purchase-order-status.enum';
 
+export type PurchaseListItem = PurchaseOrder & { isCancellable: boolean };
+
+export interface PurchasesPage {
+  data: PurchaseListItem[];
+  meta: { total: number; page: number; limit: number; totalPages: number };
+}
+
 @QueryHandler(GetPurchasesQuery)
 export class GetPurchasesHandler implements IQueryHandler<GetPurchasesQuery> {
   constructor(
@@ -15,10 +22,8 @@ export class GetPurchasesHandler implements IQueryHandler<GetPurchasesQuery> {
     private readonly redisService: RedisService,
   ) {}
 
-  async execute(query: GetPurchasesQuery): Promise<any> {
+  async execute(query: GetPurchasesQuery): Promise<PurchasesPage> {
     const { tenantId, branchId, userId, isOwner, startDateStr, endDateStr, supplierId, page, limit } = query;
-    const batchHeaderRepo = this.entityManager.getRepository(Batch);
-
     await assertUserCanAccessBranch(this.entityManager, this.redisService, {
       userId,
       isOwner,
@@ -59,26 +64,11 @@ export class GetPurchasesHandler implements IQueryHandler<GetPurchasesQuery> {
 
     const [orders, total] = await qb.getManyAndCount();
 
-    const data = await Promise.all(
-      orders.map(async (order) => {
-        if (order.status !== PurchaseOrderStatus.COMPLETED) {
-          return { ...order, isCancellable: false };
-        }
+    // Una sola consulta de lotes para toda la página (antes era una por orden)
+    const completedIds = orders.filter((order) => order.status === PurchaseOrderStatus.COMPLETED).map((order) => order.id);
+    const intactOrderIds = await this.findOrdersWithIntactBatches(completedIds);
 
-        const batchHeaders = await batchHeaderRepo.find({
-          where: { purchaseOrderId: order.id },
-          relations: { items: true },
-        });
-
-        const batches = batchHeaders.flatMap((bh) => bh.items || []);
-
-        const allIntact = batches.every(
-          (b) => Number(b.remainingQuantity) === Number(b.initialQuantity),
-        );
-
-        return { ...order, isCancellable: allIntact };
-      }),
-    );
+    const data = orders.map((order) => ({ ...order, isCancellable: intactOrderIds.has(order.id) }));
 
     return {
       data,
@@ -89,5 +79,22 @@ export class GetPurchasesHandler implements IQueryHandler<GetPurchasesQuery> {
         totalPages: Math.ceil(total / limit),
       },
     };
+  }
+
+  /** Órdenes cuyos lotes siguen intactos (nada vendido de ellos): solo esas se pueden cancelar. */
+  private async findOrdersWithIntactBatches(orderIds: string[]): Promise<Set<string>> {
+    if (orderIds.length === 0) return new Set();
+
+    const headers = await this.entityManager.getRepository(Batch).find({
+      where: { purchaseOrderId: In(orderIds) },
+      relations: { items: true },
+    });
+
+    const intact = new Set(orderIds);
+    for (const header of headers) {
+      const consumed = (header.items ?? []).some((batch) => Number(batch.remainingQuantity) !== Number(batch.initialQuantity));
+      if (consumed && header.purchaseOrderId) intact.delete(header.purchaseOrderId);
+    }
+    return intact;
   }
 }
