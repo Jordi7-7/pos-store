@@ -28,6 +28,9 @@ export class CreateCashRegisterHandler implements ICommandHandler<CreateCashRegi
         throw new AppException(ErrorCode.BranchNotFound, 'Sucursal no encontrada', HttpStatus.NOT_FOUND);
       }
 
+      // Altas simultáneas en la misma sucursal: se serializan para no repetir el código correlativo
+      await transactionalManager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`cash-registers:${tenantId}:${branchId}`]);
+
       // Obtener el código correlativo más alto dentro de la sucursal
       const maxRegister = await registerRepo
         .createQueryBuilder('cr')

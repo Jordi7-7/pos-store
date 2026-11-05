@@ -110,6 +110,8 @@ export enum ErrorCode {
   CashRegisterNotAssigned = 'CASH_REGISTER_NOT_ASSIGNED',
   CashRegisterNotAuthorized = 'CASH_REGISTER_NOT_AUTHORIZED',
   CashRegisterBusy = 'CASH_REGISTER_BUSY',
+  CashRegisterInactive = 'CASH_REGISTER_INACTIVE',
+  CashRegisterHasOpenSession = 'CASH_REGISTER_HAS_OPEN_SESSION',
   CashSessionNotFound = 'CASH_SESSION_NOT_FOUND',
   CashSessionRequired = 'CASH_SESSION_REQUIRED',
   NoOpenCashSession = 'NO_OPEN_CASH_SESSION',

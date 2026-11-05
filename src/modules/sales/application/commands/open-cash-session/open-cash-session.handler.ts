@@ -12,6 +12,20 @@ import { assertUserCanAccessBranch } from '../../../../../common/security/branch
 import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
 
+export interface OpenedCashSession {
+  id: string;
+  status: CashSessionStatus;
+  openedAt: Date;
+  closedAt: Date | null;
+  openingBalance: number;
+  closingBalance: null;
+  expectedBalance: null;
+  difference: null;
+  branch: { id: string; name: string; address: string };
+  cashRegister: { id: string; name: string; code: number };
+  user: { id: string; name: string };
+}
+
 @CommandHandler(OpenCashSessionCommand)
 export class OpenCashSessionHandler implements ICommandHandler<OpenCashSessionCommand> {
   private readonly logger = new Logger(OpenCashSessionHandler.name);
@@ -21,7 +35,7 @@ export class OpenCashSessionHandler implements ICommandHandler<OpenCashSessionCo
     private readonly redisService: RedisService,
   ) {}
 
-  async execute(command: OpenCashSessionCommand): Promise<CashSession> {
+  async execute(command: OpenCashSessionCommand): Promise<OpenedCashSession> {
     const { tenantId, userId, branchId, openingBalance, cashRegisterId } = command;
     this.logger.log(`Opening cash session for User: ${userId} in Branch: ${branchId} for Tenant: ${tenantId}`);
 
@@ -65,6 +79,10 @@ export class OpenCashSessionHandler implements ICommandHandler<OpenCashSessionCo
       });
       if (!register) {
         throw new AppException(ErrorCode.CashRegisterNotFound, 'La caja registradora seleccionada no existe en esta sucursal.', HttpStatus.NOT_FOUND);
+      }
+
+      if (!register.isActive) {
+        throw new AppException(ErrorCode.CashRegisterInactive, `La ${register.name} está desactivada y no se puede abrir.`, HttpStatus.CONFLICT, { cashRegisterName: register.name });
       }
 
       // 2.1 Check cash register authorization for non-owner users
@@ -133,7 +151,7 @@ export class OpenCashSessionHandler implements ICommandHandler<OpenCashSessionCo
           id: user.id,
           name: user.name,
         },
-      } as any;
+      };
     });
   }
 }

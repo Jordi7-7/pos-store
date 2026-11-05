@@ -82,7 +82,7 @@ export class GetCashRegistersHandler implements IQueryHandler<GetCashRegistersQu
               openingBalance: activeSession.openingBalance,
             }
           : null,
-        assignedUserIds: (reg.assignedUsers || []).map((u: any) => u.id),
+        assignedUserIds: (reg.assignedUsers || []).map((user) => user.id),
       };
     });
   }

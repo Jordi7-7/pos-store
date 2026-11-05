@@ -3,6 +3,8 @@ import { Logger, HttpStatus } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { UpdateCashRegisterCommand } from './update-cash-register.command';
 import { CashRegister } from '../../../domain/entities/cash-register.entity';
+import { CashSession } from '../../../domain/entities/cash-session.entity';
+import { CashSessionStatus } from '../../../domain/enums/cash-session-status.enum';
 import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
 
@@ -27,6 +29,13 @@ export class UpdateCashRegisterHandler implements ICommandHandler<UpdateCashRegi
 
     if (name !== undefined && name.trim()) {
       register.name = name.trim();
+    }
+    if (isActive === false && register.isActive) {
+      // Una caja con turno abierto sigue recibiendo ventas: primero se cierra el turno
+      const openSession = await this.entityManager.getRepository(CashSession).existsBy({ cashRegisterId: id, status: CashSessionStatus.OPEN });
+      if (openSession) {
+        throw new AppException(ErrorCode.CashRegisterHasOpenSession, 'No puedes desactivar una caja con un turno abierto. Cierra el turno primero.', HttpStatus.CONFLICT, { cashRegisterId: id });
+      }
     }
     if (isActive !== undefined) {
       register.isActive = isActive;

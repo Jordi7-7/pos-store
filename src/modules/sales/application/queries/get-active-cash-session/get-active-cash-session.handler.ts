@@ -1,14 +1,15 @@
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EntityManager, Repository, In } from 'typeorm';
+import { EntityManager, FindOptionsWhere, Repository, In } from 'typeorm';
 import { Logger } from '@nestjs/common';
 import { GetActiveCashSessionQuery } from './get-active-cash-session.query';
 import { CashSession } from '../../../domain/entities/cash-session.entity';
 import { User } from '../../../../users/domain/entities/user.entity';
+import { CashSessionStatus } from '../../../domain/enums/cash-session-status.enum';
 
 export interface ActiveCashSessionResponseDto {
   id: string;
-  status: string;
+  status: CashSessionStatus;
   branchId: string;
   cashRegisterId: string;
   cashRegisterName: string;
@@ -31,8 +32,8 @@ export class GetActiveCashSessionHandler implements IQueryHandler<GetActiveCashS
     const { tenantId, userId, isOwner, branchId, cashRegisterId } = query;
 
     // Criterios base: sesión abierta dentro del tenant
-    const where: any = {
-      status: 'OPEN',
+    const where: FindOptionsWhere<CashSession> = {
+      status: CashSessionStatus.OPEN,
       branch: { tenantId },
     };
 

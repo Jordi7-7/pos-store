@@ -43,9 +43,11 @@ Forma de toda respuesta de error:
 | `BRANCH_REQUIRED` | 400 | common | Debes seleccionar una sucursal para {actionDescription}. | — |
 | `CANNOT_DEACTIVATE_SELF` | 400 | users | No puedes desactivar tu propia cuenta mientras estás en sesión. | — |
 | `CASH_REGISTER_BUSY` | 409 | sales | La {register.name} ya tiene un turno abierto (por {openedByName}). Debes cerrar ese turno o seleccionar otra caja. | `cashRegisterName`, `openedBy` |
+| `CASH_REGISTER_HAS_OPEN_SESSION` | 409 | sales | No puedes desactivar una caja con un turno abierto. Cierra el turno primero. | `cashRegisterId` |
+| `CASH_REGISTER_INACTIVE` | 409 | sales | La {register.name} está desactivada y no se puede abrir. | `cashRegisterName` |
 | `CASH_REGISTER_NOT_ASSIGNED` | 403 | sales | No tienes asignada esta caja registradora para {actionDescription}. | — |
 | `CASH_REGISTER_NOT_AUTHORIZED` | 403 | sales | No tienes autorización para operar en la {register.name}. | `cashRegisterName` |
-| `CASH_REGISTER_NOT_FOUND` | 404 | sales | Caja registradora no encontrada. | — |
+| `CASH_REGISTER_NOT_FOUND` | 404 | sales | Caja registradora no encontrada | — |
 | `CASH_SESSION_NOT_FOUND` | 404 | sales | Sesión de caja no encontrada. | `id`, `sessionId` |
 | `CASH_SESSION_REQUIRED` | 400 | sales | Debes tener una sesión de caja abierta para registrar una venta. | — |
 | `CATEGORY_NAME_TAKEN` | 409 | products | La categoría "{name}" ya existe. | `name` |
