@@ -9,7 +9,6 @@ import { ProductVariant } from '../../../../products/domain/entities/product-var
 import { InventoryMovement } from '../../../../products/domain/entities/inventory-movement.entity';
 import { CashSession } from '../../../domain/entities/cash-session.entity';
 import { CashSessionStatus } from '../../../domain/enums/cash-session-status.enum';
-import { CashRegister } from '../../../domain/entities/cash-register.entity';
 import { Customer } from '../../../../customers/domain/entities/customer.entity';
 import { InventoryMovementReason } from '../../../../../common/enums/inventory-movement-reason.enum';
 import { InventoryMovementType } from '../../../../../common/enums/inventory-movement-type.enum';
@@ -19,9 +18,15 @@ import { consumeStock } from '../../../../products/application/services/inventor
 import { allocatePayments, assertPaymentsCoverTotal, priceSale, SalePricing } from '../../../domain/services/sale-pricing';
 import { lockCashSession } from '../shared/cash-session-lock';
 import { assertUserAssignedToCashRegister } from '../shared/cash-register-access';
+import { reserveInvoiceNumber } from '../shared/invoice-number';
 import { SaleStatus } from '../../../../../common/enums/sale-status.enum';
 import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
+
+interface PricedSale {
+  pricing: SalePricing;
+  payments: SalePaymentInput[];
+}
 
 @CommandHandler(ProcessSaleCommand)
 export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
@@ -33,224 +38,169 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
   ) {}
 
   async execute(command: ProcessSaleCommand): Promise<Sale> {
-    const { 
-      tenantId,
-      userId,
-      branchId, 
-      cashSessionId, 
-      customerId, 
-      items, 
-      payments, 
-      discountType, 
-      discountRate, 
-      discountAmount 
-    } = command;
+    const { tenantId, branchId, cashSessionId } = command;
     this.logger.log(`Processing sale for Tenant: ${tenantId}, Branch: ${branchId}, Cash Session: ${cashSessionId}`);
 
     if (!cashSessionId) {
       throw new AppException(ErrorCode.CashSessionRequired, 'Debes tener una sesión de caja abierta para registrar una venta.', HttpStatus.BAD_REQUEST);
     }
 
-    // Importes e invariantes monetarias (sin tocar la base de datos): falla rápido ante datos manipulados
-    let pricing: SalePricing;
-    let appliedPayments: SalePaymentInput[];
+    const priced = this.priceAndAllocate(command);
+    return this.entityManager.transaction((manager) => this.register(manager, command, cashSessionId, priced));
+  }
+
+  /** Importes e invariantes monetarias (sin tocar la base de datos): falla rápido ante datos manipulados. */
+  private priceAndAllocate(command: ProcessSaleCommand): PricedSale {
     try {
-      pricing = priceSale(items, discountAmount);
-      assertPaymentsCoverTotal(pricing.total, payments.map((payment) => payment.amount));
-      appliedPayments = allocatePayments(pricing.total, payments);
+      const pricing = priceSale(command.items, command.discountAmount);
+      assertPaymentsCoverTotal(pricing.total, command.payments.map((payment) => payment.amount));
+      return { pricing, payments: allocatePayments(pricing.total, command.payments) };
     } catch (error) {
-      this.logger.warn(`Sale rejected: invalid amounts for Tenant ${tenantId} (${error instanceof Error ? error.message : 'unknown'})`);
+      this.logger.warn(`Sale rejected: invalid amounts for Tenant ${command.tenantId} (${error instanceof Error ? error.message : 'unknown'})`);
       throw error;
     }
+  }
 
-    return this.entityManager.transaction(async (transactionalManager) => {
-      // El usuario solo puede vender en sucursales que tiene asignadas
-      await assertUserCanOperateInBranch(transactionalManager, this.redisService, {
-        tenantId,
-        userId,
-        branchId,
-        actionDescription: 'registrar ventas',
-      });
+  private async register(manager: EntityManager, command: ProcessSaleCommand, cashSessionId: string, priced: PricedSale): Promise<Sale> {
+    const { tenantId, userId, branchId, customerId } = command;
 
-      // 1. Grouped Repository Initialization (Pattern 3)
-      const cashSessionRepo = transactionalManager.getRepository(CashSession);
-      const customerRepo = transactionalManager.getRepository(Customer);
-      const variantRepo = transactionalManager.getRepository(ProductVariant);
-      const saleRepo = transactionalManager.getRepository(Sale);
-      const inventoryRepo = transactionalManager.getRepository(InventoryMovement);
+    // El usuario solo puede vender en sucursales que tiene asignadas
+    await assertUserCanOperateInBranch(manager, this.redisService, { tenantId, userId, branchId, actionDescription: 'registrar ventas' });
 
-      // Evita que el cierre de caja calcule el arqueo mientras esta venta está en curso
-      await lockCashSession(transactionalManager, cashSessionId, 'share');
+    // Evita que el cierre de caja calcule el arqueo mientras esta venta está en curso
+    await lockCashSession(manager, cashSessionId, 'share');
 
-      // 2. Verify Cash Session exists, matches branch and tenant, and is open
-      const cashSession = await cashSessionRepo.findOne({
-        where: {
-          id: cashSessionId,
-          status: CashSessionStatus.OPEN,
-          branch: { id: branchId, tenantId },
-        },
-        relations: { branch: true },
-      });
-      if (!cashSession) {
-        this.logger.warn(`Sale failed: active cash session ${cashSessionId} not found or closed for branch ${branchId} under tenant ${tenantId}`);
-        throw new AppException(ErrorCode.NoOpenCashSession, 'No hay una sesión de caja abierta en esta sucursal.', HttpStatus.CONFLICT, { cashSessionId, branchId });
-      }
-
-      // Cualquier cajero asignado a la caja puede vender en su sesión abierta (no solo quien la abrió)
-      await assertUserAssignedToCashRegister(transactionalManager, {
-        tenantId,
-        userId,
-        cashRegisterId: cashSession.cashRegisterId,
-        actionDescription: 'registrar ventas',
-      });
-
-      // Lock cash register and generate invoice number
-      const registerRepo = transactionalManager.getRepository(CashRegister);
-      let registerId = cashSession.cashRegisterId;
-      if (!registerId) {
-        let reg = await registerRepo.findOne({
-          where: { branchId, code: 1, tenantId }
-        });
-        if (!reg) {
-          reg = new CashRegister();
-          reg.tenantId = tenantId;
-          reg.branchId = branchId;
-          reg.code = 1;
-          reg.name = 'Caja Principal 1';
-          reg.nextInvoiceNumber = 1;
-          reg = await registerRepo.save(reg);
-        }
-        registerId = reg.id;
-      }
-
-      const register = await registerRepo.findOne({
-        where: { id: registerId },
-        lock: { mode: 'pessimistic_write' }
-      });
-      if (!register) {
-        throw new AppException(ErrorCode.CashRegisterNotFound, 'Caja registradora no encontrada.', HttpStatus.NOT_FOUND);
-      }
-
-      const branchCode = String(cashSession.branch.code || 1).padStart(3, '0');
-      const registerCode = String(register.code || 1).padStart(3, '0');
-      const seqStr = String(register.nextInvoiceNumber).padStart(9, '0');
-      const invoiceNumber = `${branchCode}-${registerCode}-${seqStr}`;
-
-      // Increment sequential count
-      register.nextInvoiceNumber += 1;
-      await registerRepo.save(register);
-
-      // 3. Validate Customer belongs to Tenant if provided
-      if (customerId) {
-        const customerExists = await customerRepo.findOne({
-          where: { id: customerId, tenantId },
-        });
-        if (!customerExists) {
-          this.logger.warn(`Sale failed: Customer ID ${customerId} not found for Tenant ${tenantId}`);
-          throw new AppException(ErrorCode.CustomerNotFound, 'Cliente no encontrado.', HttpStatus.NOT_FOUND, { customerId });
-        }
-      }
-
-      const saleItemsToSave: SaleItem[] = new Array<SaleItem>(items.length);
-      const inventoryMovements: InventoryMovement[] = [];
-
-      // 4. Process items, verify/discount stock, compile costs.
-      //    Se recorren ordenados por variante: dos ventas con los mismos productos en distinto
-      //    orden bloquearían las filas de stock en orden cruzado (deadlock).
-      const processingOrder = items
-        .map((_, index) => index)
-        .sort((a, b) => items[a].variantId.localeCompare(items[b].variantId));
-
-      for (const index of processingOrder) {
-        const itemDto = items[index];
-        const variant = await variantRepo.findOne({
-          where: {
-            id: itemDto.variantId,
-            product: { tenantId },
-          },
-          relations: { product: true },
-        });
-        if (!variant) {
-          this.logger.warn(`Sale failed: Product Variant ID ${itemDto.variantId} not found for Tenant ${tenantId}`);
-          throw new AppException(ErrorCode.VariantNotFound, 'Variante no encontrada.', HttpStatus.NOT_FOUND, { variantId: itemDto.variantId });
-        }
-
-        // Descuenta stock (puede quedar en negativo) y lotes FIFO
-        const { averageUnitCost } = await consumeStock(transactionalManager, {
-          branchId,
-          variantId: itemDto.variantId,
-          quantity: itemDto.quantity,
-          fallbackUnitCost: variant.purchasePrice,
-        });
-
-        // Build Sale Item
-        const pricedLine = pricing.lines[index];
-        const hasItemDiscount = pricedLine.discountAmount > 0;
-
-        const saleItem = new SaleItem();
-        saleItem.variantId = itemDto.variantId;
-        saleItem.variant = variant;
-        saleItem.quantity = itemDto.quantity;
-        saleItem.price = itemDto.price;
-        saleItem.cost = averageUnitCost;
-        saleItem.discountType = hasItemDiscount ? (itemDto.discountType || null) : null;
-        saleItem.discountRate = hasItemDiscount && itemDto.discountRate !== undefined ? Number(itemDto.discountRate) : null;
-        saleItem.discountAmount = pricedLine.discountAmount;
-        saleItem.subtotal = pricedLine.subtotal;
-        saleItem.globalDiscountAmount = pricedLine.globalDiscountAmount;
-        saleItem.total = pricedLine.total;
-        saleItemsToSave[index] = saleItem;
-
-        // Build inventory movement (Kardex)
-        const movement = new InventoryMovement();
-        movement.tenantId = tenantId;
-        movement.originBranchId = branchId;
-        movement.destinationBranchId = null;
-        movement.variantId = itemDto.variantId;
-        movement.quantity = itemDto.quantity;
-        movement.type = InventoryMovementType.OUT;
-        movement.reason = InventoryMovementReason.VENTA;
-        inventoryMovements.push(movement);
-      }
-
-      const hasSaleDiscount = pricing.globalDiscountAmount > 0;
-
-      // 5. Create and save Sale
-      const sale = new Sale();
-      sale.tenantId = tenantId;
-      sale.branchId = branchId;
-      sale.cashSessionId = cashSessionId;
-      sale.invoiceNumber = invoiceNumber;
-      sale.customerId = customerId || null;
-      sale.subtotal = pricing.subtotal;
-      sale.total = pricing.total;
-      sale.itemsDiscountAmount = pricing.itemsDiscountAmount;
-      sale.globalDiscountAmount = pricing.globalDiscountAmount;
-      sale.discountAmount = pricing.discountAmount;
-      sale.discountType = hasSaleDiscount ? (discountType || null) : null;
-      sale.discountRate = hasSaleDiscount && discountRate !== undefined ? Number(discountRate) : null;
-      sale.status = SaleStatus.COMPLETED;
-      sale.userId = userId || null;
-      sale.items = saleItemsToSave;
-
-      // 6. Create Payments
-      sale.payments = appliedPayments.map((p) => {
-        const payment = new SalePayment();
-        payment.paymentMethod = p.paymentMethod;
-        payment.amount = p.amount;
-        payment.referenceNumber = p.referenceNumber || null;
-        return payment;
-      });
-
-      // Save Sale
-      const savedSale = await saleRepo.save(sale);
-
-      // Save inventory movements (Kardex)
-      await inventoryRepo.save(inventoryMovements);
-
-      this.logger.log(`Sale processed successfully: ID ${savedSale.id}, Total: ${savedSale.total}`);
-
-      return savedSale;
+    const cashSession = await this.loadOpenSession(manager, command, cashSessionId);
+    // Cualquier cajero asignado a la caja puede vender en su sesión abierta (no solo quien la abrió)
+    await assertUserAssignedToCashRegister(manager, {
+      tenantId,
+      userId,
+      cashRegisterId: cashSession.cashRegisterId,
+      actionDescription: 'registrar ventas',
     });
+
+    const invoiceNumber = await reserveInvoiceNumber(manager, { tenantId, branchId, cashSession });
+    if (customerId) {
+      await this.assertCustomerBelongsToTenant(manager, tenantId, customerId);
+    }
+
+    const { items, movements } = await this.sellItems(manager, command, priced.pricing);
+
+    const sale = this.buildSale(command, cashSessionId, invoiceNumber, priced, items);
+    const savedSale = await manager.getRepository(Sale).save(sale);
+    await manager.getRepository(InventoryMovement).save(movements); // kardex
+
+    this.logger.log(`Sale processed successfully: ID ${savedSale.id}, Total: ${savedSale.total}`);
+    return savedSale;
+  }
+
+  private async loadOpenSession(manager: EntityManager, command: ProcessSaleCommand, cashSessionId: string): Promise<CashSession> {
+    const { tenantId, branchId } = command;
+    const cashSession = await manager.getRepository(CashSession).findOne({
+      where: { id: cashSessionId, status: CashSessionStatus.OPEN, branch: { id: branchId, tenantId } },
+      relations: { branch: true },
+    });
+    if (!cashSession) {
+      this.logger.warn(`Sale failed: active cash session ${cashSessionId} not found or closed for branch ${branchId} under tenant ${tenantId}`);
+      throw new AppException(ErrorCode.NoOpenCashSession, 'No hay una sesión de caja abierta en esta sucursal.', HttpStatus.CONFLICT, { cashSessionId, branchId });
+    }
+    return cashSession;
+  }
+
+  private async assertCustomerBelongsToTenant(manager: EntityManager, tenantId: string, customerId: string): Promise<void> {
+    const customer = await manager.getRepository(Customer).findOne({ where: { id: customerId, tenantId } });
+    if (!customer) {
+      this.logger.warn(`Sale failed: Customer ID ${customerId} not found for Tenant ${tenantId}`);
+      throw new AppException(ErrorCode.CustomerNotFound, 'Cliente no encontrado.', HttpStatus.NOT_FOUND, { customerId });
+    }
+  }
+
+  /**
+   * Descuenta stock y lotes FIFO de cada línea y arma sus ítems y movimientos de kardex. Se recorren
+   * ordenadas por variante: dos ventas con los mismos productos en distinto orden bloquearían las
+   * filas de stock en orden cruzado (deadlock). Los ítems conservan el orden de la venta.
+   */
+  private async sellItems(manager: EntityManager, command: ProcessSaleCommand, pricing: SalePricing): Promise<{ items: SaleItem[]; movements: InventoryMovement[] }> {
+    const { tenantId, branchId, items } = command;
+    const saleItems = new Array<SaleItem>(items.length);
+    const movements: InventoryMovement[] = [];
+
+    const processingOrder = items.map((_, index) => index).sort((a, b) => items[a].variantId.localeCompare(items[b].variantId));
+    for (const index of processingOrder) {
+      const input = items[index];
+      const variant = await manager.getRepository(ProductVariant).findOne({
+        where: { id: input.variantId, product: { tenantId } },
+        relations: { product: true },
+      });
+      if (!variant) {
+        this.logger.warn(`Sale failed: Product Variant ID ${input.variantId} not found for Tenant ${tenantId}`);
+        throw new AppException(ErrorCode.VariantNotFound, 'Variante no encontrada.', HttpStatus.NOT_FOUND, { variantId: input.variantId });
+      }
+
+      // Puede dejar el stock en negativo
+      const { averageUnitCost } = await consumeStock(manager, {
+        branchId,
+        variantId: input.variantId,
+        quantity: input.quantity,
+        fallbackUnitCost: variant.purchasePrice,
+      });
+
+      const line = pricing.lines[index];
+      const hasItemDiscount = line.discountAmount > 0;
+      const item = new SaleItem();
+      item.variantId = input.variantId;
+      item.variant = variant;
+      item.quantity = input.quantity;
+      item.price = input.price;
+      item.cost = averageUnitCost;
+      item.discountType = hasItemDiscount ? (input.discountType || null) : null;
+      item.discountRate = hasItemDiscount && input.discountRate !== undefined ? Number(input.discountRate) : null;
+      item.discountAmount = line.discountAmount;
+      item.subtotal = line.subtotal;
+      item.globalDiscountAmount = line.globalDiscountAmount;
+      item.total = line.total;
+      saleItems[index] = item;
+
+      const movement = new InventoryMovement();
+      movement.tenantId = tenantId;
+      movement.originBranchId = branchId;
+      movement.destinationBranchId = null;
+      movement.variantId = input.variantId;
+      movement.quantity = input.quantity;
+      movement.type = InventoryMovementType.OUT;
+      movement.reason = InventoryMovementReason.VENTA;
+      movements.push(movement);
+    }
+    return { items: saleItems, movements };
+  }
+
+  private buildSale(command: ProcessSaleCommand, cashSessionId: string, invoiceNumber: string, priced: PricedSale, items: SaleItem[]): Sale {
+    const { pricing, payments } = priced;
+    const hasSaleDiscount = pricing.globalDiscountAmount > 0;
+
+    const sale = new Sale();
+    sale.tenantId = command.tenantId;
+    sale.branchId = command.branchId;
+    sale.cashSessionId = cashSessionId;
+    sale.invoiceNumber = invoiceNumber;
+    sale.customerId = command.customerId || null;
+    sale.subtotal = pricing.subtotal;
+    sale.total = pricing.total;
+    sale.itemsDiscountAmount = pricing.itemsDiscountAmount;
+    sale.globalDiscountAmount = pricing.globalDiscountAmount;
+    sale.discountAmount = pricing.discountAmount;
+    sale.discountType = hasSaleDiscount ? (command.discountType || null) : null;
+    sale.discountRate = hasSaleDiscount && command.discountRate !== undefined ? Number(command.discountRate) : null;
+    sale.status = SaleStatus.COMPLETED;
+    sale.userId = command.userId || null;
+    sale.items = items;
+    sale.payments = payments.map((p) => {
+      const payment = new SalePayment();
+      payment.paymentMethod = p.paymentMethod;
+      payment.amount = p.amount;
+      payment.referenceNumber = p.referenceNumber || null;
+      return payment;
+    });
+    return sale;
   }
 }
