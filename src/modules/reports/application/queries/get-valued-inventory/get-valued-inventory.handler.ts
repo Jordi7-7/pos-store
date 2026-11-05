@@ -1,13 +1,31 @@
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
-import { EntityManager } from 'typeorm';
+import { EntityManager, In } from 'typeorm';
 import { GetValuedInventoryQuery } from './get-valued-inventory.query';
 import { ProductVariant } from '../../../../products/domain/entities/product-variant.entity';
-import { PurchaseOrderStatus } from '../../../../purchases/domain/enums/purchase-order-status.enum';
+import { valueStock } from '../../../domain/inventory-valuation';
 import { Money } from '../../../../../common/domain/money';
-import { PurchaseOrderItem } from '../../../../purchases/domain/entities/purchase-order-item.entity';
-
+import { addQuantities } from '../../../../../common/domain/quantity';
+import { SqlParams } from '../../../../../common/utils/sql-params';
 import { RedisService } from '../../../../../common/redis/redis.service';
 import { assertUserCanAccessBranch } from '../../../../../common/security/branch-access.helper';
+
+/** Variante con existencias tal como la devuelve Postgres: numeric llega como texto. */
+interface StockedVariantRow {
+  id: string;
+  sku: string;
+  quantity: string;
+  layersQuantity: string;
+  layersValue: string;
+  currentCost: string;
+}
+
+interface ValuedVariant {
+  id: string;
+  sku: string;
+  quantity: number;
+  unitCost: number;
+  totalValue: number;
+}
 
 @QueryHandler(GetValuedInventoryQuery)
 export class GetValuedInventoryHandler implements IQueryHandler<GetValuedInventoryQuery> {
@@ -16,6 +34,10 @@ export class GetValuedInventoryHandler implements IQueryHandler<GetValuedInvento
     private readonly redisService: RedisService,
   ) {}
 
+  /**
+   * Existencias valuadas con lo que realmente queda en los lotes (costo FIFO), la misma base que el
+   * costo de ventas. Los totales cubren todas las variantes con existencias; la página solo recorta la lista.
+   */
   async execute(query: GetValuedInventoryQuery) {
     const { tenantId, page, limit, branchId, userId, isOwner } = query;
 
@@ -26,119 +48,96 @@ export class GetValuedInventoryHandler implements IQueryHandler<GetValuedInvento
       actionDescription: 'consultar el reporte de existencias valuadas',
     });
 
-    // 1. Fetch latest purchase order item price for each variant of this tenant
-    const poQuery = this.entityManager
-      .createQueryBuilder(PurchaseOrderItem, 'poi')
-      .innerJoin('poi.purchaseOrder', 'po')
-      .select('poi.variantId', 'variantId')
-      .addSelect('poi.purchasePrice', 'purchasePrice')
-      .distinctOn(['poi.variantId'])
-      .where('po.tenantId = :tenantId', { tenantId })
-      // Una compra anulada ya no es el último costo de nada
-      .andWhere('po.status = :completed', { completed: PurchaseOrderStatus.COMPLETED })
-      .orderBy('poi.variantId')
-      .addOrderBy('po.createdAt', 'DESC');
+    const valued = (await this.loadStockedVariants(tenantId, branchId)).map(toValuedVariant);
 
-    if (branchId) {
-      poQuery.andWhere('po.branchId = :branchId', { branchId });
-    }
+    const totalQuantity = valued.reduce((sum, variant) => addQuantities(sum, variant.quantity), 0);
+    const totalValue = Money.sum(valued.map((variant) => Money.of(variant.totalValue))).toNumber();
 
-    const latestPurchases = await poQuery.getRawMany();
-
-    const priceMap = new Map<string, number>();
-    for (const row of latestPurchases) {
-      priceMap.set(row.variantId, Number(row.purchasePrice || 0));
-    }
-
-    // Subquery condition for stock !== 0
-    const stockCondition = branchId
-      ? `COALESCE((SELECT SUM(quantity) FROM product_stocks WHERE variant_id = variant.id AND branch_id = :branchId), 0) <> 0`
-      : `COALESCE((SELECT SUM(quantity) FROM product_stocks WHERE variant_id = variant.id), 0) <> 0`;
-
-    const stockParams: { tenantId: string; branchId?: string } = branchId ? { tenantId, branchId } : { tenantId };
-
-    // 2. Build QueryBuilder on ProductVariant to filter stock !== 0 and apply pagination
-    const variantRepository = this.entityManager.getRepository(ProductVariant);
-    const queryBuilder = variantRepository.createQueryBuilder('variant')
-      .innerJoinAndSelect('variant.product', 'product')
-      .leftJoinAndSelect(
-        'variant.stocks',
-        'stocks',
-        branchId ? 'stocks.branchId = :branchId' : undefined,
-        branchId ? { branchId } : undefined,
-      )
-      .leftJoinAndSelect('variant.attributeValues', 'attributeValues')
-      .where('variant.tenantId = :tenantId', { tenantId })
-      .andWhere(stockCondition, stockParams)
-      .orderBy('variant.sku', 'ASC');
-
-    if (page && limit) {
-      const take = limit;
-      const skip = (page - 1) * limit;
-      queryBuilder.skip(skip).take(take);
-    }
-
-    // 3. Compute global totalQuantity and totalValue across all non-zero stock variants
-    const allVariants = await variantRepository.createQueryBuilder('variant')
-      .leftJoinAndSelect(
-        'variant.stocks',
-        'stocks',
-        branchId ? 'stocks.branchId = :branchId' : undefined,
-        branchId ? { branchId } : undefined,
-      )
-      .where('variant.tenantId = :tenantId', { tenantId })
-      .andWhere(stockCondition, stockParams)
-      .getMany();
-
-    let globalTotalQuantity = 0;
-    let globalTotalValue = Money.ZERO;
-
-    for (const v of allVariants) {
-      const qty = (v.stocks || []).reduce((sum, s) => sum + Number(s.quantity || 0), 0);
-      const purchasePrice = priceMap.has(v.id) 
-        ? priceMap.get(v.id)! 
-        : Number(v.purchasePrice || 0);
-      
-      globalTotalQuantity += qty;
-      globalTotalValue = globalTotalValue.plus(Money.ofLine(purchasePrice, qty));
-    }
-
-    const [variants, total] = await queryBuilder.getManyAndCount();
-
-    const data = variants.map((variant) => {
-      const quantity = (variant.stocks || []).reduce((sum, s) => sum + Number(s.quantity || 0), 0);
-      
-      // Fallback: if no purchase order exists, use current variant purchasePrice from catalog
-      const purchasePrice = priceMap.has(variant.id) 
-        ? priceMap.get(variant.id)! 
-        : Number(variant.purchasePrice || 0);
-
-      const totalValue = Money.ofLine(purchasePrice, quantity).toNumber();
-
-      const attrsStr = (variant.attributeValues || [])
-        .map((av) => av.value)
-        .join(' / ');
-      const name = attrsStr ? `${variant.product?.name} (${attrsStr})` : (variant.product?.name || '');
-
-      return {
-        sku: variant.sku,
-        name,
-        quantity,
-        purchasePrice,
-        totalValue,
-      };
-    });
+    const pageItems = page && limit ? valued.slice((page - 1) * limit, page * limit) : valued;
+    const names = await this.loadNames(pageItems.map((variant) => variant.id));
 
     return {
-      data,
+      data: pageItems.map((variant) => ({
+        sku: variant.sku,
+        name: names.get(variant.id) ?? '',
+        quantity: variant.quantity,
+        // Costo medio por unidad de lo que hay en existencia
+        purchasePrice: variant.unitCost,
+        totalValue: variant.totalValue,
+      })),
       meta: {
-        total,
+        total: valued.length,
         page: page || 1,
-        limit: limit || total,
-        totalPages: limit ? Math.ceil(total / limit) : 1,
-        totalQuantity: globalTotalQuantity,
-        totalValue: globalTotalValue.toNumber(),
-      }
+        limit: limit || valued.length,
+        totalPages: limit ? Math.ceil(valued.length / limit) : 1,
+        totalQuantity,
+        totalValue,
+      },
     };
   }
+
+  /** Una fila por variante con existencias distintas de cero, con sus unidades y valor en lotes. */
+  private loadStockedVariants(tenantId: string, branchId: string | undefined): Promise<StockedVariantRow[]> {
+    const params = new SqlParams();
+    const tenant = params.add(tenantId);
+    const branch = branchId ? params.add(branchId) : null;
+
+    return this.entityManager.query<StockedVariantRow[]>(
+      `
+      SELECT v.id,
+             v.sku,
+             stock.quantity AS "quantity",
+             COALESCE(layers.quantity, 0) AS "layersQuantity",
+             COALESCE(layers.value, 0) AS "layersValue",
+             v.purchase_price AS "currentCost"
+      FROM product_variants v
+      INNER JOIN (
+        SELECT variant_id, SUM(quantity) AS quantity
+        FROM product_stocks
+        ${branch ? `WHERE branch_id = ${branch}` : ''}
+        GROUP BY variant_id
+      ) stock ON stock.variant_id = v.id
+      LEFT JOIN (
+        SELECT variant_id,
+               SUM(remaining_quantity) AS quantity,
+               SUM(remaining_quantity * unit_cost) AS value
+        FROM product_batches
+        WHERE tenant_id = ${tenant} AND remaining_quantity > 0 ${branch ? `AND branch_id = ${branch}` : ''}
+        GROUP BY variant_id
+      ) layers ON layers.variant_id = v.id
+      WHERE v.tenant_id = ${tenant}
+        AND v.deleted_at IS NULL
+        AND stock.quantity <> 0
+      ORDER BY v.sku ASC
+      `,
+      params.values,
+    );
+  }
+
+  /** Nombre visible de cada variante: producto y, si tiene, sus atributos (p. ej. "Camisa (Rojo / M)"). */
+  private async loadNames(variantIds: string[]): Promise<Map<string, string>> {
+    if (variantIds.length === 0) return new Map();
+    const variants = await this.entityManager.getRepository(ProductVariant).find({
+      where: { id: In(variantIds) },
+      relations: { product: true, attributeValues: true },
+    });
+    return new Map(
+      variants.map((variant) => {
+        const attributes = (variant.attributeValues ?? []).map((attribute) => attribute.value).join(' / ');
+        const productName = variant.product?.name ?? '';
+        return [variant.id, attributes ? `${productName} (${attributes})` : productName];
+      }),
+    );
+  }
+}
+
+function toValuedVariant(row: StockedVariantRow): ValuedVariant {
+  const quantity = Number(row.quantity);
+  const valuation = valueStock({
+    quantity,
+    layersQuantity: Number(row.layersQuantity),
+    layersValue: Number(row.layersValue),
+    currentCost: Number(row.currentCost),
+  });
+  return { id: row.id, sku: row.sku, quantity, unitCost: valuation.unitCost, totalValue: valuation.totalValue };
 }

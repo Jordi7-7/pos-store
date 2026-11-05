@@ -152,17 +152,27 @@ describe('Reportes: costo de ventas y existencias valuadas', () => {
   });
 
   describe('existencias valuadas', () => {
-    it('valora con el último costo de compra y totaliza cantidad y valor', async () => {
+    it('valora con el costo de cada lote que queda y da el costo medio por unidad', async () => {
       const variantId = await seedVariant(db, shop.tenantId, 'VAL-1');
       await buy(variantId, 10, 4);
       await buy(variantId, 10, 6);
 
       const { data, meta } = await inventory({ limit: 100 });
-      expect(data.find((row) => row.sku === 'VAL-1')).toMatchObject({ quantity: 20, purchasePrice: 6, totalValue: 120 });
+      expect(data.find((row) => row.sku === 'VAL-1')).toMatchObject({ quantity: 20, purchasePrice: 5, totalValue: 100 });
       expect(meta.totalQuantity).toBeGreaterThanOrEqual(20);
     });
 
-    it('una compra anulada deja de ser el último costo: se valora con la última compra vigente', async () => {
+    it('lo vendido sale por orden FIFO: solo vale lo que queda de cada lote', async () => {
+      const variantId = await seedVariant(db, shop.tenantId, 'VAL-FIFO');
+      await buy(variantId, 10, 4);
+      await buy(variantId, 10, 6);
+      await sell(variantId, 12, 20); // 10 del lote a 4 y 2 del lote a 6
+
+      const row = (await inventory({ limit: 100 })).data.find((r) => r.sku === 'VAL-FIFO');
+      expect(row).toMatchObject({ quantity: 8, purchasePrice: 6, totalValue: 48 });
+    });
+
+    it('una compra anulada deja de contar: se valora con los lotes vigentes', async () => {
       const variantId = await seedVariant(db, shop.tenantId, 'VAL-2');
       await buy(variantId, 10, 4);
       const second = await buy(variantId, 10, 9);
@@ -172,17 +182,38 @@ describe('Reportes: costo de ventas y existencias valuadas', () => {
       expect(row).toMatchObject({ quantity: 10, purchasePrice: 4, totalValue: 40 });
     });
 
-    it('sin sucursal suma todas; con sucursal, solo su stock y el costo de sus compras', async () => {
+    it('sin sucursal suma todas; con sucursal, solo su stock y los lotes de esa sucursal', async () => {
       const variantId = await seedVariant(db, shop.tenantId, 'VAL-3');
       await buy(variantId, 4, 5, shop.branchId);
       await buy(variantId, 6, 7, northBranchId);
 
       const all = (await inventory({ limit: 100 })).data.find((r) => r.sku === 'VAL-3');
-      expect(all?.quantity).toBe(10);
+      expect(all).toMatchObject({ quantity: 10, totalValue: 62, purchasePrice: 6.2 });
       const north = (await inventory({ branchId: northBranchId, limit: 100 })).data.find((r) => r.sku === 'VAL-3');
       expect(north).toMatchObject({ quantity: 6, purchasePrice: 7, totalValue: 42 });
       const main = (await inventory({ branchId: shop.branchId, limit: 100 })).data.find((r) => r.sku === 'VAL-3');
       expect(main).toMatchObject({ quantity: 4, purchasePrice: 5, totalValue: 20 });
+    });
+
+    it('las unidades en stock sin lote (datos antiguos) se valoran al costo vigente', async () => {
+      const variantId = await seedVariant(db, shop.tenantId, 'VAL-LEGACY', { purchasePrice: 4 });
+      await db.query(`INSERT INTO product_stocks (branch_id, variant_id, quantity) VALUES ($1, $2, 5)`, [shop.branchId, variantId]);
+
+      const row = (await inventory({ limit: 1000 })).data.find((r) => r.sku === 'VAL-LEGACY');
+      expect(row).toMatchObject({ quantity: 5, purchasePrice: 4, totalValue: 20 });
+    });
+
+    it('una venta sin stock deja cantidad negativa valorada al costo vigente', async () => {
+      const variantId = await seedVariant(db, shop.tenantId, 'VAL-DEBT', { purchasePrice: 4 });
+      await sell(variantId, 3, 10);
+
+      const row = (await inventory({ limit: 1000 })).data.find((r) => r.sku === 'VAL-DEBT');
+      expect(row).toMatchObject({ quantity: -3, totalValue: -12 });
+    });
+
+    it('sin atributos, el nombre es el del producto', async () => {
+      const row = (await inventory({ limit: 1000 })).data.find((r) => r.sku === 'VAL-1');
+      expect(row?.name).toBe('VAL-1');
     });
 
     it('los totales cubren todas las variantes con stock, no solo la página', async () => {
