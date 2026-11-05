@@ -8,7 +8,9 @@ import { Branch } from '../../../../branches/domain/entities/branch.entity';
 import { HashService } from '../../../services/hash.service';
 import { Supplier } from '../../../../purchases/domain/entities/supplier.entity';
 import { Customer } from '../../../../customers/domain/entities/customer.entity';
-import { APP_PERMISSIONS } from '../../../../../common/enums/permissions.enum';
+import { ADMIN_PERMISSIONS, CASHIER_PERMISSIONS, MANAGER_PERMISSIONS } from '../../../domain/default-roles';
+import { slugify } from '../../../domain/slugify';
+import { isUniqueViolation } from '../../../../../common/errors/database-errors';
 import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
 
@@ -22,6 +24,30 @@ export class OnboardTenantHandler implements ICommandHandler<OnboardTenantComman
   ) {}
 
   async execute(command: OnboardTenantCommand) {
+    try {
+      return await this.onboard(command);
+    } catch (error) {
+      // Altas simultáneas pasan las comprobaciones previas: la segunda choca con el índice único
+      if (isUniqueViolation(error)) throw this.conflictFor(error, command);
+      throw error;
+    }
+  }
+
+  private conflictFor(error: unknown, command: OnboardTenantCommand): AppException {
+    const detail = (error as { detail?: string }).detail ?? '';
+    if (detail.includes('(slug)')) {
+      return new AppException(ErrorCode.TenantSlugTaken, 'Ese identificador de tienda acaba de ser tomado. Inténtalo de nuevo.', HttpStatus.CONFLICT);
+    }
+    if (detail.includes('(email)')) {
+      return new AppException(ErrorCode.EmailTaken, 'Ese correo ya está registrado en otra cuenta.', HttpStatus.CONFLICT);
+    }
+    if (detail.includes('(username)')) {
+      return new AppException(ErrorCode.UsernameTaken, 'Ese nombre de usuario ya está en uso.', HttpStatus.CONFLICT);
+    }
+    return new AppException(ErrorCode.TenantRucTaken, `Ya existe una tienda registrada con el RUC ${command.ruc}.`, HttpStatus.CONFLICT, { ruc: command.ruc });
+  }
+
+  private async onboard(command: OnboardTenantCommand) {
     const {
       tenantName,
       ruc,
@@ -53,20 +79,7 @@ export class OnboardTenantHandler implements ICommandHandler<OnboardTenantComman
     }
 
     return this.entityManager.transaction(async (transactionalManager) => {
-      // Helper function to sanitize a slug
-      const sanitizeSlug = (str: string): string => {
-        return str
-          .toLowerCase()
-          .trim()
-          .normalize('NFD')
-          .replace(/[\u0300-\u036f]/g, '') // Remove accents
-          .replace(/[^a-z0-9]+/g, '-')     // Replace non-alphanumeric with hyphens
-          .replace(/^-+|-+$/g, '');        // Trim leading/trailing hyphens
-      };
-
-      const baseSlug = command.slug
-        ? sanitizeSlug(command.slug)
-        : sanitizeSlug(tenantName) || 'tienda';
+      const baseSlug = slugify(command.slug || tenantName) || 'tienda';
 
       let cleanSlug = baseSlug;
       let counter = 1;
@@ -116,97 +129,13 @@ export class OnboardTenantHandler implements ICommandHandler<OnboardTenantComman
       );
 
       // Seed default system roles for the new tenant
-      const adminPermissions = Array.from(
-        new Set(
-          Object.entries(APP_PERMISSIONS)
-            .filter(([key]) => !['ROLES_MANAGE', 'BRANCHES_MANAGE', 'USERS_MANAGE', 'CASH_REGISTERS_MANAGE'].includes(key))
-            .map(([, val]) => val)
-        )
-      );
-
-      const managerPermissions = [
-        // Vistas de interfaz
-        APP_PERMISSIONS.VIEW_DASHBOARD,
-        APP_PERMISSIONS.VIEW_POS,
-        APP_PERMISSIONS.VIEW_SALES,
-        APP_PERMISSIONS.VIEW_PRODUCTS,
-        APP_PERMISSIONS.VIEW_CATEGORIES,
-        APP_PERMISSIONS.VIEW_ATTRIBUTES,
-        APP_PERMISSIONS.VIEW_PURCHASES,
-        APP_PERMISSIONS.VIEW_SUPPLIERS,
-        APP_PERMISSIONS.VIEW_CASH_SESSIONS,
-        APP_PERMISSIONS.VIEW_CASH_REGISTERS,
-        APP_PERMISSIONS.VIEW_CUSTOMERS,
-        APP_PERMISSIONS.VIEW_MEDIA,
-        APP_PERMISSIONS.VIEW_REPORTS,
-
-        // Acciones GET (consultas a API)
-        APP_PERMISSIONS.DASHBOARD_GET,
-        APP_PERMISSIONS.SALES_GET,
-        APP_PERMISSIONS.PRODUCTS_GET,
-        APP_PERMISSIONS.CATEGORIES_GET,
-        APP_PERMISSIONS.ATTRIBUTES_GET,
-        APP_PERMISSIONS.PURCHASES_GET,
-        APP_PERMISSIONS.SUPPLIERS_GET,
-        APP_PERMISSIONS.CASH_SESSIONS_GET,
-        APP_PERMISSIONS.CASH_REGISTERS_GET,
-        APP_PERMISSIONS.CUSTOMERS_GET,
-        APP_PERMISSIONS.MEDIA_GET,
-        APP_PERMISSIONS.REPORTS_GET,
-
-        // Acciones operativas
-        APP_PERMISSIONS.POS_SELL,
-        APP_PERMISSIONS.POS_APPLY_DISCOUNT,
-        APP_PERMISSIONS.SALES_REFUND,
-        APP_PERMISSIONS.PRODUCTS_CREATE,
-        APP_PERMISSIONS.PRODUCTS_EDIT,
-        APP_PERMISSIONS.PRODUCTS_ADJUST_STOCK,
-        APP_PERMISSIONS.PRODUCTS_IMPORT,
-        APP_PERMISSIONS.PRODUCTS_PRINT_BARCODES,
-        APP_PERMISSIONS.CATEGORIES_CREATE,
-        APP_PERMISSIONS.CATEGORIES_EDIT,
-        APP_PERMISSIONS.ATTRIBUTES_CREATE,
-        APP_PERMISSIONS.ATTRIBUTES_EDIT,
-        APP_PERMISSIONS.PURCHASES_CREATE,
-        APP_PERMISSIONS.PURCHASES_IMPORT,
-        APP_PERMISSIONS.SUPPLIERS_CREATE,
-        APP_PERMISSIONS.SUPPLIERS_EDIT,
-        APP_PERMISSIONS.CASH_OPEN_CLOSE,
-        APP_PERMISSIONS.CASH_CREATE_EXPENSE,
-        APP_PERMISSIONS.CUSTOMERS_CREATE,
-        APP_PERMISSIONS.CUSTOMERS_EDIT,
-        APP_PERMISSIONS.MEDIA_UPLOAD,
-        APP_PERMISSIONS.REPORTS_EXPORT,
-      ];
-
-      const cashierPermissions = [
-        // Vistas de interfaz
-        APP_PERMISSIONS.VIEW_POS,
-        APP_PERMISSIONS.VIEW_SALES,
-
-        // Acciones GET requeridas para operar el POS
-        APP_PERMISSIONS.PRODUCTS_GET,
-        APP_PERMISSIONS.CATEGORIES_GET,
-        APP_PERMISSIONS.CUSTOMERS_GET,
-        APP_PERMISSIONS.CASH_REGISTERS_GET,
-        APP_PERMISSIONS.CASH_SESSIONS_GET,
-        APP_PERMISSIONS.SALES_GET,
-
-        // Acciones operativas del cajero
-        APP_PERMISSIONS.POS_SELL,
-        APP_PERMISSIONS.POS_APPLY_DISCOUNT,
-        APP_PERMISSIONS.CASH_OPEN_CLOSE,
-        APP_PERMISSIONS.CASH_CREATE_EXPENSE,
-        APP_PERMISSIONS.CUSTOMERS_CREATE,
-      ];
-
       await transactionalManager.query(
         `INSERT INTO "roles" ("tenant_id", "name", "description", "permissions", "is_system")
          VALUES 
          ($1, 'Administrador', 'Gestión completa de operaciones, catálogo, usuarios y configuración.', $2, true),
          ($1, 'Gerente / Supervisor', 'Operaciones diarias, inventario, compras, clientes y reportes.', $3, true),
          ($1, 'Cajero', 'Ventas en mostrador, emisión de tickets, turnos de caja y cobros.', $4, true)`,
-        [savedTenant.id, adminPermissions, managerPermissions, cashierPermissions],
+        [savedTenant.id, ADMIN_PERMISSIONS, MANAGER_PERMISSIONS, CASHIER_PERMISSIONS],
       );
 
       // D. Create Default Supplier
@@ -228,7 +157,7 @@ export class OnboardTenantHandler implements ICommandHandler<OnboardTenantComman
       customer.phone = '9999999999';
       await transactionalManager.save(customer);
 
-      this.logger.log(`Onboarding successful. Created Tenant: ${savedTenant.name} (ID: ${savedTenant.id}), User OWNER: ${savedUser.email}`);
+      this.logger.log(`Onboarding successful. Created Tenant: ${savedTenant.name} (ID: ${savedTenant.id}), owner user ID: ${savedUser.id}`);
 
       return {
         tenant: {
