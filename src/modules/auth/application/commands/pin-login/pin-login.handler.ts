@@ -12,6 +12,7 @@ import { ErrorCode } from '../../../../../common/errors/error-codes';
 import { AttemptPolicy, LoginAttemptsService } from '../../../services/login-attempts.service';
 
 import { Tenant } from '../../../../tenants/domain/entities/tenant.entity';
+import { resolveEffectivePermissions } from '../../../domain/effective-permissions';
 
 @CommandHandler(PinLoginCommand)
 export class PinLoginHandler implements ICommandHandler<PinLoginCommand> {
@@ -84,15 +85,7 @@ export class PinLoginHandler implements ICommandHandler<PinLoginCommand> {
 
     await this.loginAttempts.reset(perIp.key);
 
-    // Resolving effective permissions
-    let effectivePermissions: string[] = [];
-    if (matchedUser.isOwner) {
-      effectivePermissions = ['*'];
-    } else {
-      const rolePerms = matchedUser.roleEntity?.permissions || [];
-      const customPerms = matchedUser.customPermissions || [];
-      effectivePermissions = Array.from(new Set([...rolePerms, ...customPerms]));
-    }
+    const effectivePermissions = resolveEffectivePermissions(matchedUser);
 
     const payload = {
       sub: matchedUser.id,

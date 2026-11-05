@@ -6,6 +6,7 @@ import { EntityManager } from 'typeorm';
 import { RefreshTokenCommand } from './refresh-token.command';
 import { User } from '../../../../users/domain/entities/user.entity';
 import { RedisService } from '../../../../../common/redis/redis.service';
+import { resolveEffectivePermissions } from '../../../domain/effective-permissions';
 
 @CommandHandler(RefreshTokenCommand)
 export class RefreshTokenHandler implements ICommandHandler<RefreshTokenCommand> {
@@ -46,15 +47,7 @@ export class RefreshTokenHandler implements ICommandHandler<RefreshTokenCommand>
 
       this.logger.log(`Tokens rotated successfully for User ID: ${userId}`);
 
-      // Resolving effective permissions
-      let effectivePermissions: string[] = [];
-      if (user.isOwner) {
-        effectivePermissions = ['*'];
-      } else {
-        const rolePerms = user.roleEntity?.permissions || [];
-        const customPerms = user.customPermissions || [];
-        effectivePermissions = Array.from(new Set([...rolePerms, ...customPerms]));
-      }
+      const effectivePermissions = resolveEffectivePermissions(user);
 
       const userPayload = {
         sub: user.id,

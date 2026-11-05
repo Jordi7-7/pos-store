@@ -1,6 +1,9 @@
 import { Entity, Column, ManyToOne, JoinColumn, Index, ManyToMany, JoinTable } from 'typeorm';
 import { BaseEntity } from '../../../../common/database/base.entity';
 import { Tenant } from '../../../tenants/domain/entities/tenant.entity';
+import type { Role } from '../../../roles/domain/entities/role.entity';
+import type { Branch } from '../../../branches/domain/entities/branch.entity';
+import type { CashRegister } from '../../../sales/domain/entities/cash-register.entity';
 
 @Entity('users')
 @Index(['tenantId', 'email'], { unique: true })
@@ -33,7 +36,7 @@ export class User extends BaseEntity {
 
   @ManyToOne('Role', 'users', { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'role_id' })
-  roleEntity?: any;
+  roleEntity?: Role | null;
 
   @Column({ type: 'text', array: true, nullable: true, name: 'custom_permissions' })
   customPermissions?: string[] | null;
@@ -50,7 +53,7 @@ export class User extends BaseEntity {
     joinColumn: { name: 'user_id', referencedColumnName: 'id' },
     inverseJoinColumn: { name: 'branch_id', referencedColumnName: 'id' },
   })
-  branches?: any[];
+  branches?: Branch[];
 
   @ManyToMany('CashRegister', { cascade: false })
   @JoinTable({
@@ -58,5 +61,5 @@ export class User extends BaseEntity {
     joinColumn: { name: 'user_id', referencedColumnName: 'id' },
     inverseJoinColumn: { name: 'cash_register_id', referencedColumnName: 'id' },
   })
-  cashRegisters?: any[];
+  cashRegisters?: CashRegister[];
 }

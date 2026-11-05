@@ -8,6 +8,7 @@ import { LoginHandler } from './application/commands/login/login.handler';
 import { RefreshTokenHandler } from './application/commands/refresh/refresh-token.handler';
 import { LogoutHandler } from './application/commands/logout/logout.handler';
 import { PinLoginHandler } from './application/commands/pin-login/pin-login.handler';
+import { GetProfileHandler } from './application/queries/get-profile/get-profile.handler';
 import { HashService } from './services/hash.service';
 import { LoginAttemptsService } from './services/login-attempts.service';
 import { OnboardingSecretGuard } from './guards/onboarding-secret.guard';
@@ -34,6 +35,7 @@ import { OnboardingSecretGuard } from './guards/onboarding-secret.guard';
     RefreshTokenHandler,
     LogoutHandler,
     PinLoginHandler,
+    GetProfileHandler,
   ],
   exports: [HashService, JwtModule, OnboardingSecretGuard],
 })

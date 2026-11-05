@@ -9,6 +9,7 @@ import { HashService } from '../../../services/hash.service';
 import { RedisService } from '../../../../../common/redis/redis.service';
 
 import { Tenant } from '../../../../tenants/domain/entities/tenant.entity';
+import { resolveEffectivePermissions } from '../../../domain/effective-permissions';
 
 @CommandHandler(LoginCommand)
 export class LoginHandler implements ICommandHandler<LoginCommand> {
@@ -70,15 +71,7 @@ export class LoginHandler implements ICommandHandler<LoginCommand> {
       throw new UnauthorizedException('Invalid email/username or password');
     }
 
-    // Resolving effective permissions: roleEntity permissions + customPermissions
-    let effectivePermissions: string[] = [];
-    if (user.isOwner) {
-      effectivePermissions = ['*'];
-    } else {
-      const rolePerms = user.roleEntity?.permissions || [];
-      const customPerms = user.customPermissions || [];
-      effectivePermissions = Array.from(new Set([...rolePerms, ...customPerms]));
-    }
+    const effectivePermissions = resolveEffectivePermissions(user);
 
     const payload = {
       sub: user.id,

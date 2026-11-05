@@ -1,7 +1,5 @@
-import { Controller, Post, Body, HttpCode, HttpStatus, Get, Ip, UnauthorizedException, UseGuards } from '@nestjs/common';
-import { CommandBus } from '@nestjs/cqrs';
-import { EntityManager } from 'typeorm';
-import { User } from '../../../users/domain/entities/user.entity';
+import { Controller, Post, Body, HttpCode, HttpStatus, Get, Ip, UseGuards } from '@nestjs/common';
+import { CommandBus, QueryBus } from '@nestjs/cqrs';
 import { OnboardTenantDto } from '../dtos/onboard-tenant.dto';
 import { OnboardTenantCommand } from '../../application/commands/onboard/onboard-tenant.command';
 import { LoginDto } from '../dtos/login.dto';
@@ -11,6 +9,8 @@ import { RefreshTokenCommand } from '../../application/commands/refresh/refresh-
 import { LogoutCommand } from '../../application/commands/logout/logout.command';
 import { PinLoginCommand } from '../../application/commands/pin-login/pin-login.command';
 import { PinLoginDto } from '../dtos/pin-login.dto';
+import { GetProfileQuery } from '../../application/queries/get-profile/get-profile.query';
+import { Profile } from '../../application/queries/get-profile/get-profile.handler';
 import { Public } from '../../decorators/public.decorator';
 import { CurrentUser } from '../../decorators/current-user.decorator';
 import { OnboardingSecretGuard } from '../../guards/onboarding-secret.guard';
@@ -19,7 +19,7 @@ import { OnboardingSecretGuard } from '../../guards/onboarding-secret.guard';
 export class AuthController {
   constructor(
     private readonly commandBus: CommandBus,
-    private readonly entityManager: EntityManager,
+    private readonly queryBus: QueryBus,
   ) {}
 
   @Public()
@@ -75,65 +75,7 @@ export class AuthController {
   }
 
   @Get('profile')
-  async getProfile(@CurrentUser('sub') userId: string) {
-    const user = await this.entityManager.findOne(User, {
-      where: { id: userId },
-      relations: { tenant: true, roleEntity: true, branches: true, cashRegisters: true },
-    });
-    if (!user) {
-      throw new UnauthorizedException('User not found');
-    }
-
-    let effectivePermissions: string[] = [];
-    let roleObj: { id: string; name: string } | null = null;
-
-    if (user.isOwner) {
-      effectivePermissions = ['*'];
-      roleObj = null;
-    } else {
-      const rolePerms = user.roleEntity?.permissions || [];
-      const customPerms = user.customPermissions || [];
-      effectivePermissions = Array.from(new Set([...rolePerms, ...customPerms]));
-      roleObj = user.roleEntity
-        ? {
-            id: user.roleEntity.id,
-            name: user.roleEntity.name,
-          }
-        : null;
-    }
-
-    const branches = (user.branches || []).map((b: any) => ({
-      id: b.id,
-      name: b.name,
-      address: b.address || null,
-    }));
-
-    return {
-      id: user.id,
-      name: user.name,
-      username: user.username,
-      email: user.email,
-      isOwner: user.isOwner,
-      role: roleObj,
-      permissions: effectivePermissions,
-      branches,
-      cashRegisters: (user.cashRegisters || []).map((cr: any) => ({
-        id: cr.id,
-        name: cr.name,
-        code: cr.code,
-        branchId: cr.branchId,
-      })),
-      tenant: {
-        id: user.tenant.id,
-        name: user.tenant.name,
-        ruc: user.tenant.ruc,
-        slug: user.tenant.slug,
-        logoUrl: user.tenant.logoUrl || null,
-        country: user.tenant.country,
-        timezone: user.tenant.timezone,
-        currencyCode: user.tenant.currencyCode,
-        currencySymbol: user.tenant.currencySymbol,
-      }
-    };
+  async getProfile(@CurrentUser('tenantId') tenantId: string, @CurrentUser('sub') userId: string) {
+    return this.queryBus.execute<GetProfileQuery, Profile>(new GetProfileQuery(tenantId, userId));
   }
 }
