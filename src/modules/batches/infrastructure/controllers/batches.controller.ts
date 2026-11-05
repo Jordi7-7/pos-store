@@ -5,6 +5,7 @@ import { RequirePermissions } from '../../../auth/decorators/permissions.decorat
 import { APP_PERMISSIONS } from '../../../../common/enums/permissions.enum';
 import { GetBatchesQuery } from '../../application/queries/get-batches/get-batches.query';
 import { GetBatchesByVariantQuery } from '../../application/queries/get-batches-by-variant/get-batches-by-variant.query';
+import { parseLimit, parsePage } from '../../../../common/utils/pagination';
 
 @Controller('batches')
 export class BatchesController {
@@ -25,8 +26,8 @@ export class BatchesController {
       new GetBatchesByVariantQuery(
         tenantId,
         variantId,
-        page ? Number(page) : 1,
-        limit ? Number(limit) : 10,
+        parsePage(page),
+        parseLimit(limit),
         branchId,
         userId,
         isOwner,
@@ -54,8 +55,8 @@ export class BatchesController {
         startDate,
         endDate,
         search,
-        page ? Number(page) : 1,
-        limit ? Number(limit) : 10,
+        parsePage(page),
+        parseLimit(limit),
         userId,
         isOwner,
       ),

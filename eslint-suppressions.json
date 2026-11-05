@@ -50,10 +50,7 @@
       "count": 2
     },
     "@typescript-eslint/no-unsafe-assignment": {
-      "count": 7
-    },
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 3
+      "count": 2
     }
   },
   "src/modules/auth/application/commands/pin-login/pin-login.handler.ts": {
@@ -61,10 +58,7 @@
       "count": 2
     },
     "@typescript-eslint/no-unsafe-assignment": {
-      "count": 7
-    },
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 3
+      "count": 2
     }
   },
   "src/modules/auth/application/commands/refresh/refresh-token.handler.spec.ts": {
@@ -77,10 +71,10 @@
       "count": 3
     },
     "@typescript-eslint/no-unsafe-assignment": {
-      "count": 10
+      "count": 5
     },
     "@typescript-eslint/no-unsafe-member-access": {
-      "count": 5
+      "count": 2
     }
   },
   "src/modules/auth/auth.module.ts": {
@@ -133,15 +127,6 @@
     }
   },
   "src/modules/auth/infrastructure/controllers/auth.controller.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 2
-    },
-    "@typescript-eslint/no-unsafe-assignment": {
-      "count": 12
-    },
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 10
-    },
     "@typescript-eslint/no-unsafe-return": {
       "count": 4
     }
@@ -430,11 +415,6 @@
       "count": 3
     }
   },
-  "src/modules/roles/domain/entities/role.entity.ts": {
-    "@typescript-eslint/no-unsafe-return": {
-      "count": 1
-    }
-  },
   "src/modules/sales/application/commands/close-cash-session/close-cash-session.handler.spec.ts": {
     "@typescript-eslint/no-unnecessary-type-assertion": {
       "count": 1
@@ -455,11 +435,8 @@
     "@typescript-eslint/no-explicit-any": {
       "count": 1
     },
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 1
-    },
     "@typescript-eslint/no-unsafe-return": {
-      "count": 3
+      "count": 2
     }
   },
   "src/modules/sales/application/queries/get-active-cash-session/get-active-cash-session.handler.ts": {
@@ -470,10 +447,7 @@
       "count": 1
     },
     "@typescript-eslint/no-unsafe-member-access": {
-      "count": 6
-    },
-    "@typescript-eslint/no-unsafe-return": {
-      "count": 2
+      "count": 4
     }
   },
   "src/modules/sales/application/queries/get-cash-registers/get-cash-registers.handler.ts": {
@@ -504,14 +478,6 @@
       "count": 1
     }
   },
-  "src/modules/sales/application/queries/get-my-cash-registers/get-my-cash-registers.handler.ts": {
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-return": {
-      "count": 1
-    }
-  },
   "src/modules/sales/application/queries/get-sales-paginated/get-sales-paginated.handler.ts": {
     "@typescript-eslint/no-unused-vars": {
       "count": 1
@@ -528,15 +494,6 @@
     }
   },
   "src/modules/sales/infrastructure/controllers/sales.controller.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-assignment": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 2
-    },
     "@typescript-eslint/no-unsafe-return": {
       "count": 11
     },
@@ -580,21 +537,7 @@
       "count": 2
     }
   },
-  "src/modules/users/domain/entities/user.entity.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 3
-    }
-  },
   "src/modules/users/infrastructure/controllers/users.controller.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-assignment": {
-      "count": 5
-    },
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 7
-    },
     "@typescript-eslint/no-unsafe-return": {
       "count": 3
     }

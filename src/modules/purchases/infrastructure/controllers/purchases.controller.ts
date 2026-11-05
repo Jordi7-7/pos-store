@@ -17,6 +17,7 @@ import { GetPurchasesQuery } from '../../application/queries/get-purchases/get-p
 import { GetPurchasesByVariantQuery } from '../../application/queries/get-purchases-by-variant/get-purchases-by-variant.query';
 import { RequirePermissions, RequireAnyPermissions } from '../../../auth/decorators/permissions.decorator';
 import { APP_PERMISSIONS } from '../../../../common/enums/permissions.enum';
+import { parseLimit, parsePage } from '../../../../common/utils/pagination';
 
 @Controller('purchases')
 export class PurchasesController {
@@ -109,8 +110,8 @@ export class PurchasesController {
         startDate,
         endDate,
         supplierId || undefined,
-        page ? Number(page) : 1,
-        limit ? Number(limit) : 10,
+        parsePage(page),
+        parseLimit(limit),
       ),
     );
   }
@@ -129,8 +130,8 @@ export class PurchasesController {
     return this.queryBus.execute(new GetPurchasesByVariantQuery(
       tenantId,
       variantId,
-      page ? Number(page) : 1,
-      limit ? Number(limit) : 10,
+      parsePage(page),
+      parseLimit(limit),
       branchId || undefined,
       userId,
       isOwner,
