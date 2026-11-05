@@ -70,8 +70,17 @@ describe('Alta de tienda (onboarding)', () => {
     expect(result.tenant.slug).toBe('ferreteria-el-nandu-1');
   });
 
-  it('rechaza un correo que ya usa otra cuenta con EMAIL_TAKEN', async () => {
-    await expect(onboard({ ruc: '0991234567004', username: 'repetido', email: 'ana@example.com' })).rejects.toMatchObject({ code: 'EMAIL_TAKEN' });
+  it('permite el mismo correo y usuario en otra tienda: una persona puede administrar varias', async () => {
+    const result = await onboard({ ruc: '0991234567004', slug: 'segunda-tienda', email: 'ana@example.com' });
+    expect(result.user.email).toBe('ana@example.com');
+  });
+
+  it('rechaza un usuario repetido dentro de la misma tienda con USERNAME_TAKEN o EMAIL_TAKEN', async () => {
+    const [{ id: tenantId }] = await db.query(`SELECT id FROM tenants WHERE ruc = '0991234567001'`);
+    const insert = (username: string, email: string) =>
+      db.query(`INSERT INTO users (tenant_id, name, username, email, password, is_owner) VALUES ($1, 'X', $2, $3, 'x', false)`, [tenantId, username, email]);
+    await expect(insert('ana.duena', 'otro@example.com')).rejects.toMatchObject({ code: '23505' });
+    await expect(insert('nuevo', 'ana@example.com')).rejects.toMatchObject({ code: '23505' });
   });
 
   it('rechaza un nombre de usuario sin caracteres válidos', async () => {

@@ -54,6 +54,8 @@ describe('Índices de consulta', () => {
     const created = await indexNames();
     expect(created).toEqual(expect.arrayContaining(['IDX_sales_tenant_created_at', 'IDX_sale_items_sale', 'IDX_product_batches_fifo_available']));
 
+    // Deshace las migraciones posteriores a la de índices (la de correo por tienda no revierte nada) y luego la de índices
+    await db.undoLastMigration();
     await db.undoLastMigration();
     const afterUndo = await indexNames();
     expect(afterUndo).not.toContain('IDX_sales_tenant_created_at');
