@@ -3,6 +3,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { CqrsModule } from '@nestjs/cqrs';
 import { AuthController } from './infrastructure/controllers/auth.controller';
+import { WebAuthController } from './infrastructure/controllers/web-auth.controller';
 import { OnboardTenantHandler } from './application/commands/onboard/onboard-tenant.handler';
 import { LoginHandler } from './application/commands/login/login.handler';
 import { RefreshTokenHandler } from './application/commands/refresh/refresh-token.handler';
@@ -13,6 +14,7 @@ import { AuthTokenService } from './services/auth-token.service';
 import { HashService } from './services/hash.service';
 import { LoginAttemptsService } from './services/login-attempts.service';
 import { OnboardingSecretGuard } from './guards/onboarding-secret.guard';
+import { WebRequestGuard } from './guards/web-request.guard';
 
 @Module({
   imports: [
@@ -26,12 +28,13 @@ import { OnboardingSecretGuard } from './guards/onboarding-secret.guard';
     }),
     CqrsModule,
   ],
-  controllers: [AuthController],
+  controllers: [AuthController, WebAuthController],
   providers: [
     HashService,
     AuthTokenService,
     LoginAttemptsService,
     OnboardingSecretGuard,
+    WebRequestGuard,
     OnboardTenantHandler,
     LoginHandler,
     RefreshTokenHandler,

@@ -1,7 +1,7 @@
 import { ValidationPipe } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
-import { parseCorsOrigins } from './config/env.validation';
+import { corsOptionsDelegate } from './config/cors.options';
 import { AllExceptionsFilter } from './common/errors/all-exceptions.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 
@@ -19,7 +19,7 @@ export function configureApp(app: NestExpressApplication): void {
   // `req.ip` sea la IP real del cliente y el límite de intentos de login funcione por IP.
   app.set('trust proxy', Number(process.env.TRUST_PROXY ?? 1));
   app.use(helmet());
-  app.enableCors({ origin: parseCorsOrigins(process.env.CORS_ORIGINS) });
+  app.enableCors(corsOptionsDelegate(process.env.CORS_ORIGINS));
   app.useGlobalFilters(new AllExceptionsFilter());
   app.useGlobalInterceptors(new LoggingInterceptor());
 }

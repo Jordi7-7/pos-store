@@ -110,6 +110,11 @@ export class AuthTokenService {
     return this.configService.get<string>(key, fallback) as JwtSignOptions['expiresIn'];
   }
 
+  /** Segundos que le quedan a un refresh token recién emitido: la cookie de la web vive lo mismo. */
+  secondsUntilRefreshExpiry(refreshToken: string): number {
+    return this.secondsUntilExpiry(refreshToken);
+  }
+
   /** El Redis expira junto con el token, sea cual sea el TTL configurado. */
   private secondsUntilExpiry(token: string): number {
     const decoded = this.jwtService.decode<{ exp?: number } | null>(token);
