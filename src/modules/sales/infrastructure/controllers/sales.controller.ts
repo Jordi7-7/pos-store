@@ -230,7 +230,8 @@ export class SalesController {
   }
 
   @Get('cash-sessions/:id/details')
-  @RequirePermissions(APP_PERMISSIONS.CASH_SESSIONS_GET)
+  // Quien cierra caja necesita ver el efectivo esperado y los movimientos del turno
+  @RequireAnyPermissions(APP_PERMISSIONS.CASH_SESSIONS_GET, APP_PERMISSIONS.CASH_OPEN_CLOSE)
   async getCashSessionDetails(
     @CurrentUser('tenantId') tenantId: string,
     @CurrentUser('sub') userId: string,
