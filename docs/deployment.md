@@ -39,6 +39,9 @@ Nombres, no valores. Las marcadas **obligatoria** hacen que la API **no arranque
 | `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD` | sí en la práctica | Sin Redis no hay refresh, ni límite de intentos de login |
 | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `AWS_S3_BUCKET_NAME`, `AWS_S3_ENDPOINT`, `AWS_S3_PUBLIC_URL` | para imágenes | Credenciales y endpoint de R2 |
 | `CORS_ORIGINS` | **sí en producción** | Orígenes permitidos separados por coma (`https://app.midominio.com,https://…`). Fuera de producción, vacío = abierto |
+| `AUTH_COOKIE_PATH` | **sí en producción con Caddy** | Ruta de la cookie de sesión web tal como la ve el navegador. Caddy publica la API bajo `/api`, así que debe ser **`/api/auth/web`** (por defecto `/auth/web`, que solo sirve sin prefijo, como en desarrollo). Si no coincide con la ruta real, el navegador no manda la cookie y la web pide iniciar sesión en cada recarga |
+| `AUTH_COOKIE_SECURE` | no | `true`/`false`. Por defecto es `true` con `NODE_ENV=production`: la cookie solo viaja por HTTPS. Pon `false` solo si la web se sirve por `http://` (p. ej. pruebas locales con `NODE_ENV=production`) |
+| `AUTH_COOKIE_NAME` | no (`pos_rt`) | Nombre de la cookie del refresh token de la web |
 | `TRUST_PROXY` | recomendada | Nº de proxies delante de la API. **`1` con Caddy**. Sin esto la IP del cliente es la del proxy y el límite de intentos de login por IP deja de funcionar |
 
 ### Rotación de secretos (recomendada antes de exponer el sistema)
@@ -144,6 +147,7 @@ Comunícalos antes de desplegar; ninguno rompe a un cliente que ya maneja el con
 - **Comprador por defecto:** una venta sin `customerId` se asigna al CONSUMIDOR FINAL de la tienda.
 - **Idempotencia:** `POST /sales` acepta `clientRequestId` (opcional hoy, 8–64 caracteres). Un reintento con el mismo valor devuelve la venta ya creada. Se volverá obligatorio cuando el front y el móvil lo envíen.
 - **Sucursales:** quien no es propietario ve solo lo de sus sucursales en devoluciones, gastos, turnos de caja y venta por folio (403 `BRANCH_ACCESS_DENIED` si pide algo ajeno).
+- **Sesión web con cookie:** nuevos `POST /auth/web/login`, `/auth/web/pin-login`, `/auth/web/refresh` y `/auth/web/logout`. El refresh token viaja en una cookie `HttpOnly; SameSite=Strict` (`pos_rt`) y nunca en el cuerpo; el cuerpo devuelve solo `accessToken`. Exigen la cabecera `X-Requested-With: pos-web`. Los endpoints `/auth/*` del móvil no cambian. CORS ahora admite credenciales solo para los orígenes de `CORS_ORIGINS` (y `localhost` si no está definida). **Despliega el backend antes que la web** y configura `AUTH_COOKIE_PATH=/api/auth/web`; al desplegar la web nueva todos los usuarios deberán iniciar sesión una vez.
 - **Pagos:** el servidor guarda de cada pago solo lo que cubre el total de la venta (el vuelto no es ingreso).
 
 ---
