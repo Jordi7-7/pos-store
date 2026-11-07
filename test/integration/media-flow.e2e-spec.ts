@@ -48,7 +48,11 @@ describe('Media: galería de imágenes', () => {
   const remove = (tenant: SeededTenant, id: string) => new DeleteImageHandler(db.manager, s3).execute(new DeleteImageCommand(tenant.tenantId, id));
   const upload = (tenant: SeededTenant, url: string, description?: string) => new UploadImageByUrlHandler(db.manager, s3).execute(new UploadImageByUrlCommand(tenant.tenantId, url, description));
 
+  // ProductImage arma su url al leerla con AWS_S3_PUBLIC_URL; el test no debe depender del .env de quien lo corre
+  const previousPublicUrl = process.env.AWS_S3_PUBLIC_URL;
+
   beforeAll(async () => {
+    process.env.AWS_S3_PUBLIC_URL = 'https://cdn.example.com';
     database = await startTestDatabase('media');
     db = database.db;
     shop = await seedTenant(db, 'galeria');
@@ -62,6 +66,8 @@ describe('Media: galería de imágenes', () => {
   });
 
   afterAll(async () => {
+    if (previousPublicUrl === undefined) delete process.env.AWS_S3_PUBLIC_URL;
+    else process.env.AWS_S3_PUBLIC_URL = previousPublicUrl;
     await database?.destroy();
   });
 
