@@ -17,6 +17,10 @@ FROM node:24-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
+# pnpm también en la imagen final: las migraciones se ejecutan con `pnpm run migration:run:prod`
+# pnpm no debe reinstalar dependencias al arrancar (node_modules ya viene podado y sin red en producción)
+ENV pnpm_config_verify_deps_before_run=false
+RUN corepack enable && corepack prepare pnpm@11.17.0 --activate
 COPY package.json ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
