@@ -64,7 +64,7 @@ Cifras de referencia al cierre de la fase backend: **431 unitarios + 313 de inte
 ## Entorno local (trampas conocidas)
 - **zsh** expande comodines: entrecomilla (`'--include=*.ts'`) o usa `Grep`/`find`.
 - **macOS no tiene `timeout`**: usa `perl -e 'alarm 240; exec @ARGV' <comando>`.
-- La extensión **Console Ninja** inyecta ruido en la salida de Jest (redirige a un archivo y filtra con `grep -a`) y **una vez corrompió `node_modules/@nestjs/core/index.js`** (el backend salía con código 0 sin arrancar). Comprobación: `node -e "console.log(typeof require('@nestjs/core').NestFactory)"` debe imprimir `function`.
+- La extensión **Console Ninja** inyecta ruido en la salida de Jest (redirige a un archivo y filtra con `grep -a`) y **una vez corrompió `node_modules/@nestjs/core/index.js`** (el backend salía con código 0 sin arrancar). Comprobación: `node -e "console.log(typeof require('@nestjs/core').NestFactory)"` debe imprimir `object` (es una instancia; si imprime `undefined`, el archivo está corrupto).
 - Si `node_modules` quedó con versiones antiguas: `pnpm install --offline --frozen-lockfile`.
 - Postgres local (Homebrew) no tiene el rol `postgres`: para reproducir el CI usa Docker (ver README). La base de desarrollo es `pos_store`; puede tener **migraciones pendientes** (`pnpm typeorm migration:show -d src/config/data-source.ts`); el código nuevo falla con 500 si faltan.
 - Las herramientas `Edit`/`Write` exigen haber leído el archivo antes en la sesión.
