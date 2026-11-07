@@ -166,9 +166,10 @@ Comunícalos antes de desplegar; ninguno rompe a un cliente que ya maneja el con
 
 Detectadas al revisar `Dockerfile` y `../test-docker/docker-compose.yml`; no se han cambiado todavía:
 
-- El `command` de la API en el compose ejecuta `pnpm run migration:run:prod && node dist/main.js`: **las migraciones corren en cada arranque**, con varias réplicas competirían, y la imagen final no instala `pnpm` (solo existe en la etapa de build). Recomendado: un job único previo (`node node_modules/typeorm/cli.js migration:run -d dist/config/data-source.js`) y la API arranca solo con `node dist/main`.
-- `Dockerfile`: `pnpm@latest` sin versión fija y `--dangerously-allow-all-builds`; el contenedor corre como root; no hay `HEALTHCHECK` (ya existe `GET /health` para usarlo).
-- Imágenes con la etiqueta `latest`: despliega por `sha-<corto>` para poder volver atrás.
+- El `command` de la API en el compose ejecuta `pnpm run migration:run:prod && node dist/main.js`: **las migraciones corren en cada arranque** y, con varias réplicas, competirían. Con una sola réplica es aceptable. Recomendado a futuro: un job único previo (`node node_modules/typeorm/cli.js migration:run -d dist/config/data-source.js`) y la API arranca solo con `node dist/main`.
+- La imagen final **sí instala `pnpm` 11.17.0** (necesario para `pnpm run migration:run:prod`) y define `pnpm_config_verify_deps_before_run=false`; sin esa variable, `pnpm run` reinstalaba ~700 paquetes en cada arranque. `dotenv` está en `dependencies` (lo usa `data-source.ts`) para que sobreviva a `pnpm prune --prod`.
+- `Dockerfile`: `--dangerously-allow-all-builds` en la etapa de build; el contenedor corre como root. El compose de producción ya define un healthcheck contra `GET /health`.
+- Imágenes con la etiqueta `latest`: el compose de producción acepta `BACKEND_TAG` y `FRONTEND_TAG` en el `.env`; fíjalas a `sha-<corto>` para poder volver atrás.
 - Redis con contraseña y accesible solo desde la red interna (ya lo está en el compose); Postgres solo en `127.0.0.1`.
 - `Caddyfile`: usa `:80`; en producción necesita dominio + HTTPS y cabeceras de seguridad (el backend ya aplica `helmet`).
 - `test-docker/` no está en control de versiones.
