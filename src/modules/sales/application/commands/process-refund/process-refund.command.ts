@@ -1,5 +1,6 @@
 export interface RefundItemInput {
   variantId: string;
+  saleItemId?: string;
   quantity: number;
 }
 

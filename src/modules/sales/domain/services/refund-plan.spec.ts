@@ -57,6 +57,22 @@ describe('planRefund', () => {
     expect(plan.totalRefunded).toBe(18);
   });
 
+  it('con saleItemId devuelve de esa línea y no de la primera de la variante', () => {
+    const first = line({ id: 'l1', quantity: 1, price: 10, total: 10 });
+    const second = line({ id: 'l2', quantity: 1, price: 8, total: 8 });
+
+    const plan = planRefund([first, second], [{ variantId: 'v1', saleItemId: 'l2', quantity: 1 }]);
+
+    expect(plan.allocations).toEqual([expect.objectContaining({ line: second, quantity: 1, amount: 8 })]);
+  });
+
+  it('con saleItemId no toma de otras líneas aunque la elegida no alcance', () => {
+    const first = line({ id: 'l1', quantity: 1, total: 10 });
+    const second = line({ id: 'l2', quantity: 1, total: 8 });
+
+    expect(() => planRefund([first, second], [{ variantId: 'v1', saleItemId: 'l2', quantity: 2 }])).toThrow(DomainError);
+  });
+
   it('salta las líneas ya devueltas', () => {
     const first = line({ quantity: 1, total: 10, refundedQuantity: 1 });
     const second = line({ quantity: 1, total: 8 });

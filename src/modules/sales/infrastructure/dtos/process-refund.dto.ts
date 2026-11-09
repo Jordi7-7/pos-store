@@ -1,10 +1,15 @@
-import { IsUUID, IsNotEmpty, IsArray, ValidateNested, IsNumber, Min, IsString } from 'class-validator';
+import { IsOptional, IsUUID, IsNotEmpty, IsArray, ValidateNested, IsNumber, Min, IsString } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class RefundItemDto {
   @IsUUID()
   @IsNotEmpty()
   variantId: string;
+
+  /** Línea exacta de la venta a devolver. Sin ella se consumen las líneas de la variante en orden. */
+  @IsOptional()
+  @IsUUID()
+  saleItemId?: string;
 
   @IsNumber()
   @Min(1)

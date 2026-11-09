@@ -4,6 +4,7 @@ import { addQuantities, subtractQuantities } from '../../../../common/domain/qua
 import { ErrorCode } from '../../../../common/errors/error-codes';
 
 export interface RefundableLine {
+  id?: string;
   variantId: string;
   quantity: number;
   price: number;
@@ -15,6 +16,8 @@ export interface RefundableLine {
 
 export interface RefundRequest {
   variantId: string;
+  /** Si viene, solo se devuelve de esa línea; si no, de las líneas de la variante en orden. */
+  saleItemId?: string;
   quantity: number;
 }
 
@@ -79,7 +82,9 @@ export function planRefund<Line extends RefundableLine>(
   const allocations: RefundAllocation<Line>[] = [];
 
   for (const request of requests) {
-    const candidates = lines.filter((line) => line.variantId === request.variantId);
+    const candidates = lines.filter(
+      (line) => line.variantId === request.variantId && (request.saleItemId === undefined || line.id === request.saleItemId),
+    );
     if (candidates.length === 0) {
       throw invalidRefund(`Product variant ${request.variantId} was not purchased in this sale`);
     }
