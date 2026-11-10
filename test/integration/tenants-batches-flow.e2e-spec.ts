@@ -3,7 +3,7 @@ import { GetBatchesHandler } from '../../src/modules/batches/application/queries
 import { GetBatchesQuery } from '../../src/modules/batches/application/queries/get-batches/get-batches.query';
 import { GetBatchesByVariantHandler } from '../../src/modules/batches/application/queries/get-batches-by-variant/get-batches-by-variant.handler';
 import { GetBatchesByVariantQuery } from '../../src/modules/batches/application/queries/get-batches-by-variant/get-batches-by-variant.query';
-import { BatchStatus } from '../../src/modules/batches/domain/entities/batch.entity';
+import { BatchOriginType, BatchStatus } from '../../src/modules/batches/domain/entities/batch.entity';
 import { Branch } from '../../src/modules/branches/domain/entities/branch.entity';
 import { RegisterPurchaseCommand } from '../../src/modules/purchases/application/commands/register-purchase/register-purchase.command';
 import { RegisterPurchaseHandler } from '../../src/modules/purchases/application/commands/register-purchase/register-purchase.handler';
@@ -120,9 +120,9 @@ describe('Tienda y lotes', () => {
       new RegisterPurchaseHandler(db.manager, redisStub).execute(
         new RegisterPurchaseCommand(tenant.tenantId, tenant.ownerId, tenant.supplierId, branchId, invoice, [{ variantId, quantity, purchasePrice: 5 }]),
       );
-    const listBatches = (args: Partial<{ branchId: string; search: string; page: number; limit: number; userId: string; isOwner: boolean }> = {}) =>
+    const listBatches = (args: Partial<{ branchId: string; search: string; page: number; limit: number; userId: string; isOwner: boolean; originTypes: BatchOriginType[] }> = {}) =>
       new GetBatchesHandler(db.manager, redisStub).execute(
-        new GetBatchesQuery(shop.tenantId, args.branchId, undefined, undefined, args.search, args.page ?? 1, args.limit ?? 10, args.userId ?? shop.ownerId, args.isOwner ?? true),
+        new GetBatchesQuery(shop.tenantId, args.branchId, undefined, undefined, args.search, args.page ?? 1, args.limit ?? 10, args.userId ?? shop.ownerId, args.isOwner ?? true, args.originTypes),
       );
 
     beforeAll(async () => {
@@ -152,6 +152,21 @@ describe('Tienda y lotes', () => {
       const page = await listBatches({ page: 2, limit: 2 });
       expect(page.data).toHaveLength(1);
       expect(page.meta).toMatchObject({ total: 3, page: 2, totalPages: 2 });
+    });
+
+    it('filtra por tipo de lote, uno o varios', async () => {
+      const total = (await listBatches()).meta.total;
+      const [target] = (await listBatches()).data;
+      await db.query(`UPDATE batches SET origin_type = 'REFUND' WHERE id = $1`, [target.id]);
+      try {
+        expect((await listBatches({ originTypes: [BatchOriginType.REFUND] })).data.map((b) => b.id)).toEqual([target.id]);
+        expect((await listBatches({ originTypes: [BatchOriginType.PURCHASE] })).meta.total).toBe(total - 1);
+        expect((await listBatches({ originTypes: [BatchOriginType.PURCHASE, BatchOriginType.REFUND] })).meta.total).toBe(total);
+        expect((await listBatches({ originTypes: [BatchOriginType.ADJUSTMENT] })).meta.total).toBe(0);
+        expect((await listBatches({ originTypes: [] })).meta.total).toBe(total);
+      } finally {
+        await db.query(`UPDATE batches SET origin_type = 'PURCHASE' WHERE id = $1`, [target.id]);
+      }
     });
 
     it('un lote consumido aparece como agotado', async () => {

@@ -15,7 +15,7 @@ export class GetBatchesHandler implements IQueryHandler<GetBatchesQuery> {
   ) {}
 
   async execute(query: GetBatchesQuery) {
-    const { tenantId, branchId, startDateStr, endDateStr, search, page, limit, userId, isOwner } = query;
+    const { tenantId, branchId, startDateStr, endDateStr, search, page, limit, userId, isOwner, originTypes } = query;
     const batchRepo = this.entityManager.getRepository(Batch);
 
     await assertUserCanAccessBranch(this.entityManager, this.redisService, {
@@ -37,6 +37,10 @@ export class GetBatchesHandler implements IQueryHandler<GetBatchesQuery> {
 
     if (branchId) {
       qb.andWhere('batch.branchId = :branchId', { branchId });
+    }
+
+    if (originTypes && originTypes.length > 0) {
+      qb.andWhere('batch.originType IN (:...originTypes)', { originTypes });
     }
 
     if (startDateStr || endDateStr) {
