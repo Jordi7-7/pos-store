@@ -110,11 +110,11 @@ Resultado de añadir tests de integración sobre Postgres real a cada flujo. Cas
 - El cálculo del costo promedio en una compra usa el stock total de todas las sucursales.
 - El Administrador por defecto recibe casi todos los permisos (el filtro de exclusión compara por *nombre* de clave y los alias comparten valor); está fijado en un test, es una decisión pendiente del dueño.
 - Los barcodes no se normalizan ni se comprueba que no choquen con un SKU base.
-- `clientRequestId` aún es opcional; los clientes actuales no lo envían, así que **la protección contra ventas duplicadas todavía no actúa en producción**.
+- `clientRequestId` aún es opcional. **La web ya lo envía** (un valor por intento de cobro, desde 2026-11-05) y la idempotencia se comprobó contra el backend real; **el móvil todavía no**, así que no se puede volver obligatorio hasta que lo envíe.
 
 **Despliegue** (ver `docs/deployment.md`): rotar los secretos (recomendado; ninguno está en git), comprobaciones de duplicados antes de migrar, migraciones como paso aparte, backup obligatorio.
 
-**Verificación que nunca se ha hecho:** ejecutar el front web y el móvil contra este backend (cambios de código de error y de estado HTTP, errores 429/403/409, SKU en mayúsculas, formas de respuesta). También staging con datos reales.
+**Verificación contra el backend real:** hecha para la web (recorrido abrir turno → vender → devolver → cerrar por API y 14 specs de Playwright, 2026-11-05/06: contrato de errores, SKU en mayúsculas, 409 `CASH_REGISTER_BUSY` y `SALE_ALREADY_REFUNDED`) y revisión visual del móvil en simulador con Maestro (2026-11-08). **Sigue pendiente:** pasada manual de 429 y 403 (`BRANCH_ACCESS_DENIED`, `PERMISSION_ESCALATION`) en ambas apps, y staging con datos reales. El dueño indica que el backend ya está desplegado (2026-11-09).
 
 ## 7. Datos de la base de desarrollo local (al cierre)
 

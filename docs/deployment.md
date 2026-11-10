@@ -164,7 +164,7 @@ Comunícalos antes de desplegar; ninguno rompe a un cliente que ya maneja el con
 
 ## 8. Observaciones de infraestructura (pendientes, Fase 5 del plan)
 
-Detectadas al revisar `Dockerfile` y `../test-docker/docker-compose.yml`; no se han cambiado todavía:
+Detectadas al revisar `Dockerfile` y `../test-docker/docker-compose.yml`. Ya hay compose de producción en `../test-docker/prod/` con healthcheck y los arreglos de imagen de pnpm y dotenv están hechos; **siguen pendientes** los demás puntos (migraciones como job aparte, HTTPS y cabeceras en Caddy, etiquetas fijas, root en el contenedor, versionar `test-docker`):
 
 - El `command` de la API en el compose ejecuta `pnpm run migration:run:prod && node dist/main.js`: **las migraciones corren en cada arranque** y, con varias réplicas, competirían. Con una sola réplica es aceptable. Recomendado a futuro: un job único previo (`node node_modules/typeorm/cli.js migration:run -d dist/config/data-source.js`) y la API arranca solo con `node dist/main`.
 - La imagen final **sí instala `pnpm` 11.17.0** (necesario para `pnpm run migration:run:prod`) y define `pnpm_config_verify_deps_before_run=false`; sin esa variable, `pnpm run` reinstalaba ~700 paquetes en cada arranque. `dotenv` está en `dependencies` (lo usa `data-source.ts`) para que sobreviva a `pnpm prune --prod`.
