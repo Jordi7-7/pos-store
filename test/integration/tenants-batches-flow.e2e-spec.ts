@@ -193,6 +193,25 @@ describe('Tienda y lotes', () => {
       expect(foreign.data).toEqual([]);
     });
 
+    it('los ítems de cada lote salen ordenados por SKU (orden natural: 2 antes que 10)', async () => {
+      const v10 = await seedVariant(db, other.tenantId, 'ORD-10');
+      const v2 = await seedVariant(db, other.tenantId, 'ORD-2');
+      const v1 = await seedVariant(db, other.tenantId, 'ABC-1');
+      await new RegisterPurchaseHandler(db.manager, redisStub).execute(
+        new RegisterPurchaseCommand(other.tenantId, other.ownerId, other.supplierId, other.branchId, 'FAC-ORDEN', [
+          { variantId: v10, quantity: 1, purchasePrice: 1 },
+          { variantId: v2, quantity: 1, purchasePrice: 1 },
+          { variantId: v1, quantity: 1, purchasePrice: 1 },
+        ]),
+      );
+
+      const { data } = await new GetBatchesHandler(db.manager, redisStub).execute(
+        new GetBatchesQuery(other.tenantId, other.branchId, undefined, undefined, 'FAC-ORDEN', 1, 10, other.ownerId, true),
+      );
+
+      expect(data[0].items.map((item) => item.sku)).toEqual(['ABC-1', 'ORD-2', 'ORD-10']);
+    });
+
     it('los lotes de una variante muestran lo comprado y lo consumido', async () => {
       const result = await new GetBatchesByVariantHandler(db.manager, redisStub).execute(
         new GetBatchesByVariantQuery(shop.tenantId, variantId, 1, 10, shop.branchId, shop.ownerId, true),

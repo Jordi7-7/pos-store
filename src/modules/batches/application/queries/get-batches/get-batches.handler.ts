@@ -97,7 +97,13 @@ export class GetBatchesHandler implements IQueryHandler<GetBatchesQuery> {
       let totalCostValue = 0;
       let totalInitialCostValue = 0;
 
-      const items = (batch.items || []).map((item) => {
+      // La consulta no ordena el join: los ítems de cada lote se muestran por SKU (con números en orden natural: A2 antes que A10)
+      const sortedItems = [...(batch.items || [])].sort(
+        (a, b) =>
+          (a.variant?.sku || '').localeCompare(b.variant?.sku || '', 'es', { numeric: true }) || a.id.localeCompare(b.id),
+      );
+
+      const items = sortedItems.map((item) => {
         const initialQty = Number(item.initialQuantity || 0);
         const remainingQty = Number(item.remainingQuantity || 0);
         const consumedQty = Math.max(0, initialQty - remainingQty);
