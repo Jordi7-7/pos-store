@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Put, Delete, Body, Param, Query } from '@nestjs/common';
+import { Controller, Post, Get, Put, Delete, Body, Param, Query, ParseUUIDPipe } from '@nestjs/common';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
 import { CreateVariableProductDto, ProductVariantDto, CreateSimpleProductDto } from '../dtos/create-product.dto';
 import { CreateSimpleProductCommand } from '../../application/commands/create-simple-product/create-simple-product.command';
@@ -15,6 +15,10 @@ import { GetProductsQuery } from '../../application/queries/get-products/get-pro
 import { GetProductByIdQuery } from '../../application/queries/get-product-by-id/get-product-by-id.query';
 import { GetVariantBySkuQuery } from '../../application/queries/get-variant-by-sku/get-variant-by-sku.query';
 import { GetPosVariantsQuery } from '../../application/queries/get-pos-variants/get-pos-variants.query';
+import { GetPosCatalogQuery } from '../../application/queries/get-pos-catalog/get-pos-catalog.query';
+import { PosCatalogPage } from '../../application/read-models/pos-catalog';
+import { GetPosStockQuery } from '../../application/queries/get-pos-stock/get-pos-stock.query';
+import { PosStockPage } from '../../application/read-models/pos-stock';
 import { UpdateProductDto } from '../dtos/update-product.dto';
 import { UpdateProductCommand } from '../../application/commands/update-product/update-product.command';
 import { UpdateSimpleProductDto } from '../dtos/update-simple-product.dto';
@@ -274,6 +278,37 @@ export class ProductsController {
     @Query('branchId') branchId: string,
   ) {
     return this.queryBus.execute<GetPosVariantsQuery, PosVariantListItem[]>(new GetPosVariantsQuery(tenantId, branchId));
+  }
+
+  /**
+   * Catálogo para vender sin conexión, por lotes y por cambios: sin `after` baja todo; con el `cursor` de la
+   * descarga anterior solo trae lo modificado o borrado desde entonces. Repetir mientras `hasMore` sea true.
+   */
+  @Get('pos/catalog')
+  @RequireAnyPermissions(APP_PERMISSIONS.PRODUCTS_GET, APP_PERMISSIONS.POS_SELL)
+  async getPosCatalog(
+    @CurrentUser('tenantId') tenantId: string,
+    @Query('after') after?: string,
+    @Query('limit') limit?: number,
+  ): Promise<PosCatalogPage> {
+    return this.queryBus.execute<GetPosCatalogQuery, PosCatalogPage>(new GetPosCatalogQuery(tenantId, after, limit));
+  }
+
+  /**
+   * Existencias de una sucursal para vender sin conexión, por lotes y por cambios (mismo cursor que el catálogo).
+   * Cada sucursal tiene su propio stock: se baja solo el de `branchId`, y solo si el usuario tiene acceso a ella.
+   */
+  @Get('pos/stock')
+  @RequireAnyPermissions(APP_PERMISSIONS.PRODUCTS_GET, APP_PERMISSIONS.POS_SELL)
+  async getPosStock(
+    @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser('sub') userId: string,
+    @CurrentUser('isOwner') isOwner: boolean,
+    @Query('branchId', new ParseUUIDPipe()) branchId: string,
+    @Query('after') after?: string,
+    @Query('limit') limit?: number,
+  ): Promise<PosStockPage> {
+    return this.queryBus.execute<GetPosStockQuery, PosStockPage>(new GetPosStockQuery(tenantId, branchId, userId, isOwner, after, limit));
   }
 
   @Get(':id')

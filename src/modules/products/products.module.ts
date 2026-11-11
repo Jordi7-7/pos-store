@@ -38,6 +38,8 @@ import { FindPosVariantsBySkuHandler } from './application/queries/find-pos-vari
 import { GetPosVariantBySkuHandler } from './application/queries/get-pos-variant-by-sku/get-pos-variant-by-sku.handler';
 import { GetPosVariantsByBaseSkuHandler } from './application/queries/get-pos-variants-by-base-sku/get-pos-variants-by-base-sku.handler';
 import { GetPosVariantsHandler } from './application/queries/get-pos-variants/get-pos-variants.handler';
+import { GetPosCatalogHandler } from './application/queries/get-pos-catalog/get-pos-catalog.handler';
+import { GetPosStockHandler } from './application/queries/get-pos-stock/get-pos-stock.handler';
 import { GetProductsBySkuAndBarcodeHandler } from './application/queries/get-products-by-sku-and-barcode/get-products-by-sku-and-barcode.handler';
 import { GetProductsByNameHandler } from './application/queries/get-products-by-name/get-products-by-name.handler';
 import { ProductsController } from './infrastructure/controllers/products.controller';
@@ -87,6 +89,8 @@ import { ProductsController } from './infrastructure/controllers/products.contro
     GetPosVariantBySkuHandler,
     GetPosVariantsByBaseSkuHandler,
     GetPosVariantsHandler,
+    GetPosCatalogHandler,
+    GetPosStockHandler,
     GetProductsBySkuAndBarcodeHandler,
     GetProductsByNameHandler,
   ],
