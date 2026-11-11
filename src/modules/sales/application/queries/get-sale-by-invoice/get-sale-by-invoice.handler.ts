@@ -24,8 +24,13 @@ export class GetSaleByInvoiceHandler implements IQueryHandler<GetSaleByInvoiceQu
   async execute(query: GetSaleByInvoiceQuery) {
     const { tenantId, invoiceNumber } = query;
 
+    // El folio definitivo o, para una venta hecha sin conexión, el número provisional impreso en su comprobante
+    const folio = invoiceNumber.trim();
     const sale = await this.saleRepo.findOne({
-      where: { tenantId, invoiceNumber },
+      where: [
+        { tenantId, invoiceNumber: folio },
+        { tenantId, offlineReference: folio.toUpperCase() },
+      ],
       withDeleted: true,
       relations: {
         items: {
@@ -66,6 +71,7 @@ export class GetSaleByInvoiceHandler implements IQueryHandler<GetSaleByInvoiceQu
     return {
       id: sale.id,
       invoiceNumber: sale.invoiceNumber,
+      offlineReference: sale.offlineReference,
       total: Number(sale.total),
       subtotal: Number(sale.subtotal),
       discountAmount: Number(sale.discountAmount),

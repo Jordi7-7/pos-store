@@ -65,6 +65,7 @@ export enum ErrorCode {
   CustomerNotFound = 'CUSTOMER_NOT_FOUND',
   ConsumerFinalProtected = 'CONSUMER_FINAL_PROTECTED',
   IdempotencyKeyReused = 'IDEMPOTENCY_KEY_REUSED',
+  OfflineReferenceTaken = 'OFFLINE_REFERENCE_TAKEN',
   CustomerIdentityTaken = 'CUSTOMER_IDENTITY_TAKEN',
 
   // Catálogo

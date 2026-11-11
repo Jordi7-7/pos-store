@@ -305,4 +305,77 @@ describe('API por HTTP: flujo completo y contrato de errores', () => {
       expect(response.headers['strict-transport-security']).toBeDefined();
     });
   });
+
+  describe('venta sin conexión: POST /sales/offline', () => {
+    const offlineSale = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
+      branchId,
+      cashSessionId: sessionId,
+      items: [{ variantId, quantity: 1, price: 10 }],
+      payments: [{ paymentMethod: 'EFECTIVO', amount: 10 }],
+      clientRequestId: 'http-offline-0001',
+      occurredAt: new Date().toISOString(),
+      offlineReference: 'OFF-HTTP-0001',
+      ...overrides,
+    });
+
+    it('exige los tres datos del modo sin conexión', async () => {
+      for (const field of ['clientRequestId', 'occurredAt', 'offlineReference']) {
+        const { [field]: _omitted, ...body } = offlineSale();
+        const response = await api('post', '/sales/offline', ownerToken).send(body);
+
+        expectErrorEnvelope(response, 400, 'VALIDATION_FAILED');
+        expect(JSON.stringify((response.body as { details: unknown }).details)).toContain(field);
+      }
+    });
+
+    it('requiere sesión: sin token responde 401', async () => {
+      expect((await api('post', '/sales/offline').send(offlineSale())).status).toBe(401);
+    });
+
+    it('con el turno ya cerrado se rechaza con NO_OPEN_CASH_SESSION y el contrato de errores', async () => {
+      expectErrorEnvelope(await api('post', '/sales/offline', ownerToken).send(offlineSale()), 409, 'NO_OPEN_CASH_SESSION');
+    });
+
+    it('con un turno abierto sincroniza la venta con su hora, y se encuentra por el folio definitivo y por el provisional', async () => {
+      const opened = await api('post', '/sales/cash-sessions/open', ownerToken).send({ branchId, cashRegisterId, openingBalance: 0 });
+      expect(opened.status).toBe(201);
+      const openSessionId = (opened.body as { id: string }).id;
+      // el turno lleva abierto un rato: así una venta hecha hace un minuto cae dentro del turno
+      await database.db.query(`UPDATE cash_sessions SET opened_at = now() - interval '2 hours' WHERE id = $1`, [openSessionId]);
+      const occurredAt = new Date(Date.now() - 60_000).toISOString();
+
+      const response = await api('post', '/sales/offline', ownerToken).send(offlineSale({ cashSessionId: openSessionId, occurredAt }));
+
+      expect(response.status).toBe(201);
+      const sale = response.body as { id: string; invoiceNumber: string; createdAt: string };
+      expect(new Date(sale.createdAt).toISOString()).toBe(occurredAt);
+
+      const byFolio = await api('get', `/sales/invoice/${sale.invoiceNumber}`, ownerToken);
+      const byAlias = await api('get', '/sales/invoice/off-http-0001', ownerToken);
+      expect(byFolio.body).toMatchObject({ id: sale.id, offlineReference: 'OFF-HTTP-0001' });
+      expect(byAlias.body).toMatchObject({ id: sale.id, invoiceNumber: sale.invoiceNumber });
+
+      // el reintento con la misma clave devuelve la misma venta
+      const retry = await api('post', '/sales/offline', ownerToken).send(offlineSale({ cashSessionId: openSessionId, occurredAt }));
+      expect(retry.body).toMatchObject({ id: sale.id });
+    });
+
+    it('POST /sales ignora occurredAt y offlineReference: una venta en línea no cambia su hora ni su número', async () => {
+      const active = await api('get', `/sales/cash-sessions/active?branchId=${branchId}&cashRegisterId=${cashRegisterId}`, ownerToken);
+      const activeSessionId = (active.body as { id: string }).id;
+
+      const response = await api('post', '/sales', ownerToken).send({
+        branchId,
+        cashSessionId: activeSessionId,
+        items: [{ variantId, quantity: 1, price: 10 }],
+        payments: [{ paymentMethod: 'EFECTIVO', amount: 10 }],
+        occurredAt: '2020-01-01T00:00:00.000Z',
+        offlineReference: 'OFF-ENLINEA-01',
+      });
+
+      expect(response.status).toBe(201);
+      expect(new Date((response.body as { createdAt: string }).createdAt).getFullYear()).toBeGreaterThan(2020);
+      expect(await api('get', '/sales/invoice/OFF-ENLINEA-01', ownerToken).then((r) => r.status)).toBe(404);
+    });
+  });
 });

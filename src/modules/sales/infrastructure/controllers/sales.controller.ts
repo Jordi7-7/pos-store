@@ -1,6 +1,7 @@
 import { Controller, Post, Body, Param, Get, Query } from '@nestjs/common';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
-import { ProcessSaleDto } from '../dtos/process-sale.dto';
+import { Sale } from '../../domain/entities/sale.entity';
+import { ProcessOfflineSaleDto, ProcessSaleDto } from '../dtos/process-sale.dto';
 import { ProcessSaleCommand } from '../../application/commands/process-sale/process-sale.command';
 import { OpenCashSessionDto } from '../dtos/open-cash-session.dto';
 import { OpenCashSessionCommand } from '../../application/commands/open-cash-session/open-cash-session.command';
@@ -71,6 +72,36 @@ export class SalesController {
         dto.discountRate,
         dto.discountAmount,
         dto.clientRequestId,
+      ),
+    );
+  }
+
+  /**
+   * Sincroniza una venta hecha sin conexión. Es la misma operación que `POST /sales` (misma lógica de precios, stock y
+   * folio), pero con los tres datos del modo sin conexión obligatorios: así una venta normal no puede cambiar su hora.
+   */
+  @Post('offline')
+  @RequirePermissions(APP_PERMISSIONS.POS_SELL)
+  async processOffline(
+    @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser('sub') userId: string,
+    @Body() dto: ProcessOfflineSaleDto,
+  ): Promise<Sale> {
+    return this.commandBus.execute<ProcessSaleCommand, Sale>(
+      new ProcessSaleCommand(
+        tenantId,
+        userId,
+        dto.branchId,
+        dto.cashSessionId,
+        dto.customerId,
+        dto.items,
+        dto.payments,
+        dto.discountType,
+        dto.discountRate,
+        dto.discountAmount,
+        dto.clientRequestId,
+        new Date(dto.occurredAt),
+        dto.offlineReference,
       ),
     );
   }

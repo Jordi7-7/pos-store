@@ -2,7 +2,7 @@ import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { Logger, HttpStatus } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { ProcessSaleCommand, SalePaymentInput } from './process-sale.command';
-import { Sale, SALE_CLIENT_REQUEST_INDEX } from '../../../domain/entities/sale.entity';
+import { Sale, SALE_CLIENT_REQUEST_INDEX, SALE_OFFLINE_REFERENCE_INDEX } from '../../../domain/entities/sale.entity';
 import { SaleItem } from '../../../domain/entities/sale-item.entity';
 import { SalePayment } from '../../../domain/entities/sale-payment.entity';
 import { ProductVariant } from '../../../../products/domain/entities/product-variant.entity';
@@ -23,6 +23,7 @@ import { reserveInvoiceNumber } from '../shared/invoice-number';
 import { SaleStatus } from '../../../../../common/enums/sale-status.enum';
 import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
+import { resolveSaleTime } from '../../../domain/services/sale-timing';
 import { isUniqueViolation } from '../../../../../common/errors/database-errors';
 import { Money } from '../../../../../common/domain/money';
 
@@ -58,9 +59,15 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
       return await this.entityManager.transaction((manager) => this.register(manager, command, cashSessionId, priced));
     } catch (error) {
       // Dos reintentos simultáneos con el mismo identificador: el segundo choca con el índice único y se revierte entero
-      if (command.clientRequestId && isUniqueViolation(error, SALE_CLIENT_REQUEST_INDEX)) {
+      const clash = isUniqueViolation(error, SALE_CLIENT_REQUEST_INDEX) || isUniqueViolation(error, SALE_OFFLINE_REFERENCE_INDEX);
+      if (command.clientRequestId && clash) {
         const winner = await this.findReplay(command, cashSessionId, priced);
         if (winner) return winner;
+      }
+      // El número provisional ya lo tiene otra venta: error de negocio, nunca la violación cruda
+      if (isUniqueViolation(error, SALE_OFFLINE_REFERENCE_INDEX)) {
+        this.logger.warn(`Sale rejected: offline reference already used in Tenant ${command.tenantId}`);
+        throw new AppException(ErrorCode.OfflineReferenceTaken, 'Ese número provisional ya se usó en otra venta.', HttpStatus.CONFLICT);
       }
       throw error;
     }
@@ -87,7 +94,25 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
       throw new AppException(ErrorCode.IdempotencyKeyReused, 'Ese identificador ya se usó en otra venta distinta.', HttpStatus.CONFLICT);
     }
     this.logger.log(`Sale replay: returning existing sale ${existing.id} for clientRequestId`);
+    await this.adoptOfflineReference(existing, command.offlineReference);
     return existing;
+  }
+
+  /**
+   * La venta llegó al servidor pero la respuesta se perdió: la app la creyó sin conexión, imprimió un número provisional
+   * y la sincroniza después. La venta ya existe, así que solo se le añade ese número para poder buscarla con el ticket.
+   */
+  private async adoptOfflineReference(sale: Sale, offlineReference: string | undefined): Promise<void> {
+    const reference = offlineReference?.trim().toUpperCase();
+    if (!reference || sale.offlineReference) return;
+    try {
+      await this.entityManager.getRepository(Sale).update({ id: sale.id }, { offlineReference: reference });
+      sale.offlineReference = reference;
+    } catch (error) {
+      // Otra venta ya tiene ese número: la venta sigue siendo válida, solo se queda sin alias
+      if (!isUniqueViolation(error, SALE_OFFLINE_REFERENCE_INDEX)) throw error;
+      this.logger.warn(`Offline reference already used; sale ${sale.id} keeps no alias`);
+    }
   }
 
   /** Importes e invariantes monetarias (sin tocar la base de datos): falla rápido ante datos manipulados. */
@@ -123,9 +148,11 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
     const invoiceNumber = await reserveInvoiceNumber(manager, { tenantId, branchId, cashSession });
     const buyerId = await this.resolveBuyerId(manager, tenantId, customerId);
 
-    const { items, movements } = await this.sellItems(manager, command, priced.pricing);
+    // Venta hecha sin conexión: lleva la hora real en que se cobró (acotada al turno abierto y a ahora)
+    const soldAt = resolveSaleTime(command.occurredAt, cashSession.openedAt, new Date());
+    const { items, movements } = await this.sellItems(manager, command, priced.pricing, soldAt);
 
-    const sale = this.buildSale(command, cashSessionId, invoiceNumber, buyerId, priced, items);
+    const sale = this.buildSale(command, cashSessionId, invoiceNumber, buyerId, priced, items, soldAt);
     const savedSale = await manager.getRepository(Sale).save(sale);
     await manager.getRepository(InventoryMovement).save(movements); // kardex
 
@@ -164,7 +191,7 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
    * ordenadas por variante: dos ventas con los mismos productos en distinto orden bloquearían las
    * filas de stock en orden cruzado (deadlock). Los ítems conservan el orden de la venta.
    */
-  private async sellItems(manager: EntityManager, command: ProcessSaleCommand, pricing: SalePricing): Promise<{ items: SaleItem[]; movements: InventoryMovement[] }> {
+  private async sellItems(manager: EntityManager, command: ProcessSaleCommand, pricing: SalePricing, soldAt?: Date): Promise<{ items: SaleItem[]; movements: InventoryMovement[] }> {
     const { tenantId, branchId, items } = command;
     const saleItems = new Array<SaleItem>(items.length);
     const movements: InventoryMovement[] = [];
@@ -213,12 +240,13 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
       movement.quantity = input.quantity;
       movement.type = InventoryMovementType.OUT;
       movement.reason = InventoryMovementReason.VENTA;
+      if (soldAt) movement.createdAt = soldAt;
       movements.push(movement);
     }
     return { items: saleItems, movements };
   }
 
-  private buildSale(command: ProcessSaleCommand, cashSessionId: string, invoiceNumber: string, buyerId: string, priced: PricedSale, items: SaleItem[]): Sale {
+  private buildSale(command: ProcessSaleCommand, cashSessionId: string, invoiceNumber: string, buyerId: string, priced: PricedSale, items: SaleItem[], soldAt?: Date): Sale {
     const { pricing, payments } = priced;
     const hasSaleDiscount = pricing.globalDiscountAmount > 0;
 
@@ -229,6 +257,8 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
     sale.invoiceNumber = invoiceNumber;
     sale.customerId = buyerId;
     sale.clientRequestId = command.clientRequestId ?? null;
+    sale.offlineReference = command.offlineReference?.trim().toUpperCase() || null;
+    if (soldAt) sale.createdAt = soldAt;
     sale.subtotal = pricing.subtotal;
     sale.total = pricing.total;
     sale.itemsDiscountAmount = pricing.itemsDiscountAmount;

@@ -61,6 +61,7 @@ Forma de toda respuesta de error:
 | `DUPLICATE_VARIANT_COMBINATION` | 409 | products | No se permiten múltiples variantes con la misma combinación de atributos en un mismo producto. | — |
 | `EMAIL_TAKEN` | 409 | auth, users | Ese correo ya está registrado en otra cuenta. | `email` |
 | `EMPTY_PURCHASE` | 400 | purchases | La compra debe tener al menos un producto. | — |
+| `FORBIDDEN` | 403 | auth | Solicitud de sesión web no válida. | — |
 | `IDEMPOTENCY_KEY_REUSED` | 409 | sales | Ese identificador ya se usó en otra venta distinta. | — |
 | `IMAGES_NOT_FOUND` | 404 | products | Una o más imágenes de la variante no existen. | — |
 | `IMPORT_EMPTY` | 400 | products, purchases | No se proporcionaron registros para importar. | — |
@@ -80,6 +81,7 @@ Forma de toda respuesta de error:
 | `MEDIA_NOT_FOUND` | 404 | media | Imagen no encontrada. | — |
 | `MEDIA_NOT_OWNED` | 403 | media | El archivo no pertenece a esta tienda. | — |
 | `NO_OPEN_CASH_SESSION` | 409 | sales | No hay una sesión de caja abierta en esta sucursal. | `branchId`, `cashSessionId` |
+| `OFFLINE_REFERENCE_TAKEN` | 409 | sales | Ese número provisional ya se usó en otra venta. | — |
 | `ONBOARDING_UNAUTHORIZED` | 401 | auth | No autorizado | — |
 | `OWNER_ONLY_EDITS_SELF` | 403 | users | Solo el propietario puede modificar su propia cuenta. | — |
 | `PAYLOAD_TOO_LARGE` | 413 | media | La imagen supera el tamaño máximo de {Math.round(maxBytes / 1024 / 1024)} MB. | — |
@@ -122,6 +124,7 @@ Forma de toda respuesta de error:
 | `USER_NOT_AUTHENTICATED` | 403 | auth, common | Usuario no autenticado o no válido para {actionDescription}. | — |
 | `USER_NOT_FOUND` | 401, 404 | auth, sales, users | Usuario no encontrado | `targetUserId` |
 | `USER_NOT_VALID` | 403 | common | Usuario no válido para {actionDescription}. | — |
+| `VALIDATION_FAILED` | 400 | batches | Tipo de lote no válido: {unknown.join(', ')}. | `originTypes` |
 | `VARIANTS_REQUIRED` | 400 | products | Un producto variable debe tener al menos una variante. | — |
 | `VARIANT_HAS_STOCK` | 409 | products | No se puede eliminar la variante porque tiene existencias activas o saldos negativos en inventario. Todas las cantidades deben estar en 0. | — |
 | `VARIANT_NOT_FOUND` | 404 | products, purchases, sales | Variante no encontrada. | `sku`, `variantId` |

@@ -29,5 +29,9 @@ export class ProcessSaleCommand {
     public readonly discountAmount?: number,
     /** Identificador de este intento de cobro, generado por la aplicación: un reintento con el mismo valor no duplica la venta. */
     public readonly clientRequestId?: string,
+    /** Venta hecha sin conexión: hora real en que se cobró. */
+    public readonly occurredAt?: Date,
+    /** Venta hecha sin conexión: número provisional impreso en el comprobante. */
+    public readonly offlineReference?: string,
   ) {}
 }

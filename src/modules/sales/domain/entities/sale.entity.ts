@@ -13,7 +13,11 @@ import { SaleStatus } from '../../../../common/enums/sale-status.enum';
 /** Índice único que impide registrar dos veces la misma venta reintentada por el cliente. */
 export const SALE_CLIENT_REQUEST_INDEX = 'UQ_sales_tenant_client_request';
 
+/** Índice único del número provisional de una venta hecha sin conexión (por tienda). */
+export const SALE_OFFLINE_REFERENCE_INDEX = 'UQ_sales_tenant_offline_reference';
+
 @Entity('sales')
+@Index(SALE_OFFLINE_REFERENCE_INDEX, ['tenantId', 'offlineReference'], { unique: true, where: '"offline_reference" IS NOT NULL' })
 @Index(SALE_CLIENT_REQUEST_INDEX, ['tenantId', 'clientRequestId'], { unique: true, where: '"client_request_id" IS NOT NULL' })
 export class Sale extends BaseEntity {
   @Column({ name: 'tenant_id', type: 'uuid' })
@@ -39,6 +43,10 @@ export class Sale extends BaseEntity {
 
   @Column({ name: 'client_request_id', type: 'varchar', length: 64, nullable: true })
   clientRequestId: string | null;
+
+  /** Número provisional que la aplicación imprimió en el comprobante al vender sin conexión; se puede buscar con él. */
+  @Column({ name: 'offline_reference', type: 'varchar', length: 40, nullable: true })
+  offlineReference: string | null;
 
   @Column({ name: 'customer_id', type: 'uuid', nullable: true })
   customerId: string | null;
