@@ -1,8 +1,8 @@
 {
   "info": {
     "_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-    "name": "Aura POS & ERP API",
-    "description": "Colección completa y documentada de endpoints para Aura POS & ERP.\n\n### Autenticación y Variables\n- `baseUrl`: URL base del servidor (por defecto `http://localhost:3000`).\n- `authToken`: Token JWT obtenido en `/auth/login` o `/auth/pin-login`. Los requests de Login guardan este token automáticamente mediante Test Scripts.\n- `tenantSlug`: Slug de la tienda activa.\n- `branchId`, `cashRegisterId`, etc. se usan como variables reutilizables.",
+    "name": "POS Store API",
+    "description": "Colección completa y documentada de endpoints para POS Store.\n\n### Autenticación y Variables\n- `baseUrl`: URL base del servidor (por defecto `http://localhost:3000`).\n- `authToken`: Token JWT obtenido en `/auth/login` o `/auth/pin-login`. Los requests de Login guardan este token automáticamente mediante Test Scripts.\n- `tenantSlug`: Slug de la tienda activa.\n- `branchId`, `cashRegisterId`, etc. se usan como variables reutilizables.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {

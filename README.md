@@ -92,7 +92,7 @@ docs/                base de datos, despliegue, errores, historia
 - **Autenticación:** `Authorization: Bearer <access token>`; `POST /auth/refresh` rota el refresh token.
 - **Errores:** todas las respuestas de error son `{ statusCode, code, message, details?, path, timestamp, requestId }`. Los clientes deben decidir qué mostrar por **`code`** (ver `docs/error-codes.md`). El `requestId` también viaja en `x-request-id`: pídelo al reportar un fallo.
 
-Colección de ejemplos: `postman/Aura_POS_ERP_API.postman_collection.json`.
+Colección de ejemplos: `postman/POS_Store_API.postman_collection.json`.
 
 ## Reglas para contribuir (resumen)
 
