@@ -32,6 +32,8 @@ src/
 
 Dependencias solo hacia adentro: `infrastructure → application → domain`. `domain` no depende de `application` ni de `infrastructure`; `application` nunca importa de `infrastructure/dtos`. Lo comprueba `architecture.spec.ts`.
 
+**Decisión consciente:** es una arquitectura de tres capas pragmática. Las entidades TypeORM viven en `domain/entities` y los handlers inyectan los repositorios de TypeORM directamente (no hay puertos ni repositorios propios como en el front). No se considera una infracción; lo que importa es que las **reglas de negocio** estén aisladas en funciones puras de `domain/` y que las capas no se crucen al revés.
+
 ---
 
 ## 2. CQRS con comandos y consultas planos
@@ -56,7 +58,7 @@ process(@CurrentUser('tenantId') tenantId: string, @CurrentUser('sub') userId: s
 - Un handler largo se **trocea en métodos privados con nombre** (`validateInput`, `resolveReferences`, `buildVariants`, `reserveInvoiceNumber`…); el método público cuenta la historia en pocas líneas.
 - Lo que se repite entre handlers va a un **servicio** (`recordInitialStock`, `receiveStock`, `consumeStock`, `assertBaseSkuAvailable`, `translatingSkuConflict`).
 - Nombres y comentarios en español, comentarios que explican el **porqué**, no el qué.
-- Nada de `any` (ni `as any`), ni silenciar el lint. Si una infracción heredada desaparece, `pnpm lint:prune`.
+- Nada de `any` (ni `as any`) ni silenciar el lint en código nuevo. La deuda heredada solo baja: si una infracción desaparece, `pnpm lint:prune`.
 
 ---
 

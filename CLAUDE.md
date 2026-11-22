@@ -1,6 +1,6 @@
 # CLAUDE.md — backend `pos-store`
 
-Contexto y reglas para cualquier sesión de trabajo en este repositorio. **Léelo entero antes de cambiar código.** Detalle: `architecture_guide.md` (arquitectura), `docs/database.md`, `docs/deployment.md`, `docs/error-codes.md`, `docs/project-history.md` (historia, decisiones y pendiente).
+Contexto y reglas para cualquier sesión de trabajo en este repositorio. **Léelo entero antes de cambiar código.** Detalle: `architecture_guide.md` (arquitectura), `docs/database.md`, `docs/deployment.md`, `docs/error-codes.md`, `docs/project-history.md` (historia y porqué de las decisiones). **Estado actual, cifras y pendientes: `docs/estado.md`** (caduca; contrástalo con `git log`/`git status`).
 
 ## Quién y cómo
 - El dueño del proyecto habla **español**: responde en español. Comentarios y mensajes de usuario en español; **mensajes de commit en inglés** (convencionales: `feat(scope):`, `fix(scope):`, `refactor:`, `test:`, `docs:`).
@@ -18,14 +18,16 @@ Contexto y reglas para cualquier sesión de trabajo en este repositorio. **Léel
 - **Tenant explícito:** `tenantId` del JWT en cada comando/consulta y cada handler filtra por él. Nada implícito.
 - **DTOs** en `infrastructure/dtos`; comandos/consultas **planos**; `application` no importa de `infrastructure`.
 - **Errores:** solo `AppException(ErrorCode.X, …)` / `DomainError`; el front decide por `code`. Documenta cada código (`python3 scripts/generate-error-catalog.py`).
-- **Cero `any`**; el lint estricto no se silencia. La deuda heredada (`eslint-suppressions.json`) solo baja (`pnpm lint:prune`).
+- **Cero `any`** en código nuevo; el lint estricto no se silencia. La deuda heredada (`eslint-suppressions.json`) solo baja (`pnpm lint:prune`): al tocar un archivo con supresiones, no añadas más.
+- **Arquitectura pragmática de tres capas (a diferencia del front):** las entidades TypeORM viven en `domain/` y los handlers usan los repositorios de TypeORM directamente; no hay puertos. Es una decisión consciente, no una infracción: lo que se vigila es que `domain` no dependa de `application`/`infrastructure` y que `application` no importe `infrastructure/dtos` (`architecture.spec.ts`). Las reglas de negocio no triviales van como funciones puras en `domain/`.
 - **Estados como `varchar` en la BD**, `enum` solo en el código (el dueño rechazó enums de Postgres). Columnas con enum de TS: `type: 'varchar'` explícito.
 - **Dinero con `Money`** (centavos exactos), nunca `number` con flotantes. Devoluciones de ventas con tarjeta siguen restando efectivo de la caja (decisión actual).
 - **Sucursales:** quien no es propietario necesita asignación explícita; el propietario (`isOwner`) lo puede todo. Cualquier cajero asignado a una caja puede usar su turno abierto. El cajero puede cambiar el precio a mano.
 - **Nadie concede más permisos de los que tiene** (`PERMISSION_ESCALATION`).
 - **SKU** en MAYÚSCULAS y recortado en todo el sistema (`normalizeSku`); SKU base único por tienda; el SKU base no puede coincidir con el SKU de una variante de otro producto.
 - **CONSUMIDOR FINAL** (`9999999999999`) es el comprador por defecto e intocable. `clientRequestId` en ventas es opcional hoy, **obligatorio en el futuro**.
-- **Backend primero, luego el front** (Fase 3), luego móvil, luego infra y `test-docker`.
+- **Backend primero** cuando un cambio toca el contrato de la API; después el front y el móvil.
+- **Offline (solo ventas, móvil):** `POST /sales/offline` (idempotente, conserva la hora real), `GET /products/pos/catalog` (por cambios) y `GET /products/pos/stock?branchId=`. Detalle en `docs/deployment.md`.
 - Stack fijado: TS 6.0.x, pnpm 11, Node 24, NestJS 11, Postgres 16, Redis 7.
 
 ## Comandos
@@ -37,7 +39,7 @@ pnpm migration:run                            # BD local de desarrollo
 pnpm lint:prune                               # tras arreglar infracciones heredadas
 python3 scripts/generate-error-catalog.py     # tras añadir un ErrorCode
 ```
-Cifras de referencia al cierre de la fase backend: **431 unitarios + 313 de integración en verde**, 131 supresiones de lint (empezó en 538), los 93 handlers cubiertos. Si una cifra baja, algo se rompió.
+Si bajan los tests o suben las supresiones de lint, algo se rompió (últimas cifras en `docs/estado.md`).
 
 ## Cómo trabajar un cambio (checklist)
 **Funcionalidad nueva (handler)**
@@ -80,6 +82,3 @@ Cifras de referencia al cierre de la fase backend: **431 unitarios + 313 de inte
 - Arranque HTTP común: `src/app.setup.ts`. Entorno: `src/config/env.validation.ts`.
 - Reglas automáticas: `src/architecture.spec.ts`, `src/common/security/endpoint-access.spec.ts`.
 - Tests de integración y su infraestructura: `test/integration/`, `test/integration/support/`.
-
-## Pendiente (resumen; completo en `docs/project-history.md` §6)
-Probar front y móvil contra este backend (nunca hecho) → Fase 3 (front web con Clean Architecture, consumiendo `code`) → Fase 4 móvil → Fase 5 infra. Antes de desplegar: rotar los secretos (recomendado), comprobaciones de duplicados y backup (`docs/deployment.md`). En el backend: 131 supresiones de lint, y el Administrador por defecto recibe casi todos los permisos (decisión pendiente del dueño).
