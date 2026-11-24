@@ -6,7 +6,7 @@
 | Comprobación | Resultado | Fecha |
 |---|---|---|
 | `pnpm test` (unitarios) | 488 en verde, 75 suites | 2026-11-24 |
-| `pnpm test:integration` | 483 en verde, 31 suites (Postgres y Redis reales); `web-auth-flow` › logout es intermitente (ver abajo) | 2026-11-24 |
+| `pnpm test:integration` | 499 en verde, 33 suites (Postgres y Redis reales); `web-auth-flow` › logout es intermitente (ver abajo) | 2026-11-24 |
 | `scripts/reconcile-inventory.sql` (base de desarrollo) | documentos y contadores coherentes; cadena de saldos del kardex sin anomalías; **7 de 7.502** filas de existencia no cuadran con las capas FIFO (ver abajo) | 2026-11-24 |
 | Supresiones de lint (`eslint-suppressions.json`) | 131 (empezó en 538) | 2026-11-22 |
 
@@ -15,7 +15,8 @@ Si una cifra baja o las supresiones suben, algo se rompió.
 ## Dónde está
 - Refactor del backend **terminado y desplegado** (según el dueño, 2026-11-09). La web y el móvil ya se probaron contra este backend.
 - **Offline (solo ventas, móvil):** `POST /sales/offline`, `GET /products/pos/catalog` y `GET /products/pos/stock?branchId=` hechos y commiteados (2026-11-11). Detalle en `deployment.md`.
-- **Trabajo en curso sin commit (2026-11-22):** documentos de inventario (ingreso/ajuste/conteo/traspaso) con migraciones `1794…` nuevas y permisos de stock. No lo comitees sin preguntar.
+- **Documentos de inventario y kardex completo:** entradas, salidas, conteos y traslados, con las migraciones `1794…` (comiteado el 2026-11-24).
+- **Filtro de existencias del listado de productos:** `GET /products?stockStatus=IN_STOCK|ZERO|NEGATIVE`, resuelto en SQL (`stock-status-filter.ts`). El parámetro antiguo `inStockOnly` se mantiene como alias de `IN_STOCK` hasta que no quede una web que lo envíe.
 
 ## Conciliación de inventario
 `scripts/reconcile-inventory.sql` (solo lectura) compara la existencia (`product_stocks`) con las capas FIFO y revisa los documentos y su numeración. En la base de **desarrollo** hay 7 filas de la tienda de pruebas que no cuadran (CAM-001, HL6895, HM-130, HM130, HM131, KH8784, WA0436); son anteriores a los documentos de inventario (último movimiento entre agosto y octubre) y el dueño decidió **dejarlas** porque son datos de prueba (2026-11-22). Ejecutar el script en producción antes y después de migrar (`deployment.md` §4).
