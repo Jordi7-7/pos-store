@@ -27,6 +27,8 @@ Contexto y reglas para cualquier sesión de trabajo en este repositorio. **Léel
 - **SKU** en MAYÚSCULAS y recortado en todo el sistema (`normalizeSku`); SKU base único por tienda; el SKU base no puede coincidir con el SKU de una variante de otro producto.
 - **CONSUMIDOR FINAL** (`9999999999999`) es el comprador por defecto e intocable. `clientRequestId` en ventas es opcional hoy, **obligatorio en el futuro**.
 - **Backend primero** cuando un cambio toca el contrato de la API; después el front y el móvil.
+- **Kardex:** una línea siempre se crea con `newKardexLine` (categoría, costo y saldo obligatorios); la clasificación para filtrar es `category`, no `reason`. Ver `architecture_guide.md` §6.
+- **Costo promedio:** solo lo mueven las compras (y su cancelación) y la edición manual de la variante; **los documentos de inventario nunca** (decisión del dueño). Detalle y fuentes de cantidades del inventario en `architecture_guide.md` §6.
 - **Offline (solo ventas, móvil):** `POST /sales/offline` (idempotente, conserva la hora real), `GET /products/pos/catalog` (por cambios) y `GET /products/pos/stock?branchId=`. Detalle en `docs/deployment.md`.
 - Stack fijado: TS 6.0.x, pnpm 11, Node 24, NestJS 11, Postgres 16, Redis 7.
 
@@ -38,6 +40,7 @@ pnpm build
 pnpm migration:run                            # BD local de desarrollo
 pnpm lint:prune                               # tras arreglar infracciones heredadas
 python3 scripts/generate-error-catalog.py     # tras añadir un ErrorCode
+psql … -X -f scripts/reconcile-inventory.sql  # conciliación de inventario (solo lectura): existencia vs capas FIFO y documentos
 ```
 Si bajan los tests o suben las supresiones de lint, algo se rompió (últimas cifras en `docs/estado.md`).
 

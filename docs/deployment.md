@@ -99,7 +99,7 @@ A quien salga, genera un PIN nuevo desde Usuarios → «Generar PIN» (lo muestr
 ## 4. Orden de despliegue
 
 1. **Copia de seguridad** de la base: `pg_dump -Fc -h <host> -U <usuario> <base> > pos_store_$(date +%F).dump`. Comprueba que el archivo no está vacío. Es la única vía de vuelta para las migraciones irreversibles (§5).
-2. Ejecuta las **comprobaciones de datos** (§3) y resuélvelas.
+2. Ejecuta las **comprobaciones de datos** (§3) y resuélvelas. Ejecuta también la **conciliación de inventario** (solo lectura) y guarda su salida para compararla después del paso 6: `psql -h <host> -U <usuario> -d <base> -X -f scripts/reconcile-inventory.sql`. Comprueba que la existencia (`product_stocks`) coincide con las capas FIFO (`product_batches`), que los documentos de inventario y su numeración son coherentes, que no hay movimientos con una dirección que no sea `IN` ni `OUT` (sección E2: **si hay alguno, resuélvelo antes de migrar**) y, después de migrar, que la cadena de saldos del kardex cuadra con la existencia (sección F); el resultado esperado son ceros. Si una fila no cuadra, no la corrijas con SQL a mano: investígala y corrígela con un conteo físico para que quede historial.
 3. **Ventana tranquila** (poco tráfico): la migración de índices bloquea escrituras mientras los crea (no se usa `CONCURRENTLY` porque TypeORM ejecuta las migraciones en una transacción).
 4. Ejecuta las **migraciones como un paso aparte**, antes de arrancar la API nueva:
    ```bash
@@ -107,7 +107,7 @@ A quien salga, genera un PIN nuevo desde Usuarios → «Generar PIN» (lo muestr
    ```
    Comprueba cuáles faltan antes: `pnpm typeorm migration:show -d dist/config/data-source.js` (`[ ]` = pendiente). Todas corren en **una sola transacción**: si una falla, no se aplica ninguna.
 5. Arranca la **nueva versión de la API** (`node dist/main`). Con las migraciones aplicadas el código nuevo funciona; con la versión antigua de la API y la base ya migrada, también (las migraciones son compatibles hacia atrás salvo lo indicado en §5).
-6. **Verificación posterior** (§7).
+6. **Verificación posterior** (§7). Vuelve a ejecutar `scripts/reconcile-inventory.sql` y compara con la salida del paso 2: no debe aparecer ninguna fila nueva que no cuadre.
 
 > **Importante:** el código nuevo **falla con un 500** si la base no tiene las migraciones (por ejemplo `column Sale.client_request_id does not exist`). Migra siempre antes de arrancar la API.
 
@@ -126,6 +126,8 @@ A quien salga, genera un PIN nuevo desde Usuarios → «Generar PIN» (lo muestr
 | `1793700000000` NormalizeVariantSkusToUppercase | Todos los SKU de variante recortados y en MAYÚSCULAS | **Irreversible** (no recupera la capitalización). Se detiene si hay duplicados (§3.4) |
 | `1793800000000` AddOfflineReferenceToSales | Columna `offline_reference` + índice único por tienda (número provisional de las ventas hechas sin conexión) | Bajo: solo añade una columna opcional |
 | `1793900000000` AddProductStocksChangeIndex | Índice parcial `(branch_id, updated_at, variant_id)` en `product_stocks` para descargar existencias por cambios | Bajo: solo añade un índice (se crea bloqueando escrituras de esa tabla unos segundos; hacerla en ventana tranquila) |
+| `1794000000000` CreateInventoryDocuments | Tablas `inventory_documents` y `inventory_document_counters` (número por tienda y tipo: ENT, SAL, CNT, TRS) y, en el kardex, columnas `document_id`, `category` (clase de operación, **rellenada** para las filas existentes a partir del motivo), `unit_cost` y `balance_after`; `document_id` también en `batches` | Bajo: columnas y tablas nuevas, todas opcionales. Incluye un `UPDATE` de `category` sobre todo `inventory_movements`: en tablas grandes puede tardar y bloquea escrituras de esa tabla mientras corre; hacerla en ventana tranquila. Las filas anteriores quedan con costo y saldo nulos (no se pueden reconstruir). `down` borra las tablas y columnas nuevas (se pierden los documentos) |
+| `1794100000000` GrantStockPermissionsToExistingRoles | Todo rol y todo usuario con permisos propios que tenía `action:products.adjust_stock` recibe también `stock_entry`, `stock_exit`, `stock_count` y `stock_transfer` | **Amplía permisos:** conteo y traslado son capacidades nuevas que esos roles no tenían. Idempotente. El `down` quita esos cuatro permisos a **cualquiera** que los tenga, también a quien los recibió por otra vía |
 
 Las anteriores (`1792699800000` en adelante: propietario sin rol, usuario obligatorio, etc.) también pueden estar pendientes: confírmalo con `migration:show`.
 
