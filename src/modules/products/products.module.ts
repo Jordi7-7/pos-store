@@ -26,11 +26,17 @@ import { UpdateVariantHandler } from './application/commands/update-variant/upda
 import { DeleteProductHandler } from './application/commands/delete-product/delete-product.handler';
 import { CreateVariantHandler } from './application/commands/create-variant/create-variant.handler';
 import { DeleteVariantHandler } from './application/commands/delete-variant/delete-variant.handler';
-import { AdjustStockHandler } from './application/commands/adjust-stock/adjust-stock.handler';
 import { ImportProductsHandler } from './application/commands/import-products/import-products.handler';
 import { ValidateImportProductsHandler } from './application/queries/validate-import-products/validate-import-products.handler';
 import { GetAttributesHandler } from './application/queries/get-attributes/get-attributes.handler';
 import { GetInventoryMovementsByVariantHandler } from './application/queries/get-inventory-movements-by-variant/get-inventory-movements-by-variant.handler';
+import { GetInventoryMovementsHandler } from './application/queries/get-inventory-movements/get-inventory-movements.handler';
+import { GetInventoryDocumentHandler } from './application/queries/get-inventory-document/get-inventory-document.handler';
+import { CreateInventoryDocumentHandler } from './application/commands/create-inventory-document/create-inventory-document.handler';
+import { CreateStockCountHandler } from './application/commands/create-stock-count/create-stock-count.handler';
+import { GetStockCountSheetHandler } from './application/queries/get-stock-count-sheet/get-stock-count-sheet.handler';
+import { CreateStockTransferHandler } from './application/commands/create-stock-transfer/create-stock-transfer.handler';
+import { InventoryDocument } from './domain/entities/inventory-document.entity';
 import { GetTagsHandler } from './application/queries/get-tags/get-tags.handler';
 import { CreateTagHandler } from './application/commands/create-tag/create-tag.handler';
 import { UpdateVariantTagsHandler } from './application/commands/update-variant-tags/update-variant-tags.handler';
@@ -54,6 +60,7 @@ import { ProductsController } from './infrastructure/controllers/products.contro
       ProductStock,
       ProductBatch,
       InventoryMovement,
+      InventoryDocument,
       ProductImage,
       Category,
       Tag,
@@ -77,7 +84,12 @@ import { ProductsController } from './infrastructure/controllers/products.contro
     DeleteProductHandler,
     CreateVariantHandler,
     DeleteVariantHandler,
-    AdjustStockHandler,
+    GetInventoryMovementsHandler,
+    GetInventoryDocumentHandler,
+    CreateInventoryDocumentHandler,
+    CreateStockCountHandler,
+    CreateStockTransferHandler,
+    GetStockCountSheetHandler,
     ImportProductsHandler,
     ValidateImportProductsHandler,
     GetAttributesHandler,

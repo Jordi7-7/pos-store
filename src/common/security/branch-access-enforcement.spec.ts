@@ -2,8 +2,9 @@ import { ForbiddenException } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { RedisService } from '../redis/redis.service';
 import * as branchAccess from './branch-access.helper';
-import { AdjustStockCommand } from '../../modules/products/application/commands/adjust-stock/adjust-stock.command';
-import { AdjustStockHandler } from '../../modules/products/application/commands/adjust-stock/adjust-stock.handler';
+import { CreateInventoryDocumentCommand } from '../../modules/products/application/commands/create-inventory-document/create-inventory-document.command';
+import { CreateInventoryDocumentHandler } from '../../modules/products/application/commands/create-inventory-document/create-inventory-document.handler';
+import { InventoryDocumentKind } from '../enums/inventory-document-kind.enum';
 import { ImportProductsCommand } from '../../modules/products/application/commands/import-products/import-products.command';
 import { ImportProductsHandler } from '../../modules/products/application/commands/import-products/import-products.handler';
 import { CancelPurchaseOrderCommand } from '../../modules/purchases/application/commands/cancel-purchase-order/cancel-purchase-order.command';
@@ -12,7 +13,6 @@ import { ImportPurchasesCommand } from '../../modules/purchases/application/comm
 import { ImportPurchasesHandler } from '../../modules/purchases/application/commands/import-purchases/import-purchases.handler';
 import { RegisterPurchaseCommand } from '../../modules/purchases/application/commands/register-purchase/register-purchase.command';
 import { RegisterPurchaseHandler } from '../../modules/purchases/application/commands/register-purchase/register-purchase.handler';
-import { InventoryMovementType } from '../enums/inventory-movement-type.enum';
 
 /**
  * Todo comando que escribe stock en una sucursal debe verificar que el usuario tiene
@@ -46,8 +46,8 @@ describe('Acceso a sucursal en comandos de stock y compras', () => {
 
   const cases: Array<[string, () => Promise<unknown>, string]> = [
     [
-      'AdjustStock',
-      () => new AdjustStockHandler(entityManager, redis).execute(new AdjustStockCommand('t1', 'u1', 'b1', 'v1', 1, InventoryMovementType.IN)),
+      'CreateInventoryDocument',
+      () => new CreateInventoryDocumentHandler(entityManager, redis).execute(new CreateInventoryDocumentCommand('t1', 'u1', 'b1', InventoryDocumentKind.ENTRY, 'DONACION', [{ variantId: 'v1', quantity: 1 }])),
       'b1',
     ],
     [

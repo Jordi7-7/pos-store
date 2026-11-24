@@ -1,6 +1,5 @@
 import { DataSource } from 'typeorm';
-import { AdjustStockCommand } from '../../src/modules/products/application/commands/adjust-stock/adjust-stock.command';
-import { AdjustStockHandler } from '../../src/modules/products/application/commands/adjust-stock/adjust-stock.handler';
+import { adjustStock } from './support/stock-adjustment';
 import { BatchStatus, Batch } from '../../src/modules/batches/domain/entities/batch.entity';
 import { InventoryMovement } from '../../src/modules/products/domain/entities/inventory-movement.entity';
 import { ProductBatch } from '../../src/modules/products/domain/entities/product-batch.entity';
@@ -57,7 +56,7 @@ describe('Compras: registrar, importar y cancelar', () => {
   const countOrders = (): Promise<number> => db.getRepository(PurchaseOrder).countBy({ tenantId: shop.tenantId });
 
   const adjust = (variantId: string, quantity: number, type: InventoryMovementType) =>
-    new AdjustStockHandler(db.manager, redisStub).execute(new AdjustStockCommand(shop.tenantId, shop.ownerId, shop.branchId, variantId, quantity, type));
+    adjustStock(db.manager, redisStub, { tenantId: shop.tenantId, userId: shop.ownerId, branchId: shop.branchId, variantId, quantity, type });
 
   beforeAll(async () => {
     database = await startTestDatabase('purchases');

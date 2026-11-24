@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Put, Delete, Body, Param, Query, ParseUUIDPipe } from '@nestjs/common';
+import { Controller, Post, Get, Put, Delete, Body, Param, Query, ParseUUIDPipe, HttpStatus } from '@nestjs/common';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
 import { CreateVariableProductDto, ProductVariantDto, CreateSimpleProductDto } from '../dtos/create-product.dto';
 import { CreateSimpleProductCommand } from '../../application/commands/create-simple-product/create-simple-product.command';
@@ -28,8 +28,24 @@ import { UpdateVariantCommand } from '../../application/commands/update-variant/
 import { DeleteProductCommand } from '../../application/commands/delete-product/delete-product.command';
 import { DeleteVariantCommand } from '../../application/commands/delete-variant/delete-variant.command';
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
-import { AdjustStockDto } from '../dtos/adjust-stock.dto';
-import { AdjustStockCommand } from '../../application/commands/adjust-stock/adjust-stock.command';
+import { InventoryMovementsFilterDto } from '../dtos/inventory-movements-filter.dto';
+import { InventoryMovementReason } from '../../../../common/enums/inventory-movement-reason.enum';
+import { permissionForDocumentKind } from '../../domain/services/inventory-document-rules';
+import type { JwtUserPayload } from '../../../auth/interfaces/jwt-user-payload.interface';
+import { meetsRequirement } from '../../../auth/domain/permission-check';
+import { AppException } from '../../../../common/errors/app.exception';
+import { ErrorCode } from '../../../../common/errors/error-codes';
+import { StockCountSheetFilterDto } from '../dtos/stock-count-sheet.dto';
+import { GetStockCountSheetQuery } from '../../application/queries/get-stock-count-sheet/get-stock-count-sheet.query';
+import { StockCountSheetPage } from '../../application/read-models/stock-count-sheet';
+import { CreateStockTransferDto } from '../dtos/create-stock-transfer.dto';
+import { CreateStockTransferCommand } from '../../application/commands/create-stock-transfer/create-stock-transfer.command';
+import { CreateStockCountDto } from '../dtos/create-stock-count.dto';
+import { CreateStockCountCommand } from '../../application/commands/create-stock-count/create-stock-count.command';
+import { CreateInventoryDocumentDto } from '../dtos/create-inventory-document.dto';
+import { CreateInventoryDocumentCommand } from '../../application/commands/create-inventory-document/create-inventory-document.command';
+import { InventoryDocumentDetail, InventoryDocumentResult } from '../../application/read-models/inventory-document';
+import { GetInventoryDocumentQuery } from '../../application/queries/get-inventory-document/get-inventory-document.query';
 import { ValidateImportProductsDto, ImportProductsDto } from '../dtos/import-products.dto';
 import { ImportProductsCommand } from '../../application/commands/import-products/import-products.command';
 import { ValidateImportProductsQuery } from '../../application/queries/validate-import-products/validate-import-products.query';
@@ -48,8 +64,9 @@ import { PaginatedProductsResponseDto } from '../../application/read-models/prod
 import { PosVariantListItem, VariantLookupResponse } from '../../application/read-models/pos-variant-response';
 import { FindPosVariantsBySkuQuery } from '../../application/queries/find-pos-variants-by-sku/find-pos-variants-by-sku.query';
 import { PosSkuSearchResult } from '../../application/queries/find-pos-variants-by-sku/find-pos-variants-by-sku.handler';
+import { GetInventoryMovementsQuery } from '../../application/queries/get-inventory-movements/get-inventory-movements.query';
+import { InventoryMovementHistoryPage } from '../../application/read-models/inventory-movement-history';
 import { InventoryMovementsPage } from '../../application/queries/get-inventory-movements-by-variant/get-inventory-movements-by-variant.handler';
-import { AdjustStockResult } from '../../application/commands/adjust-stock/adjust-stock.handler';
 import { ImportValidationResult } from '../../application/queries/validate-import-products/validate-import-products.handler';
 import { ImportProductsResult } from '../../application/commands/import-products/import-products.handler';
 import { CreateTagDto, UpdateVariantTagsDto } from '../dtos/tag.dto';
@@ -187,6 +204,62 @@ export class ProductsController {
     );
   }
 
+  /** Historial global de movimientos de inventario (kardex), con filtros. */
+  @Get('inventory-movements')
+  @RequirePermissions(APP_PERMISSIONS.PRODUCTS_GET)
+  async getInventoryMovements(
+    @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser('sub') userId: string,
+    @CurrentUser('isOwner') isOwner: boolean,
+    @Query() filters: InventoryMovementsFilterDto,
+  ) {
+    return this.queryBus.execute<GetInventoryMovementsQuery, InventoryMovementHistoryPage>(
+      new GetInventoryMovementsQuery(tenantId, userId, isOwner, {
+        page: parsePage(filters.page),
+        limit: parseLimit(filters.limit),
+        branchId: filters.branchId,
+        type: filters.type,
+        category: filters.category,
+        reason: filters.reason,
+        variantId: filters.variantId,
+        search: filters.search,
+        startDate: filters.startDate,
+        endDate: filters.endDate,
+      }),
+    );
+  }
+
+  /** Un documento de inventario con todas sus líneas (se abre desde el historial de movimientos). */
+  @Get('inventory-documents/:id')
+  @RequirePermissions(APP_PERMISSIONS.PRODUCTS_GET)
+  async getInventoryDocument(
+    @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser('sub') userId: string,
+    @CurrentUser('isOwner') isOwner: boolean,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.queryBus.execute<GetInventoryDocumentQuery, InventoryDocumentDetail>(new GetInventoryDocumentQuery(tenantId, userId, isOwner, id));
+  }
+
+  /** Variantes de una sucursal con su existencia, por SKU y paginadas, para armar un conteo físico. */
+  @Get('stock-count-sheet')
+  @RequirePermissions(APP_PERMISSIONS.PRODUCTS_STOCK_COUNT)
+  async getStockCountSheet(
+    @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser('sub') userId: string,
+    @CurrentUser('isOwner') isOwner: boolean,
+    @Query() filters: StockCountSheetFilterDto,
+  ) {
+    return this.queryBus.execute<GetStockCountSheetQuery, StockCountSheetPage>(
+      new GetStockCountSheetQuery(tenantId, userId, isOwner, filters.branchId, {
+        categoryId: filters.categoryId,
+        onlyWithStock: filters.onlyWithStock === true,
+        after: filters.after,
+        limit: parseLimit(filters.limit),
+      }),
+    );
+  }
+
   @Get('inventory-movements-by-variant')
   @RequirePermissions(APP_PERMISSIONS.PRODUCTS_GET)
   async getMovementsByVariant(
@@ -209,23 +282,47 @@ export class ProductsController {
     ));
   }
 
-  @Post('stock-adjustments')
-  @RequirePermissions(APP_PERMISSIONS.PRODUCTS_ADJUST_STOCK)
-  async adjustStock(
+  /** Entrada o salida manual de varios productos en una sucursal, todo o nada. */
+  @Post('inventory-documents')
+  @RequireAnyPermissions(APP_PERMISSIONS.PRODUCTS_STOCK_ENTRY, APP_PERMISSIONS.PRODUCTS_STOCK_EXIT)
+  async createInventoryDocument(
+    @CurrentUser() user: JwtUserPayload,
     @CurrentUser('tenantId') tenantId: string,
     @CurrentUser('sub') userId: string,
-    @Body() dto: AdjustStockDto,
+    @Body() dto: CreateInventoryDocumentDto,
   ) {
-    return this.commandBus.execute<AdjustStockCommand, AdjustStockResult>(
-      new AdjustStockCommand(
-        tenantId,
-        userId,
-        dto.branchId,
-        dto.variantId,
-        dto.quantity,
-        dto.type,
-        dto.comment,
-      ),
+    // El permiso depende del tipo: quien puede sacar mercancía no necesariamente puede meterla
+    if (!meetsRequirement(user, { all: [permissionForDocumentKind(dto.kind)] })) {
+      throw new AppException(ErrorCode.PermissionDenied, 'No tienes permisos suficientes para realizar esta acción.', HttpStatus.FORBIDDEN);
+    }
+    return this.commandBus.execute<CreateInventoryDocumentCommand, InventoryDocumentResult>(
+      new CreateInventoryDocumentCommand(tenantId, userId, dto.branchId, dto.kind, dto.reason, dto.lines, dto.comment, dto.clientRequestId),
+    );
+  }
+
+  /** Conteo físico de varios productos: corrige las existencias con la diferencia contada. */
+  @Post('stock-counts')
+  @RequirePermissions(APP_PERMISSIONS.PRODUCTS_STOCK_COUNT)
+  async createStockCount(
+    @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser('sub') userId: string,
+    @Body() dto: CreateStockCountDto,
+  ) {
+    return this.commandBus.execute<CreateStockCountCommand, InventoryDocumentResult>(
+      new CreateStockCountCommand(tenantId, userId, dto.branchId, InventoryMovementReason.CONTEO_FISICO, dto.lines, dto.comment, dto.clientRequestId, dto.acceptStockChanges === true),
+    );
+  }
+
+  /** Traslado de varios productos entre dos sucursales, instantáneo y todo o nada. */
+  @Post('stock-transfers')
+  @RequirePermissions(APP_PERMISSIONS.PRODUCTS_STOCK_TRANSFER)
+  async createStockTransfer(
+    @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser('sub') userId: string,
+    @Body() dto: CreateStockTransferDto,
+  ) {
+    return this.commandBus.execute<CreateStockTransferCommand, InventoryDocumentResult>(
+      new CreateStockTransferCommand(tenantId, userId, dto.originBranchId, dto.destinationBranchId, InventoryMovementReason.TRASLADO, dto.lines, dto.comment, dto.clientRequestId),
     );
   }
 

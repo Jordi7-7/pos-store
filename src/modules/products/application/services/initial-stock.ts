@@ -1,9 +1,11 @@
 import { EntityManager } from 'typeorm';
 import { Batch, BatchOriginType } from '../../../batches/domain/entities/batch.entity';
+import { InventoryMovementCategory } from '../../../../common/enums/inventory-movement-category.enum';
 import { InventoryMovementReason } from '../../../../common/enums/inventory-movement-reason.enum';
 import { InventoryMovementType } from '../../../../common/enums/inventory-movement-type.enum';
 import { InventoryMovement } from '../../domain/entities/inventory-movement.entity';
 import { ProductBatch } from '../../domain/entities/product-batch.entity';
+import { newKardexLine } from './kardex';
 
 export interface InitialStockEntry {
   branchId: string;
@@ -48,18 +50,20 @@ export async function recordInitialStock(manager: EntityManager, tenantId: strin
     }),
   );
 
+  // La fila de stock nace con esa cantidad, así que el saldo tras el movimiento es la propia cantidad
   await manager.getRepository(InventoryMovement).save(
-    received.map((entry) => {
-      const movement = new InventoryMovement();
-      movement.tenantId = tenantId;
-      movement.originBranchId = null;
-      movement.destinationBranchId = entry.branchId;
-      movement.variantId = entry.variantId;
-      movement.purchaseOrderId = null;
-      movement.quantity = Number(entry.quantity);
-      movement.type = InventoryMovementType.IN;
-      movement.reason = InventoryMovementReason.INITIAL_STOCK;
-      return movement;
-    }),
+    received.map((entry) =>
+      newKardexLine({
+        tenantId,
+        variantId: entry.variantId,
+        quantity: Number(entry.quantity),
+        type: InventoryMovementType.IN,
+        category: InventoryMovementCategory.INITIAL,
+        reason: InventoryMovementReason.INITIAL_STOCK,
+        branchId: entry.branchId,
+        unitCost: entry.unitCost,
+        balanceAfter: Number(entry.quantity),
+      }),
+    ),
   );
 }

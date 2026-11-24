@@ -1,8 +1,7 @@
 import { DataSource } from 'typeorm';
 import { InventoryMovementType } from '../../src/common/enums/inventory-movement-type.enum';
 import { Branch } from '../../src/modules/branches/domain/entities/branch.entity';
-import { AdjustStockCommand } from '../../src/modules/products/application/commands/adjust-stock/adjust-stock.command';
-import { AdjustStockHandler } from '../../src/modules/products/application/commands/adjust-stock/adjust-stock.handler';
+import { adjustStock } from './support/stock-adjustment';
 import { GetInventoryMovementsByVariantHandler } from '../../src/modules/products/application/queries/get-inventory-movements-by-variant/get-inventory-movements-by-variant.handler';
 import { GetInventoryMovementsByVariantQuery } from '../../src/modules/products/application/queries/get-inventory-movements-by-variant/get-inventory-movements-by-variant.query';
 import { CancelPurchaseOrderCommand } from '../../src/modules/purchases/application/commands/cancel-purchase-order/cancel-purchase-order.command';
@@ -102,7 +101,7 @@ describe('Consultas de compras, kardex y roles', () => {
       const find = async (id: string) => (await purchases(owner())).data.find((o) => o.id === id);
       expect((await find(secondOrder.id))?.isCancellable).toBe(true);
 
-      await new AdjustStockHandler(db.manager, redisStub).execute(new AdjustStockCommand(shop.tenantId, shop.ownerId, shop.branchId, otherVariantId, 1, InventoryMovementType.OUT));
+      await adjustStock(db.manager, redisStub, { tenantId: shop.tenantId, userId: shop.ownerId, branchId: shop.branchId, variantId: otherVariantId, quantity: 1, type: InventoryMovementType.OUT });
       expect((await find(secondOrder.id))?.isCancellable).toBe(false);
 
       await new CancelPurchaseOrderHandler(db.manager, redisStub).execute(new CancelPurchaseOrderCommand(shop.tenantId, shop.ownerId, northOrder.id));

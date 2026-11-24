@@ -378,4 +378,228 @@ describe('API por HTTP: flujo completo y contrato de errores', () => {
       expect(await api('get', '/sales/invoice/OFF-ENLINEA-01', ownerToken).then((r) => r.status)).toBe(404);
     });
   });
+
+  describe('entradas y salidas manuales de inventario (POST /products/inventory-documents)', () => {
+    const body = (overrides: Record<string, unknown> = {}) => ({ branchId, kind: 'ENTRY', reason: 'DONACION', comment: 'Muestra', lines: [{ variantId, quantity: 2 }], ...overrides });
+
+    it('registra una entrada: 201 con número, líneas y sin campos de más', async () => {
+      const response = await api('post', '/products/inventory-documents', ownerToken).send(body({ isOwner: true, tenantId: 'otro' }));
+
+      expect(response.status).toBe(201);
+      expect(response.body).toMatchObject({ number: expect.stringMatching(/^ENT-\d{6}$/) as string, kind: 'ENTRY', reason: 'DONACION', comment: 'Muestra', branchId, lines: [{ variantId, sku: 'HTTP-1', quantity: 2 }] });
+    });
+
+    it('el historial se filtra por categoría y devuelve categoría, costo y saldo; una categoría inválida es 400 y una vacía se ignora', async () => {
+      const range = 'startDate=2020-01-01&endDate=2100-01-01';
+      const adjustments = await api('get', `/products/inventory-movements?category=ADJUSTMENT&variantId=${variantId}&${range}`, ownerToken);
+
+      expect(adjustments.status).toBe(200);
+      const rows = (adjustments.body as { data: Array<{ category: string; unitCost: number | null; balanceAfter: number | null }> }).data;
+      expect(rows.length).toBeGreaterThan(0);
+      for (const row of rows) expect(row).toMatchObject({ category: 'ADJUSTMENT', unitCost: expect.any(Number) as number, balanceAfter: expect.any(Number) as number });
+
+      // cada categoría trae solo lo suyo: las ventas de esa variante no incluyen los ajustes manuales
+      const sales = await api('get', `/products/inventory-movements?category=SALE&variantId=${variantId}&${range}`, ownerToken);
+      const saleRows = (sales.body as { data: Array<{ category: string; reason: string }> }).data;
+      expect(saleRows.length).toBeGreaterThan(0);
+      for (const row of saleRows) expect(row).toMatchObject({ category: 'SALE', reason: 'VENTA' });
+
+      expectErrorEnvelope(await api('get', `/products/inventory-movements?category=NOPE&${range}`, ownerToken), 400, 'VALIDATION_FAILED');
+      expect((await api('get', `/products/inventory-movements?category=&${range}`, ownerToken)).status).toBe(200);
+    });
+
+    it('un documento se abre por su id con todas sus líneas; un id inexistente es 404 y uno que no es UUID, 400', async () => {
+      const created = await api('post', '/products/inventory-documents', ownerToken).send(body({ comment: 'Para abrir', lines: [{ variantId, quantity: 1 }] }));
+      const id = (created.body as { id: string }).id;
+
+      const opened = await api('get', `/products/inventory-documents/${id}`, ownerToken);
+      expect(opened.status).toBe(200);
+      expect(opened.body).toMatchObject({ id, kind: 'ENTRY', comment: 'Para abrir', branch: { id: branchId }, lines: [{ variantId, sku: 'HTTP-1', type: 'IN', quantity: 1 }] });
+
+      expectErrorEnvelope(await api('get', '/products/inventory-documents/00000000-0000-4000-8000-000000000000', ownerToken), 404, 'INVENTORY_DOCUMENT_NOT_FOUND');
+      expectErrorEnvelope(await api('get', '/products/inventory-documents/no-uuid', ownerToken), 400, 'BAD_REQUEST');
+    });
+
+    it('el historial por HTTP muestra el documento con su número y quién lo hizo', async () => {
+      const response = await api('get', `/products/inventory-movements?variantId=${variantId}&reason=DONACION&startDate=2020-01-01&endDate=2100-01-01`, ownerToken);
+
+      expect(response.status).toBe(200);
+      const [first] = (response.body as { data: Array<{ document: { number: string; userName: string } | null }> }).data;
+      expect(first.document).toMatchObject({ number: expect.stringMatching(/^ENT-/) as string, userName: expect.any(String) as string });
+    });
+
+    it('una salida que no alcanza: 409 INSUFFICIENT_STOCK con las líneas que fallaron en details', async () => {
+      const response = await api('post', '/products/inventory-documents', ownerToken).send(body({ kind: 'EXIT', reason: 'MERMA', lines: [{ variantId, quantity: 99999 }] }));
+
+      expectErrorEnvelope(response, 409, 'INSUFFICIENT_STOCK');
+      expect(response.body).toMatchObject({ details: { branchId, lines: [{ variantId, sku: 'HTTP-1', requested: 99999 }] } });
+    });
+
+    it('un motivo que no es manual, un tipo que no corresponde, líneas vacías o cantidades inválidas: 400', async () => {
+      expectErrorEnvelope(await api('post', '/products/inventory-documents', ownerToken).send(body({ reason: 'VENTA' })), 400, 'VALIDATION_FAILED');
+      expectErrorEnvelope(await api('post', '/products/inventory-documents', ownerToken).send(body({ lines: [] })), 400, 'VALIDATION_FAILED');
+      expectErrorEnvelope(await api('post', '/products/inventory-documents', ownerToken).send(body({ lines: [{ variantId, quantity: 0 }] })), 400, 'VALIDATION_FAILED');
+      expectErrorEnvelope(await api('post', '/products/inventory-documents', ownerToken).send(body({ lines: [{ variantId: 'no-uuid', quantity: 1 }] })), 400, 'VALIDATION_FAILED');
+      expectErrorEnvelope(await api('post', '/products/inventory-documents', ownerToken).send(body({ reason: 'MERMA' })), 400, 'INVALID_MOVEMENT_REASON');
+    });
+
+    it('reenviar con el mismo clientRequestId devuelve el mismo documento', async () => {
+      const clientRequestId = '7f1c6f6e-2d8e-4b7a-9d6a-3a1d3f0b9c11';
+      const first = await api('post', '/products/inventory-documents', ownerToken).send(body({ clientRequestId }));
+      const second = await api('post', '/products/inventory-documents', ownerToken).send(body({ clientRequestId }));
+
+      expect(second.status).toBe(201);
+      expect((second.body as { id: string }).id).toBe((first.body as { id: string }).id);
+    });
+
+    it('sin el permiso de ajustar stock: 403 PERMISSION_DENIED', async () => {
+      const role = await api('post', '/roles', ownerToken).send({ name: 'Solo ver productos', permissions: [APP_PERMISSIONS.VIEW_PRODUCTS] });
+      await api('post', '/users', ownerToken).send({ name: 'Bodega', username: 'bodega1', password, roleId: (role.body as { id: string }).id, branchIds: [branchId] });
+      const login = await api('post', '/auth/login').send({ email: 'bodega1', password, tenantSlug: slug });
+      const cashierToken = (login.body as { accessToken: string }).accessToken;
+
+      expectErrorEnvelope(await api('post', '/products/inventory-documents', cashierToken).send(body()), 403, 'PERMISSION_DENIED');
+    });
+
+    it('el ajuste antiguo de una variante (POST /products/stock-adjustments) se retiró: 404', async () => {
+      const response = await api('post', '/products/stock-adjustments', ownerToken).send({ branchId, variantId, quantity: 1, type: 'IN' });
+
+      expect(response.status).toBe(404);
+    });
+
+    it('toda salida exige un comentario y una entrada solo si el motivo es OTRO: 400 COMMENT_REQUIRED', async () => {
+      expectErrorEnvelope(await api('post', '/products/inventory-documents', ownerToken).send(body({ kind: 'EXIT', reason: 'MERMA', comment: undefined })), 400, 'COMMENT_REQUIRED');
+      expectErrorEnvelope(await api('post', '/products/inventory-documents', ownerToken).send(body({ kind: 'EXIT', reason: 'PERDIDA', comment: 'ab' })), 400, 'COMMENT_REQUIRED');
+      expectErrorEnvelope(await api('post', '/products/inventory-documents', ownerToken).send(body({ kind: 'ENTRY', reason: 'OTRO', comment: undefined })), 400, 'COMMENT_REQUIRED');
+
+      const donation = await api('post', '/products/inventory-documents', ownerToken).send(body({ reason: 'DONACION', comment: undefined }));
+      expect(donation.status).toBe(201);
+      expect(donation.body).toMatchObject({ reason: 'DONACION', comment: null });
+    });
+
+    it('los motivos antiguos ya no se pueden elegir: 400', async () => {
+      expectErrorEnvelope(await api('post', '/products/inventory-documents', ownerToken).send(body({ kind: 'EXIT', reason: 'CADUCIDAD' })), 400, 'VALIDATION_FAILED');
+      expectErrorEnvelope(await api('post', '/products/inventory-documents', ownerToken).send(body({ reason: 'OTRO_INGRESO' })), 400, 'VALIDATION_FAILED');
+    });
+
+    it('el permiso depende del tipo: con solo el de salidas se puede sacar mercancía pero no meterla', async () => {
+      const role = await api('post', '/roles', ownerToken).send({ name: 'Solo salidas', permissions: [APP_PERMISSIONS.VIEW_PRODUCTS, APP_PERMISSIONS.PRODUCTS_STOCK_EXIT] });
+      await api('post', '/users', ownerToken).send({ name: 'Salidas', username: 'salidas1', password, roleId: (role.body as { id: string }).id, branchIds: [branchId] });
+      const login = await api('post', '/auth/login').send({ email: 'salidas1', password, tenantSlug: slug });
+      const token = (login.body as { accessToken: string }).accessToken;
+
+      const exit = await api('post', '/products/inventory-documents', token).send(body({ kind: 'EXIT', reason: 'MERMA', lines: [{ variantId, quantity: 1 }] }));
+      expect(exit.status).toBe(201);
+      expectErrorEnvelope(await api('post', '/products/inventory-documents', token).send(body({ kind: 'ENTRY', reason: 'DONACION' })), 403, 'PERMISSION_DENIED');
+    });
+  });
+
+  describe('conteo físico (POST /products/stock-counts)', () => {
+    let countedVariantId: string;
+    const body = (overrides: Record<string, unknown> = {}) => ({ branchId, lines: [{ variantId: countedVariantId, counted: 7, expected: 10 }], ...overrides });
+
+    it('prepara un producto con 10 unidades', async () => {
+      const product = await api('post', '/products/simple', ownerToken).send({ name: 'Contable', description: 'x', sku: 'HTTP-CNT', purchasePrice: 2, salePrice: 5, stocks: [{ branchId, quantity: 10 }] });
+      expect(product.status).toBe(201);
+      countedVariantId = (product.body as { variants: Array<{ id: string }> }).variants[0].id;
+    });
+
+    it('contar 7 de 10 resta 3: 201 con número CNT y la línea de salida', async () => {
+      // el conteo no tiene motivo que elegir: si el cliente manda otro, el sistema pone el suyo
+      const response = await api('post', '/products/stock-counts', ownerToken).send(body({ comment: 'Conteo de prueba', isOwner: true, reason: 'MERMA' }));
+
+      expect(response.status).toBe(201);
+      expect(response.body).toMatchObject({ number: expect.stringMatching(/^CNT-\d{6}$/) as string, kind: 'COUNT', reason: 'CONTEO_FISICO', comment: 'Conteo de prueba', lines: [{ variantId: countedVariantId, sku: 'HTTP-CNT', quantity: 3, type: 'OUT' }] });
+    });
+
+    it('si el stock ya no es el que se veía: 409 STOCK_CHANGED_SINCE_COUNT con las líneas; al confirmar se aplica sobre el stock actual', async () => {
+      // ahora hay 7; el usuario "veía" 10
+      const stale = await api('post', '/products/stock-counts', ownerToken).send(body({ lines: [{ variantId: countedVariantId, counted: 6, expected: 10 }] }));
+
+      expectErrorEnvelope(stale, 409, 'STOCK_CHANGED_SINCE_COUNT');
+      expect(stale.body).toMatchObject({ details: { branchId, lines: [{ variantId: countedVariantId, sku: 'HTTP-CNT', expected: 10, current: 7 }] } });
+
+      const accepted = await api('post', '/products/stock-counts', ownerToken).send(body({ lines: [{ variantId: countedVariantId, counted: 6, expected: 10 }], acceptStockChanges: true }));
+      expect(accepted.status).toBe(201);
+      expect(accepted.body).toMatchObject({ lines: [{ quantity: 4, type: 'OUT' }] }); // 7 − 4 = 3
+    });
+
+    it('sin diferencias: 400 COUNT_WITHOUT_DIFFERENCES; cuerpo inválido: 400', async () => {
+      expectErrorEnvelope(await api('post', '/products/stock-counts', ownerToken).send(body({ lines: [{ variantId: countedVariantId, counted: 3, expected: 3 }] })), 400, 'COUNT_WITHOUT_DIFFERENCES');
+      expectErrorEnvelope(await api('post', '/products/stock-counts', ownerToken).send(body({ lines: [] })), 400, 'VALIDATION_FAILED');
+      expectErrorEnvelope(await api('post', '/products/stock-counts', ownerToken).send(body({ lines: [{ variantId: countedVariantId, counted: -1, expected: 3 }] })), 400, 'VALIDATION_FAILED');
+    });
+
+    it('la lista para contar trae las variantes con su existencia; los filtros vacíos se ignoran y un id inválido es 400', async () => {
+      const sheet = await api('get', `/products/stock-count-sheet?branchId=${branchId}&onlyWithStock=true&categoryId=&after=&limit=100`, ownerToken);
+
+      expect(sheet.status).toBe(200);
+      const body = sheet.body as { items: Array<{ sku: string; stock: number }>; nextAfter: string | null };
+      expect(body.items.find((item) => item.sku === 'HTTP-CNT')).toMatchObject({ stock: 3 });
+      expect(body.items.every((item) => item.stock !== 0)).toBe(true);
+      expectErrorEnvelope(await api('get', '/products/stock-count-sheet?branchId=no-es-uuid', ownerToken), 400, 'VALIDATION_FAILED');
+      expectErrorEnvelope(await api('get', '/products/stock-count-sheet', ownerToken), 400, 'VALIDATION_FAILED');
+    });
+
+    it('sin el permiso de conteo: 403 PERMISSION_DENIED, aunque pueda hacer entradas y salidas', async () => {
+      const role = await api('post', '/roles', ownerToken).send({ name: 'Entradas y salidas', permissions: [APP_PERMISSIONS.VIEW_PRODUCTS, APP_PERMISSIONS.PRODUCTS_STOCK_ENTRY, APP_PERMISSIONS.PRODUCTS_STOCK_EXIT] });
+      await api('post', '/users', ownerToken).send({ name: 'Sin conteo', username: 'sinconteo1', password, roleId: (role.body as { id: string }).id, branchIds: [branchId] });
+      const login = await api('post', '/auth/login').send({ email: 'sinconteo1', password, tenantSlug: slug });
+      const token = (login.body as { accessToken: string }).accessToken;
+
+      expectErrorEnvelope(await api('post', '/products/stock-counts', token).send(body()), 403, 'PERMISSION_DENIED');
+      expectErrorEnvelope(await api('get', `/products/stock-count-sheet?branchId=${branchId}`, token), 403, 'PERMISSION_DENIED');
+    });
+  });
+
+  describe('traslados entre sucursales (POST /products/stock-transfers)', () => {
+    let otherBranchId: string;
+    let transferVariantId: string;
+    const body = (overrides: Record<string, unknown> = {}) => ({ originBranchId: branchId, destinationBranchId: otherBranchId, lines: [{ variantId: transferVariantId, quantity: 4 }], ...overrides });
+
+    it('prepara una segunda sucursal y un producto con 10 unidades en la primera', async () => {
+      const branch = await api('post', '/branches', ownerToken).send({ name: 'Sucursal Norte', address: 'Calle 2' });
+      expect(branch.status).toBe(201);
+      otherBranchId = (branch.body as { id: string }).id;
+      const product = await api('post', '/products/simple', ownerToken).send({ name: 'Trasladable', description: 'x', sku: 'HTTP-TRS', purchasePrice: 2, salePrice: 5, stocks: [{ branchId, quantity: 10 }] });
+      expect(product.status).toBe(201);
+      transferVariantId = (product.body as { variants: Array<{ id: string }> }).variants[0].id;
+    });
+
+    it('traslada 4: 201 con número TRS, las dos sucursales y la línea; el stock se reparte', async () => {
+      const response = await api('post', '/products/stock-transfers', ownerToken).send(body({ comment: 'Reposición semanal', isOwner: true, reason: 'MERMA' })); // el traslado no tiene motivo que elegir: el sistema pone TRASLADO
+
+      expect(response.status).toBe(201);
+      expect(response.body).toMatchObject({ number: expect.stringMatching(/^TRS-\d{6}$/) as string, kind: 'TRANSFER', reason: 'TRASLADO', branchId, destinationBranchId: otherBranchId, comment: 'Reposición semanal', lines: [{ variantId: transferVariantId, sku: 'HTTP-TRS', quantity: 4, type: 'OUT' }] });
+      const list = await api('get', `/products/pos/variants?branchId=${otherBranchId}`, ownerToken);
+      expect((list.body as Array<{ sku: string; stock: number }>).find((v) => v.sku === 'HTTP-TRS')?.stock).toBe(4);
+    });
+
+    it('origen igual al destino: 400 SAME_BRANCH_TRANSFER; sin stock: 409 con las líneas; cuerpo inválido: 400', async () => {
+      expectErrorEnvelope(await api('post', '/products/stock-transfers', ownerToken).send(body({ destinationBranchId: branchId })), 400, 'SAME_BRANCH_TRANSFER');
+      const short = await api('post', '/products/stock-transfers', ownerToken).send(body({ lines: [{ variantId: transferVariantId, quantity: 999 }] }));
+      expectErrorEnvelope(short, 409, 'INSUFFICIENT_STOCK');
+      expect(short.body).toMatchObject({ details: { branchId, lines: [{ variantId: transferVariantId, sku: 'HTTP-TRS', available: 6, requested: 999 }] } });
+      expectErrorEnvelope(await api('post', '/products/stock-transfers', ownerToken).send(body({ originBranchId: 'no-uuid' })), 400, 'VALIDATION_FAILED');
+      expectErrorEnvelope(await api('post', '/products/stock-transfers', ownerToken).send(body({ lines: [] })), 400, 'VALIDATION_FAILED');
+    });
+
+    it('sin el permiso de traslados: 403 PERMISSION_DENIED, aunque pueda hacer entradas, salidas y conteos', async () => {
+      const role = await api('post', '/roles', ownerToken).send({ name: 'Todo menos traslados', permissions: [APP_PERMISSIONS.VIEW_PRODUCTS, APP_PERMISSIONS.PRODUCTS_STOCK_ENTRY, APP_PERMISSIONS.PRODUCTS_STOCK_EXIT, APP_PERMISSIONS.PRODUCTS_STOCK_COUNT] });
+      await api('post', '/users', ownerToken).send({ name: 'Sin traslados', username: 'sintraslados1', password, roleId: (role.body as { id: string }).id, branchIds: [branchId, otherBranchId] });
+      const login = await api('post', '/auth/login').send({ email: 'sintraslados1', password, tenantSlug: slug });
+      const token = (login.body as { accessToken: string }).accessToken;
+
+      expectErrorEnvelope(await api('post', '/products/stock-transfers', token).send(body()), 403, 'PERMISSION_DENIED');
+    });
+
+    it('con el permiso pero sin acceso a la sucursal de destino: 403 BRANCH_ACCESS_DENIED', async () => {
+      const role = await api('post', '/roles', ownerToken).send({ name: 'Traslada desde una', permissions: [APP_PERMISSIONS.VIEW_PRODUCTS, APP_PERMISSIONS.PRODUCTS_STOCK_TRANSFER] });
+      await api('post', '/users', ownerToken).send({ name: 'Solo origen', username: 'soloorigen1', password, roleId: (role.body as { id: string }).id, branchIds: [branchId] });
+      const login = await api('post', '/auth/login').send({ email: 'soloorigen1', password, tenantSlug: slug });
+      const token = (login.body as { accessToken: string }).accessToken;
+
+      expectErrorEnvelope(await api('post', '/products/stock-transfers', token).send(body()), 403, 'BRANCH_ACCESS_DENIED');
+    });
+  });
 });

@@ -11,8 +11,10 @@ import { ProductBatch } from '../../../domain/entities/product-batch.entity';
 import { Batch, BatchOriginType } from '../../../../batches/domain/entities/batch.entity';
 import { InventoryMovement } from '../../../domain/entities/inventory-movement.entity';
 import { Branch } from '../../../../branches/domain/entities/branch.entity';
+import { InventoryMovementCategory } from '../../../../../common/enums/inventory-movement-category.enum';
 import { InventoryMovementReason } from '../../../../../common/enums/inventory-movement-reason.enum';
 import { InventoryMovementType } from '../../../../../common/enums/inventory-movement-type.enum';
+import { newKardexLine } from '../../services/kardex';
 import { ProductType } from '../../../domain/enums/product-type.enum';
 import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
@@ -187,28 +189,14 @@ export class ImportProductsHandler implements ICommandHandler<ImportProductsComm
                 batch.unitCost = purchasePrice;
                 batchesToCreate.push(batch);
 
-                const movement = new InventoryMovement();
-                movement.tenantId = tenantId;
-                movement.originBranchId = null;
-                movement.destinationBranchId = branchId;
-                movement.variantId = variantId;
-                movement.purchaseOrderId = null;
-                movement.quantity = qty;
-                movement.type = InventoryMovementType.IN;
-                movement.reason = InventoryMovementReason.INITIAL_STOCK;
-                movementsToCreate.push(movement);
+                movementsToCreate.push(
+                  newKardexLine({ tenantId, variantId, quantity: qty, type: InventoryMovementType.IN, category: InventoryMovementCategory.INITIAL, reason: InventoryMovementReason.INITIAL_STOCK, branchId, unitCost: purchasePrice, balanceAfter: qty }),
+                );
               } else if (qty < 0) {
                 // Negative initial stock: deficit/debt in branch, recorded as OUT movement
-                const movement = new InventoryMovement();
-                movement.tenantId = tenantId;
-                movement.originBranchId = branchId;
-                movement.destinationBranchId = null;
-                movement.variantId = variantId;
-                movement.purchaseOrderId = null;
-                movement.quantity = Math.abs(qty);
-                movement.type = InventoryMovementType.OUT;
-                movement.reason = InventoryMovementReason.INITIAL_STOCK;
-                movementsToCreate.push(movement);
+                movementsToCreate.push(
+                  newKardexLine({ tenantId, variantId, quantity: Math.abs(qty), type: InventoryMovementType.OUT, category: InventoryMovementCategory.INITIAL, reason: InventoryMovementReason.INITIAL_STOCK, branchId, unitCost: purchasePrice, balanceAfter: qty }),
+                );
               }
             }
           });

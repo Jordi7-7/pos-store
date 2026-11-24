@@ -53,29 +53,36 @@ Forma de toda respuesta de error:
 | `CASH_SESSION_REQUIRED` | 400 | sales | Debes tener una sesión de caja abierta para registrar una venta. | — |
 | `CATEGORY_NAME_TAKEN` | 409 | products | La categoría "{name}" ya existe. | `name` |
 | `CATEGORY_NOT_FOUND` | 404 | products | Categoría no encontrada. | `categoryId` |
+| `COMMENT_REQUIRED` | 400 | products | Escribe un comentario que explique el movimiento (mínimo {MIN_COMMENT_LENGTH} caracteres). | `min`, `reason` |
 | `CONSUMER_FINAL_PROTECTED` | 409 | customers | El CONSUMIDOR FINAL es el comprador por defecto de las ventas y no se puede eliminar. | — |
+| `COUNT_WITHOUT_DIFFERENCES` | 400 | products | Lo contado coincide con el sistema: no hay nada que ajustar. | — |
 | `CUSTOMER_IDENTITY_TAKEN` | 409 | customers | Ya existe un cliente con el documento {input.identityNumber}. | `identityNumber` |
 | `CUSTOMER_NOT_FOUND` | 404 | customers, sales | Cliente no encontrado. | `customerId`, `id` |
 | `DEFAULT_SUPPLIER_NOT_FOUND` | 404 | purchases | No se encontró un proveedor configurado para este tenant. | — |
+| `DUPLICATE_COUNT_LINE` | 400 | products | Un producto aparece más de una vez en el conteo. | `variantIds` |
 | `DUPLICATE_SKU_IN_IMPORT` | 400 | products | El archivo repite estos SKUs: {repeated.slice(0, 10).join(', ')} | `skus` |
 | `DUPLICATE_VARIANT_COMBINATION` | 409 | products | No se permiten múltiples variantes con la misma combinación de atributos en un mismo producto. | — |
 | `EMAIL_TAKEN` | 409 | auth, users | Ese correo ya está registrado en otra cuenta. | `email` |
+| `EMPTY_INVENTORY_DOCUMENT` | 400 | products | El {noun} debe tener al menos un producto. | — |
 | `EMPTY_PURCHASE` | 400 | purchases | La compra debe tener al menos un producto. | — |
 | `FORBIDDEN` | 403 | auth | Solicitud de sesión web no válida. | — |
-| `IDEMPOTENCY_KEY_REUSED` | 409 | sales | Ese identificador ya se usó en otra venta distinta. | — |
+| `IDEMPOTENCY_KEY_REUSED` | 409 | products, sales | Ese identificador ya se usó en otro movimiento distinto. | — |
 | `IMAGES_NOT_FOUND` | 404 | products | Una o más imágenes de la variante no existen. | — |
 | `IMPORT_EMPTY` | 400 | products, purchases | No se proporcionaron registros para importar. | — |
 | `IMPORT_LIMIT_EXCEEDED` | 400 | products, purchases | El archivo contiene {items.length} filas. El límite máximo permitido por importación es de 3,000 registros. | `max`, `received` |
 | `INSUFFICIENT_PAYMENT` | 400 (DomainError) | sales | El monto pagado (${paid.toString()}) es menor al total de la venta (${total.toString()}). | — |
-| `INSUFFICIENT_STOCK` | 409 | products, purchases | No hay stock suficiente para cancelar: la variante quedaría en negativo. | `available`, `branchId`, `requested`, `variantId` |
+| `INSUFFICIENT_STOCK` | 409 | products, purchases | No hay stock suficiente para cancelar: la variante quedaría en negativo. | `available`, `branchId`, `lines`, `requested`, `variantId` |
 | `INVALID_CREDENTIALS` | 401 | auth | Tienda no encontrada o credenciales inválidas | — |
 | `INVALID_MEDIA_URL` | 400 | media | message | — |
+| `INVALID_MOVEMENT_REASON` | 400 | products | El motivo {reason} no es válido para {target}. | `kind`, `reason` |
 | `INVALID_PERMISSIONS` | 400 | common | Permisos no válidos: {invalid.join(', ')} | `invalid` |
 | `INVALID_PIN` | 401 | auth | PIN o tienda inválidos. | — |
-| `INVALID_QUANTITY` | 400 | products, purchases | La cantidad para el SKU {itemDto.sku} debe ser mayor a 0. | `sku` |
+| `INVALID_QUANTITY` | 400 | products, purchases | La cantidad para el SKU {itemDto.sku} debe ser mayor a 0. | `sku`, `variantId` |
 | `INVALID_REFERENCE` | 400 | common | message | — |
 | `INVALID_REFUND` | 400 (DomainError) | sales | message | — |
 | `INVALID_SALE_AMOUNTS` | 400 (DomainError) | sales | message | — |
+| `INVENTORY_DOCUMENT_NOT_FOUND` | 404 | products | Documento de inventario no encontrado. | `documentId` |
+| `INVENTORY_DOCUMENT_TOO_LARGE` | 400 | products | Un movimiento admite hasta {MAX_DOCUMENT_LINES} productos. | `max`, `received` |
 | `LAST_VARIANT_CANNOT_BE_DELETED` | 409 | products | No puedes eliminar la única variante de este producto. Si deseas retirar el artículo por completo, elimina el producto principal. | — |
 | `MEDIA_IN_USE` | 409 | media | No se puede eliminar la imagen porque está asignada a uno o más productos. | — |
 | `MEDIA_NOT_FOUND` | 404 | media | Imagen no encontrada. | — |
@@ -85,7 +92,7 @@ Forma de toda respuesta de error:
 | `ONBOARDING_UNAUTHORIZED` | 401 | auth | No autorizado | — |
 | `OWNER_ONLY_EDITS_SELF` | 403 | users | Solo el propietario puede modificar su propia cuenta. | — |
 | `PAYLOAD_TOO_LARGE` | 413 | media | La imagen supera el tamaño máximo de {Math.round(maxBytes / 1024 / 1024)} MB. | — |
-| `PERMISSION_DENIED` | 403 | auth | No tienes permisos suficientes para realizar esta acción. | — |
+| `PERMISSION_DENIED` | 403 | auth, products | No tienes permisos suficientes para realizar esta acción. | — |
 | `PERMISSION_ESCALATION` | 403 | common | No puedes otorgar ni administrar permisos que tú no tienes. | `missing` |
 | `PIN_ALREADY_IN_USE` | 409 | users | Ese PIN ya está en uso por otro usuario. | — |
 | `PRODUCT_HAS_STOCK` | 409 | products | No se puede eliminar el producto porque tiene existencias activas o saldos negativos en inventario. Todas las cantidades deben estar en 0. | — |
@@ -102,10 +109,12 @@ Forma de toda respuesta de error:
 | `ROLE_REQUIRED` | 400 | users | Un usuario debe tener un rol asignado. | — |
 | `SALE_ALREADY_REFUNDED` | 409 | sales | La venta {sale.invoiceNumber \|\| saleId} ya ha sido devuelta en su totalidad. | `invoiceNumber`, `saleId` |
 | `SALE_NOT_FOUND` | 404 | sales | No se encontró la venta con folio "{invoiceNumber} | `invoiceNumber`, `saleId` |
+| `SAME_BRANCH_TRANSFER` | 400 | products | El origen y el destino del traslado deben ser sucursales distintas. | `branchId` |
 | `SERVICE_UNAVAILABLE` | HttpStatus.SERVICE_UNAVAILABLE | common | La base de datos no está disponible. | — |
 | `SESSION_EXPIRED` | 401 | auth | La sesión expiró. Inicia sesión nuevamente. | — |
 | `SKUS_NOT_FOUND` | 404 | purchases | Los siguientes SKUs no existen en el catálogo: {missingSkus.join(', ')} | `skus` |
 | `SKU_TAKEN` | 409 | products | El SKU "{sku}" ya está registrado en otra variante. | `sku`, `skus` |
+| `STOCK_CHANGED_SINCE_COUNT` | 409 | products | El stock cambió desde que se agregaron los productos al conteo. Revisa y confirma para aplicar la diferencia contada. | `branchId`, `lines` |
 | `STOCK_RECORD_NOT_FOUND` | 404 | purchases | No existe registro de stock de la variante en la sucursal de la orden. | `branchId`, `variantId` |
 | `SUPPLIER_HAS_PURCHASES` | 409 | purchases | No se puede eliminar el proveedor porque tiene órdenes de compra asociadas. | — |
 | `SUPPLIER_IDENTITY_TAKEN` | 409 | purchases | Ya existe un proveedor con el documento "{input.identityNumber}". | `identityNumber` |
@@ -127,4 +136,4 @@ Forma de toda respuesta de error:
 | `VALIDATION_FAILED` | 400 | batches | Tipo de lote no válido: {unknown.join(', ')}. | `originTypes` |
 | `VARIANTS_REQUIRED` | 400 | products | Un producto variable debe tener al menos una variante. | — |
 | `VARIANT_HAS_STOCK` | 409 | products | No se puede eliminar la variante porque tiene existencias activas o saldos negativos en inventario. Todas las cantidades deben estar en 0. | — |
-| `VARIANT_NOT_FOUND` | 404 | products, purchases, sales | Variante no encontrada. | `sku`, `variantId` |
+| `VARIANT_NOT_FOUND` | 404 | products, purchases, sales | Variante no encontrada. | `sku`, `variantId`, `variantIds` |

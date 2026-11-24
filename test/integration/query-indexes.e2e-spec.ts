@@ -55,7 +55,7 @@ describe('Índices de consulta', () => {
     expect(created).toEqual(expect.arrayContaining(['IDX_sales_tenant_created_at', 'IDX_sale_items_sale', 'IDX_product_batches_fifo_available']));
 
     // Deshace migraciones desde la última hasta que la de índices quede revertida (las posteriores no dependen de ella)
-    for (let undone = 0; undone < 10 && (await indexNames()).includes('IDX_sales_tenant_created_at'); undone++) {
+    for (let undone = 0; undone < 50 && (await indexNames()).includes('IDX_sales_tenant_created_at'); undone++) {
       await db.undoLastMigration();
     }
     const afterUndo = await indexNames();

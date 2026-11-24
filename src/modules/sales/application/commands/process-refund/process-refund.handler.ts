@@ -17,6 +17,8 @@ import { SaleItem } from '../../../domain/entities/sale-item.entity';
 import { RedisService } from '../../../../../common/redis/redis.service';
 import { assertUserCanOperateInBranch } from '../../../../../common/security/branch-access.helper';
 import { receiveStock } from '../../../../products/application/services/inventory-stock';
+import { newKardexLine } from '../../../../products/application/services/kardex';
+import { InventoryMovementCategory } from '../../../../../common/enums/inventory-movement-category.enum';
 import { assertValidRefundRequests, planRefund, RefundPlan } from '../../../domain/services/refund-plan';
 import { lockCashSession } from '../shared/cash-session-lock';
 import { assertUserAssignedToCashRegister } from '../shared/cash-register-access';
@@ -149,25 +151,19 @@ export class ProcessRefundHandler implements ICommandHandler<ProcessRefundComman
         const savedBatchHeader = await batchHeaderRepo.save(batchHeader);
 
         // La mercadería devuelta entra como lote nuevo al costo histórico de la venta
-        await receiveStock(transactionalManager, {
+        const unitCost = saleItem.cost || 0;
+        const balanceAfter = await receiveStock(transactionalManager, {
           tenantId,
           branchId,
           variantId,
           batchId: savedBatchHeader.id,
           quantity,
-          unitCost: saleItem.cost || 0,
+          unitCost,
         });
 
-        // Build Kardex entry
-        const movement = new InventoryMovement();
-        movement.tenantId = tenantId;
-        movement.originBranchId = null;
-        movement.destinationBranchId = branchId;
-        movement.variantId = variantId;
-        movement.quantity = quantity;
-        movement.type = InventoryMovementType.IN;
-        movement.reason = InventoryMovementReason.DEVOLUCION;
-        inventoryMovements.push(movement);
+        inventoryMovements.push(
+          newKardexLine({ tenantId, variantId, quantity, type: InventoryMovementType.IN, category: InventoryMovementCategory.RETURN, reason: InventoryMovementReason.DEVOLUCION, branchId, unitCost, balanceAfter }),
+        );
       }
 
       // 6. Create and save Refund

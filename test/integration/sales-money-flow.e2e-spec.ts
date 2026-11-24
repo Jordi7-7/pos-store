@@ -3,8 +3,7 @@ import * as path from 'path';
 import { DataSource } from 'typeorm';
 import { RedisService } from '../../src/common/redis/redis.service';
 import { databaseConnectionOptions } from '../../src/config/database.options';
-import { AdjustStockCommand } from '../../src/modules/products/application/commands/adjust-stock/adjust-stock.command';
-import { AdjustStockHandler } from '../../src/modules/products/application/commands/adjust-stock/adjust-stock.handler';
+import { adjustStock } from './support/stock-adjustment';
 import { Batch } from '../../src/modules/batches/domain/entities/batch.entity';
 import { Branch } from '../../src/modules/branches/domain/entities/branch.entity';
 import { InventoryMovement } from '../../src/modules/products/domain/entities/inventory-movement.entity';
@@ -624,7 +623,7 @@ describe('Flujo de dinero: venta, devolución y cierre de caja', () => {
     };
 
     const adjust = (id: string, quantity: number, type: InventoryMovementType) =>
-      new AdjustStockHandler(db.manager, redis).execute(new AdjustStockCommand(tenantId, userId, branchId, id, quantity, type));
+      adjustStock(db.manager, redis, { tenantId, userId, branchId, variantId: id, quantity, type });
 
     const quantityOf = async (id: string): Promise<number> =>
       (await db.getRepository(ProductStock).findOneByOrFail({ branchId, variantId: id })).quantity;

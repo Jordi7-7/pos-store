@@ -16,6 +16,8 @@ import { InventoryMovementType } from '../../../../../common/enums/inventory-mov
 import { RedisService } from '../../../../../common/redis/redis.service';
 import { assertUserCanOperateInBranch } from '../../../../../common/security/branch-access.helper';
 import { consumeStock } from '../../../../products/application/services/inventory-stock';
+import { newKardexLine } from '../../../../products/application/services/kardex';
+import { InventoryMovementCategory } from '../../../../../common/enums/inventory-movement-category.enum';
 import { allocatePayments, assertPaymentsCoverTotal, priceSale, SalePricing } from '../../../domain/services/sale-pricing';
 import { lockCashSession } from '../shared/cash-session-lock';
 import { assertUserAssignedToCashRegister } from '../shared/cash-register-access';
@@ -209,7 +211,7 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
       }
 
       // Puede dejar el stock en negativo
-      const { averageUnitCost } = await consumeStock(manager, {
+      const { averageUnitCost, newStock } = await consumeStock(manager, {
         branchId,
         variantId: input.variantId,
         quantity: input.quantity,
@@ -232,16 +234,20 @@ export class ProcessSaleHandler implements ICommandHandler<ProcessSaleCommand> {
       item.total = line.total;
       saleItems[index] = item;
 
-      const movement = new InventoryMovement();
-      movement.tenantId = tenantId;
-      movement.originBranchId = branchId;
-      movement.destinationBranchId = null;
-      movement.variantId = input.variantId;
-      movement.quantity = input.quantity;
-      movement.type = InventoryMovementType.OUT;
-      movement.reason = InventoryMovementReason.VENTA;
-      if (soldAt) movement.createdAt = soldAt;
-      movements.push(movement);
+      movements.push(
+        newKardexLine({
+          tenantId,
+          variantId: input.variantId,
+          quantity: input.quantity,
+          type: InventoryMovementType.OUT,
+          category: InventoryMovementCategory.SALE,
+          reason: InventoryMovementReason.VENTA,
+          branchId,
+          unitCost: averageUnitCost,
+          balanceAfter: newStock,
+          createdAt: soldAt,
+        }),
+      );
     }
     return { items: saleItems, movements };
   }
