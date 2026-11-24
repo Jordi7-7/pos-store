@@ -1,6 +1,8 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { Money } from '../../../../../common/domain/money';
 import { receiveStock } from '../../../../products/application/services/inventory-stock';
+import { newKardexLine } from '../../../../products/application/services/kardex';
+import { InventoryMovementCategory } from '../../../../../common/enums/inventory-movement-category.enum';
 import { weightedAverageCost } from '../../../../products/domain/services/stock-rules';
 import { Logger, HttpStatus } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
@@ -151,7 +153,7 @@ export class RegisterPurchaseHandler implements ICommandHandler<RegisterPurchase
         });
         await variantRepo.save(variant);
 
-        await receiveStock(transactionalManager, {
+        const balanceAfter = await receiveStock(transactionalManager, {
           tenantId,
           branchId,
           variantId: itemDto.variantId,
@@ -169,16 +171,20 @@ export class RegisterPurchaseHandler implements ICommandHandler<RegisterPurchase
         await purchaseOrderItemRepo.save(purchaseOrderItem);
 
         // Create Kardex entry
-        const movement = new InventoryMovement();
-        movement.tenantId = tenantId;
-        movement.originBranchId = null;
-        movement.destinationBranchId = branchId;
-        movement.variantId = itemDto.variantId;
-        movement.quantity = newQty;
-        movement.type = InventoryMovementType.IN;
-        movement.reason = InventoryMovementReason.COMPRA;
-        movement.purchaseOrderId = savedPurchase.id;
-        inventoryMovements.push(movement);
+        inventoryMovements.push(
+          newKardexLine({
+            tenantId,
+            variantId: itemDto.variantId,
+            quantity: newQty,
+            type: InventoryMovementType.IN,
+            category: InventoryMovementCategory.PURCHASE,
+            reason: InventoryMovementReason.COMPRA,
+            branchId,
+            unitCost: newPrice,
+            balanceAfter,
+            purchaseOrderId: savedPurchase.id,
+          }),
+        );
       }
 
       await inventoryRepo.save(inventoryMovements);

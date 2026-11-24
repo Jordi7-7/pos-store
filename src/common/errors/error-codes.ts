@@ -93,6 +93,15 @@ export enum ErrorCode {
   // Inventario
   InsufficientStock = 'INSUFFICIENT_STOCK',
   StockRecordNotFound = 'STOCK_RECORD_NOT_FOUND',
+  EmptyInventoryDocument = 'EMPTY_INVENTORY_DOCUMENT',
+  InventoryDocumentTooLarge = 'INVENTORY_DOCUMENT_TOO_LARGE',
+  InvalidMovementReason = 'INVALID_MOVEMENT_REASON',
+  StockChangedSinceCount = 'STOCK_CHANGED_SINCE_COUNT',
+  CountWithoutDifferences = 'COUNT_WITHOUT_DIFFERENCES',
+  DuplicateCountLine = 'DUPLICATE_COUNT_LINE',
+  SameBranchTransfer = 'SAME_BRANCH_TRANSFER',
+  CommentRequired = 'COMMENT_REQUIRED',
+  InventoryDocumentNotFound = 'INVENTORY_DOCUMENT_NOT_FOUND',
 
   // Importaciones
   ImportEmpty = 'IMPORT_EMPTY',

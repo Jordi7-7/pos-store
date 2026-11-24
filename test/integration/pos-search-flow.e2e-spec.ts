@@ -15,6 +15,7 @@ import { GetPosVariantsHandler } from '../../src/modules/products/application/qu
 import { GetPosVariantsQuery } from '../../src/modules/products/application/queries/get-pos-variants/get-pos-variants.query';
 import { GetPosVariantsByBaseSkuHandler } from '../../src/modules/products/application/queries/get-pos-variants-by-base-sku/get-pos-variants-by-base-sku.handler';
 import { GetPosVariantsByBaseSkuQuery } from '../../src/modules/products/application/queries/get-pos-variants-by-base-sku/get-pos-variants-by-base-sku.query';
+import { StockStatus } from '../../src/modules/products/domain/enums/stock-status.enum';
 import { GetProductsHandler } from '../../src/modules/products/application/queries/get-products/get-products.handler';
 import { GetProductsQuery } from '../../src/modules/products/application/queries/get-products/get-products.query';
 import { GetProductsByNameHandler } from '../../src/modules/products/application/queries/get-products-by-name/get-products-by-name.handler';
@@ -44,8 +45,8 @@ describe('Búsqueda de productos del POS', () => {
   const byCode = (code: string, tenantId = shop.tenantId, branchId?: string) =>
     new GetProductsBySkuAndBarcodeHandler(db.manager).execute(new GetProductsBySkuAndBarcodeQuery(tenantId, code, 1, 50, undefined, branchId));
   const byName = (name: string, tenantId = shop.tenantId) => new GetProductsByNameHandler(db.manager).execute(new GetProductsByNameQuery(tenantId, name, 1, 50));
-  const list = (search?: string, extra: Partial<{ page: number; limit: number; type: string; branchId: string; inStockOnly: boolean }> = {}, tenantId = shop.tenantId) =>
-    new GetProductsHandler(db.manager).execute(new GetProductsQuery(tenantId, extra.page ?? 1, extra.limit ?? 50, search, extra.type, extra.branchId, extra.inStockOnly));
+  const list = (search?: string, extra: Partial<{ page: number; limit: number; type: string; branchId: string; stockStatus: StockStatus }> = {}, tenantId = shop.tenantId) =>
+    new GetProductsHandler(db.manager).execute(new GetProductsQuery(tenantId, extra.page ?? 1, extra.limit ?? 50, search, extra.type, extra.branchId, extra.stockStatus));
 
   beforeAll(async () => {
     database = await startTestDatabase('pos_search');
@@ -185,7 +186,7 @@ describe('Búsqueda de productos del POS', () => {
       expect(all.meta.total).toBe(5);
       expect(all.data.map((p) => p.name)).not.toContain('Producto descontinuado');
       expect((await list(undefined, { type: 'VARIABLE' })).data.map((p) => p.name)).toEqual(['Gorra']);
-      const inStock = await list(undefined, { branchId: shop.branchId, inStockOnly: true });
+      const inStock = await list(undefined, { branchId: shop.branchId, stockStatus: StockStatus.IN_STOCK });
       expect(inStock.data.map((p) => p.name).sort()).toEqual(['Camisa roja', 'Gorra', 'Pantalón 100% algodón']);
 
       const second = await list(undefined, { page: 2, limit: 2 });

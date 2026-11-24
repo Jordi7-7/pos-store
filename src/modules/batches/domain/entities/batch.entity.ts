@@ -10,6 +10,8 @@ export enum BatchOriginType {
   INITIAL_STOCK = 'INITIAL_STOCK',
   ADJUSTMENT = 'ADJUSTMENT',
   REFUND = 'REFUND',
+  /** Mercancía que llegó de otra sucursal por un traslado. */
+  TRANSFER = 'TRANSFER',
 }
 
 export enum BatchStatus {
@@ -42,6 +44,9 @@ export class Batch extends BaseEntity {
   @ManyToOne(() => PurchaseOrder, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'purchase_order_id' })
   purchaseOrder: PurchaseOrder | null;
+
+  @Column({ name: 'document_id', type: 'uuid', nullable: true })
+  documentId: string | null;
 
   @Column({ type: 'varchar', length: 100, nullable: true })
   code: string | null;

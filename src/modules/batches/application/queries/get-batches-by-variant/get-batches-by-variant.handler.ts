@@ -60,6 +60,8 @@ export class GetBatchesByVariantHandler implements IQueryHandler<GetBatchesByVar
         originLabel = 'Devolución de cliente';
       } else if (batch?.originType === BatchOriginType.ADJUSTMENT) {
         originLabel = 'Ajuste de inventario';
+      } else if (batch?.originType === BatchOriginType.TRANSFER) {
+        originLabel = 'Traslado entre sucursales';
       }
 
       const initialQuantity = Number(pb.initialQuantity || 0);

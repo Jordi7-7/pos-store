@@ -1,6 +1,8 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { Money } from '../../../../../common/domain/money';
 import { receiveStock } from '../../../../products/application/services/inventory-stock';
+import { newKardexLine } from '../../../../products/application/services/kardex';
+import { InventoryMovementCategory } from '../../../../../common/enums/inventory-movement-category.enum';
 import { Logger, HttpStatus } from '@nestjs/common';
 import { EntityManager, In } from 'typeorm';
 import { RedisService } from '../../../../../common/redis/redis.service';
@@ -151,7 +153,7 @@ export class ImportPurchasesHandler implements ICommandHandler<ImportPurchasesCo
         orderItem.purchasePrice = cost;
         await itemRepo.save(orderItem);
 
-        await receiveStock(tm, {
+        const balanceAfter = await receiveStock(tm, {
           tenantId,
           branchId,
           variantId: variant.id,
@@ -160,17 +162,20 @@ export class ImportPurchasesHandler implements ICommandHandler<ImportPurchasesCo
           unitCost: cost,
         });
 
-        // Create Kardex movement
-        const movement = new InventoryMovement();
-        movement.tenantId = tenantId;
-        movement.originBranchId = null;
-        movement.destinationBranchId = branchId;
-        movement.variantId = variant.id;
-        movement.purchaseOrderId = savedPurchase.id;
-        movement.quantity = qty;
-        movement.type = InventoryMovementType.IN;
-        movement.reason = InventoryMovementReason.COMPRA;
-        inventoryMovements.push(movement);
+        inventoryMovements.push(
+          newKardexLine({
+            tenantId,
+            variantId: variant.id,
+            quantity: qty,
+            type: InventoryMovementType.IN,
+            category: InventoryMovementCategory.PURCHASE,
+            reason: InventoryMovementReason.COMPRA,
+            branchId,
+            unitCost: cost,
+            balanceAfter,
+            purchaseOrderId: savedPurchase.id,
+          }),
+        );
       }
 
       await movementRepo.save(inventoryMovements);

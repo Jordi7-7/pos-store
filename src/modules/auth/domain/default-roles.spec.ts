@@ -25,4 +25,12 @@ describe('roles por defecto de una tienda nueva', () => {
     expect(CASHIER_PERMISSIONS).not.toContain(APP_PERMISSIONS.SALES_REFUND);
     expect(CASHIER_PERMISSIONS).not.toContain(APP_PERMISSIONS.PRODUCTS_ADJUST_STOCK);
   });
+
+  it('las entradas, salidas, conteos y traslados de inventario van al gerente y al administrador, nunca al cajero', () => {
+    const stockPermissions = [APP_PERMISSIONS.PRODUCTS_STOCK_ENTRY, APP_PERMISSIONS.PRODUCTS_STOCK_EXIT, APP_PERMISSIONS.PRODUCTS_STOCK_COUNT, APP_PERMISSIONS.PRODUCTS_STOCK_TRANSFER];
+
+    expect(MANAGER_PERMISSIONS).toEqual(expect.arrayContaining(stockPermissions));
+    expect(ADMIN_PERMISSIONS).toEqual(expect.arrayContaining(stockPermissions));
+    for (const permission of stockPermissions) expect(CASHIER_PERMISSIONS).not.toContain(permission);
+  });
 });

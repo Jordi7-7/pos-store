@@ -86,6 +86,9 @@ export class GetBatchesHandler implements IQueryHandler<GetBatchesQuery> {
         case BatchOriginType.ADJUSTMENT:
           originLabel = 'Ajuste de inventario';
           break;
+        case BatchOriginType.TRANSFER:
+          originLabel = 'Traslado entre sucursales';
+          break;
         case BatchOriginType.INITIAL_STOCK:
         default:
           originLabel = 'Stock inicial';

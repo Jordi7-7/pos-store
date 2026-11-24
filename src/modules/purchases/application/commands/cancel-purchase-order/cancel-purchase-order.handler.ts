@@ -11,6 +11,8 @@ import { ProductStock } from '../../../../products/domain/entities/product-stock
 import { ProductBatch } from '../../../../products/domain/entities/product-batch.entity';
 import { Batch, BatchStatus } from '../../../../batches/domain/entities/batch.entity';
 import { InventoryMovement } from '../../../../products/domain/entities/inventory-movement.entity';
+import { newKardexLine } from '../../../../products/application/services/kardex';
+import { InventoryMovementCategory } from '../../../../../common/enums/inventory-movement-category.enum';
 import { InventoryMovementReason } from '../../../../../common/enums/inventory-movement-reason.enum';
 import { ProductVariant } from '../../../../products/domain/entities/product-variant.entity';
 import { costFromRemainingLayers } from '../../../../products/domain/services/stock-rules';
@@ -127,16 +129,20 @@ export class CancelPurchaseOrderHandler
         }
 
         // Compensatory Kardex movement (OUT - not a loss, explicitly a purchase cancellation)
-        const movement = new InventoryMovement();
-        movement.tenantId = tenantId;
-        movement.originBranchId = order.branchId;
-        movement.destinationBranchId = null;
-        movement.variantId = item.variantId;
-        movement.quantity = Number(item.quantity);
-        movement.type = InventoryMovementType.OUT;
-        movement.reason = InventoryMovementReason.ANULACION_COMPRA;
-        movement.purchaseOrderId = purchaseOrderId;
-        movements.push(movement);
+        movements.push(
+          newKardexLine({
+            tenantId,
+            variantId: item.variantId,
+            quantity: Number(item.quantity),
+            type: InventoryMovementType.OUT,
+            category: InventoryMovementCategory.PURCHASE,
+            reason: InventoryMovementReason.ANULACION_COMPRA,
+            branchId: order.branchId,
+            unitCost: Number(item.purchasePrice),
+            balanceAfter: newQty,
+            purchaseOrderId,
+          }),
+        );
       }
 
       await movementRepo.save(movements);
