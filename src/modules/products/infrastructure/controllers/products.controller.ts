@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Put, Delete, Body, Param, Query, ParseUUIDPipe, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Get, Put, Delete, Body, Param, Query, ParseEnumPipe, ParseUUIDPipe, HttpStatus } from '@nestjs/common';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
 import { CreateVariableProductDto, ProductVariantDto, CreateSimpleProductDto } from '../dtos/create-product.dto';
 import { CreateSimpleProductCommand } from '../../application/commands/create-simple-product/create-simple-product.command';
@@ -30,6 +30,7 @@ import { DeleteVariantCommand } from '../../application/commands/delete-variant/
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
 import { InventoryMovementsFilterDto } from '../dtos/inventory-movements-filter.dto';
 import { InventoryMovementReason } from '../../../../common/enums/inventory-movement-reason.enum';
+import { StockStatus } from '../../domain/enums/stock-status.enum';
 import { permissionForDocumentKind } from '../../domain/services/inventory-document-rules';
 import type { JwtUserPayload } from '../../../auth/interfaces/jwt-user-payload.interface';
 import { meetsRequirement } from '../../../auth/domain/permission-check';
@@ -192,15 +193,17 @@ export class ProductsController {
     @Query('search') search?: string,
     @Query('type') type?: string,
     @Query('branchId') branchId?: string,
+    @Query('stockStatus', new ParseEnumPipe(StockStatus, { optional: true })) stockStatus?: StockStatus,
+    /** Antiguo, de la casilla «Solo con stock»: equivale a `stockStatus=IN_STOCK`. Se retira cuando no quede una web que lo envíe. */
     @Query('inStockOnly') inStockOnly?: string | boolean,
   ) {
     const p = page ? Number(page) : undefined;
     const l = limit ? Number(limit) : undefined;
     const b = branchId || undefined;
-    const inStock = inStockOnly === 'true' || inStockOnly === true;
+    const status = stockStatus ?? (inStockOnly === 'true' || inStockOnly === true ? StockStatus.IN_STOCK : undefined);
 
     return this.queryBus.execute<GetProductsQuery, PaginatedProductsResponseDto>(
-      new GetProductsQuery(tenantId, p, l, search, type, b, inStock),
+      new GetProductsQuery(tenantId, p, l, search, type, b, status),
     );
   }
 

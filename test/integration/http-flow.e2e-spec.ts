@@ -420,6 +420,17 @@ describe('API por HTTP: flujo completo y contrato de errores', () => {
       expectErrorEnvelope(await api('get', '/products/inventory-documents/no-uuid', ownerToken), 400, 'BAD_REQUEST');
     });
 
+    it('el listado de productos filtra por estado de existencias; un estado inválido es 400 y el parámetro antiguo inStockOnly sigue valiendo', async () => {
+      for (const status of ['IN_STOCK', 'ZERO', 'NEGATIVE']) {
+        expect((await api('get', `/products?stockStatus=${status}&branchId=${branchId}`, ownerToken)).status).toBe(200);
+      }
+      expectErrorEnvelope(await api('get', '/products?stockStatus=NOPE', ownerToken), 400, 'BAD_REQUEST');
+
+      const viaNew = await api('get', `/products?stockStatus=IN_STOCK&branchId=${branchId}`, ownerToken);
+      const viaOld = await api('get', `/products?inStockOnly=true&branchId=${branchId}`, ownerToken);
+      expect((viaOld.body as { data: Array<{ id: string }> }).data.map((p) => p.id).sort()).toEqual((viaNew.body as { data: Array<{ id: string }> }).data.map((p) => p.id).sort());
+    });
+
     it('el historial por HTTP muestra el documento con su número y quién lo hizo', async () => {
       const response = await api('get', `/products/inventory-movements?variantId=${variantId}&reason=DONACION&startDate=2020-01-01&endDate=2100-01-01`, ownerToken);
 
