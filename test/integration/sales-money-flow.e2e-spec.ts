@@ -565,8 +565,8 @@ describe('Flujo de dinero: venta, devolución y cierre de caja', () => {
 
   describe('dashboard', () => {
     const metrics = (scopeBranchId?: string) =>
-      new GetDashboardMetricsHandler(db.manager, new DashboardReadQueries(db.manager)).execute(
-        new GetDashboardMetricsQuery(tenantId, scopeBranchId),
+      new GetDashboardMetricsHandler(db.manager, new DashboardReadQueries(db.manager), redis).execute(
+        new GetDashboardMetricsQuery(tenantId, userId, true, scopeBranchId),
       );
 
     it('refleja una venta y una devolución del día en todas las secciones del panel', async () => {

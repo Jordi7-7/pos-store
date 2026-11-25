@@ -15,10 +15,12 @@ export class DashboardController {
   @RequirePermissions(APP_PERMISSIONS.DASHBOARD_GET)
   async getMetrics(
     @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser('sub') userId: string,
+    @CurrentUser('isOwner') isOwner: boolean,
     @Query() query: DashboardMetricsQueryDto,
   ) {
     return this.queryBus.execute<GetDashboardMetricsQuery, DashboardMetricsDto>(
-      new GetDashboardMetricsQuery(tenantId, query.branchId),
+      new GetDashboardMetricsQuery(tenantId, userId, isOwner, query.branchId),
     );
   }
 }
