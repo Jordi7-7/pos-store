@@ -5,8 +5,8 @@
 ## Cifras medidas
 | Comprobación | Resultado | Fecha |
 |---|---|---|
-| `pnpm test` (unitarios) | 488 en verde, 75 suites | 2026-11-24 |
-| `pnpm test:integration` | 499 en verde, 33 suites (Postgres y Redis reales); `web-auth-flow` › logout es intermitente (ver abajo) | 2026-11-24 |
+| `pnpm test` (unitarios) | 502 en verde, 77 suites | 2026-11-25 |
+| `pnpm test:integration` | 535 en verde, 36 suites (Postgres y Redis reales); `web-auth-flow` › logout y `http-flow` (`ECONNRESET` bajo carga) son intermitentes | 2026-11-25 |
 | `scripts/reconcile-inventory.sql` (base de desarrollo) | documentos y contadores coherentes; cadena de saldos del kardex sin anomalías; **7 de 7.502** filas de existencia no cuadran con las capas FIFO (ver abajo) | 2026-11-24 |
 | Supresiones de lint (`eslint-suppressions.json`) | 131 (empezó en 538) | 2026-11-22 |
 
@@ -17,6 +17,13 @@ Si una cifra baja o las supresiones suben, algo se rompió.
 - **Offline (solo ventas, móvil):** `POST /sales/offline`, `GET /products/pos/catalog` y `GET /products/pos/stock?branchId=` hechos y commiteados (2026-11-11). Detalle en `deployment.md`.
 - **Documentos de inventario y kardex completo:** entradas, salidas, conteos y traslados, con las migraciones `1794…` (comiteado el 2026-11-24).
 - **Filtro de existencias del listado de productos:** `GET /products?stockStatus=IN_STOCK|ZERO|NEGATIVE`, resuelto en SQL (`stock-status-filter.ts`). El parámetro antiguo `inStockOnly` se mantiene como alias de `IN_STOCK` hasta que no quede una web que lo envíe.
+
+## Hecho el 2026-11-25
+- **Lista de documentos de inventario:** `GET /products/inventory-documents` (una fila por documento, con totales; filtros de sucursal, tipo, fechas y búsqueda por número, comentario o SKU). Los documentos y el kardex siguen abriéndose aunque el producto o la sucursal se borren después (`withDeleted` **antes** de los joins).
+- **Tres hallazgos de seguridad cerrados** (cada uno con su test): cerrar un turno exige tener la caja asignada; `create-variant` rechaza existencias en sucursales de otra tienda; el panel solo suma las sucursales que el usuario puede ver (403 si pide una ajena).
+- **Productos con variantes más estrictos:** precios y existencias ≥ 0, máximo 500 variantes por producto, todas las variantes del producto usan los mismos atributos (`VARIANT_ATTRIBUTES_INCONSISTENT`) y `SKU_TAKEN` nombra los SKU repetidos (`details.skus`). Los códigos de barras **siguen pudiendo repetirse** (decisión previa, índice no único).
+- **Borrado de atributos y opciones:** `DELETE /products/attributes/:id` y `/products/attributes/values/:id` (permiso `attributes.delete`); se rechaza con `ATTRIBUTE_IN_USE` (dice cuántas variantes) si alguna variante vigente los usa; las variantes eliminadas no cuentan. Los DTO de **editar** variante y producto simple ya rechazan precios negativos.
+- **Importación por variantes:** `POST /products/import-variants` (una fila por variante; `dryRun` valida y cuenta sin escribir; informe de errores por fila; crea categorías, atributos y valores que falten y todo en una transacción). Planificador puro en `domain/import-plan.ts`. Máximo 2.000 filas. Reutiliza los casos de uso de alta, así que valida igual que la pantalla. El importador antiguo de productos simples (`/products/import`) sigue como estaba.
 
 ## Conciliación de inventario
 `scripts/reconcile-inventory.sql` (solo lectura) compara la existencia (`product_stocks`) con las capas FIFO y revisa los documentos y su numeración. En la base de **desarrollo** hay 7 filas de la tienda de pruebas que no cuadran (CAM-001, HL6895, HM-130, HM130, HM131, KH8784, WA0436); son anteriores a los documentos de inventario (último movimiento entre agosto y octubre) y el dueño decidió **dejarlas** porque son datos de prueba (2026-11-22). Ejecutar el script en producción antes y después de migrar (`deployment.md` §4).
