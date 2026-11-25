@@ -13,6 +13,7 @@ import { ErrorCode } from '../../../../../common/errors/error-codes';
 import { recordInitialStock } from '../../services/initial-stock';
 import { translatingSkuConflict } from '../../services/sku-conflict';
 import { assertSkusDoNotShadowBaseSku } from '../../services/base-sku';
+import { assertVariantAttributesAreConsistent } from '../../services/variant-attributes';
 import { normalizeSku } from '../../../domain/sku';
 
 @CommandHandler(CreateVariantCommand)
@@ -116,6 +117,9 @@ export class CreateVariantHandler implements ICommandHandler<CreateVariantComman
           throw new AppException(ErrorCode.AttributeValuesNotFound, 'Uno o más valores de atributo no existen.', HttpStatus.NOT_FOUND);
         }
         variant.attributeValues = attributeValues;
+        // Debe usar los mismos atributos que las variantes que el producto ya tiene (las antiguas sin atributos no cuentan)
+        const existingSets = product.variants.map((existing) => (existing.attributeValues ?? []).map((value) => value.attributeId)).filter((ids) => ids.length > 0);
+        assertVariantAttributesAreConsistent([...existingSets, attributeValues.map((value) => value.attributeId)]);
       } else {
         variant.attributeValues = [];
       }

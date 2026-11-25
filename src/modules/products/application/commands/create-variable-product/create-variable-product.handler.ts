@@ -17,6 +17,7 @@ import { ErrorCode } from '../../../../../common/errors/error-codes';
 import { translatingSkuConflict } from '../../services/sku-conflict';
 import { assertBaseSkuAvailable, assertSkusDoNotShadowBaseSku } from '../../services/base-sku';
 import { recordInitialStock } from '../../services/initial-stock';
+import { assertVariantAttributesAreConsistent } from '../../services/variant-attributes';
 
 /** Todo lo que viene del cliente por id, ya comprobado contra la tienda y cargado de una vez. */
 interface ResolvedReferences {
@@ -71,6 +72,7 @@ export class CreateVariableProductHandler implements ICommandHandler<CreateVaria
     await this.assertBranchesBelongToTenant(manager, tenantId, variants);
     await this.assertSkusAvailable(manager, tenantId, baseSku, variants);
     const references = await this.resolveReferences(manager, command);
+    assertVariantAttributesAreConsistent(variants.map((variant) => (variant.attributeValues ?? []).map((value) => (references.attributeValues.get(value.attributeValueId) as AttributeValue).attributeId)));
 
     const savedProduct = await manager.getRepository(Product).save(this.buildProduct(command, baseSku, references));
     const savedVariants = await manager.getRepository(ProductVariant).save(this.buildVariants(savedProduct, command, references));
@@ -107,8 +109,10 @@ export class CreateVariableProductHandler implements ICommandHandler<CreateVaria
 
   private async assertSkusAvailable(manager: EntityManager, tenantId: string, baseSku: string, variants: VariantInput[]): Promise<void> {
     const skus = variants.map((variant) => normalizeSku(variant.sku));
-    if ((await manager.getRepository(ProductVariant).count({ where: { sku: In(skus), tenantId } })) > 0) {
-      throw new AppException(ErrorCode.SkuTaken, 'Uno o más SKUs ya están registrados en el sistema para este inquilino.', HttpStatus.CONFLICT);
+    const taken = await manager.getRepository(ProductVariant).find({ where: { sku: In(skus), tenantId }, select: { sku: true } });
+    if (taken.length > 0) {
+      const takenSkus = taken.map((variant) => variant.sku).sort();
+      throw new AppException(ErrorCode.SkuTaken, `Estos SKU ya están registrados: ${takenSkus.join(', ')}.`, HttpStatus.CONFLICT, { skus: takenSkus });
     }
     await assertBaseSkuAvailable(manager, tenantId, baseSku);
     await assertSkusDoNotShadowBaseSku(manager, tenantId, skus);

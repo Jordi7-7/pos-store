@@ -184,6 +184,38 @@ describe('Catálogo: productos, variantes e importación', () => {
       expect(await countProducts()).toBe(before);
     });
 
+    it('rechaza variantes que mezclan atributos distintos o repiten un atributo, y no crea nada', async () => {
+      const size = await newAttribute('Talla mezcla', ['S', 'M']);
+      const color = await newAttribute('Color mezcla', ['Rojo']);
+      const before = await countProducts();
+
+      await expect(
+        createVariable('Mezcla', [
+          { sku: 'MEZ-1', purchasePrice: 1, salePrice: 2, attributeValues: [{ attributeValueId: size.valueIds[0] }] },
+          { sku: 'MEZ-2', purchasePrice: 1, salePrice: 2, attributeValues: [{ attributeValueId: color.valueIds[0] }] },
+        ]),
+      ).rejects.toMatchObject({ code: 'VARIANT_ATTRIBUTES_INCONSISTENT' });
+      await expect(
+        createVariable('Repetida', [{ sku: 'REP-1', purchasePrice: 1, salePrice: 2, attributeValues: [{ attributeValueId: size.valueIds[0] }, { attributeValueId: size.valueIds[1] }] }]),
+      ).rejects.toMatchObject({ code: 'VARIANT_ATTRIBUTES_INCONSISTENT' });
+
+      expect(await countProducts()).toBe(before);
+      expect(await variantBySku('MEZ-1')).toBeNull();
+    });
+
+    it('el error de SKU repetido nombra cuáles son, para corregirlos sin buscarlos', async () => {
+      await createSimple('NOM-1');
+      await createSimple('NOM-2');
+
+      await expect(
+        createVariable('Nombra', [
+          { sku: 'nom-1', purchasePrice: 1, salePrice: 2 },
+          { sku: 'LIBRE-1', purchasePrice: 1, salePrice: 2 },
+          { sku: 'NOM-2', purchasePrice: 1, salePrice: 2 },
+        ]),
+      ).rejects.toMatchObject({ code: 'SKU_TAKEN', details: { skus: ['NOM-1', 'NOM-2'] } });
+    });
+
     it('rechaza un SKU que ya existe y exige al menos una variante y un SKU base', async () => {
       await createSimple('VAR-TAKEN');
 
@@ -200,6 +232,16 @@ describe('Catálogo: productos, variantes e importación', () => {
       await expect(add({ sku: 'ZAP-40', purchasePrice: 5, salePrice: 12, attributeValues: [{ attributeValueId: size.valueIds[1] }] })).resolves.toBeDefined();
       await expect(add({ sku: 'ZAP-X', purchasePrice: 5, salePrice: 12, attributeValues: [{ attributeValueId: size.valueIds[0] }] })).rejects.toMatchObject({ code: 'DUPLICATE_VARIANT_COMBINATION' });
       await expect(add({ sku: 'ZAP-40', purchasePrice: 5, salePrice: 12 })).rejects.toMatchObject({ code: 'SKU_TAKEN' });
+    });
+
+    it('añadir una variante con otros atributos que las del producto se rechaza', async () => {
+      const size = await newAttribute('Talla add', ['S', 'M']);
+      const color = await newAttribute('Color add', ['Rojo']);
+      const product = await createVariable('Chaqueta', [{ sku: 'CHA-S', purchasePrice: 5, salePrice: 12, attributeValues: [{ attributeValueId: size.valueIds[0] }] }]);
+      const add = (variant: VariantInput) => new CreateVariantHandler(db.manager).execute(new CreateVariantCommand(shop.tenantId, product.id, variant));
+
+      await expect(add({ sku: 'CHA-R', purchasePrice: 5, salePrice: 12, attributeValues: [{ attributeValueId: color.valueIds[0] }] })).rejects.toMatchObject({ code: 'VARIANT_ATTRIBUTES_INCONSISTENT' });
+      await expect(add({ sku: 'CHA-M', purchasePrice: 5, salePrice: 12, attributeValues: [{ attributeValueId: size.valueIds[1] }] })).resolves.toBeDefined();
     });
   });
 

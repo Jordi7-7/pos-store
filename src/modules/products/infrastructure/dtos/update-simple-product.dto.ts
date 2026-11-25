@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional, IsArray, IsNumber, IsUUID } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsArray, IsNumber, IsUUID, Min } from 'class-validator';
 
 export class UpdateSimpleProductDto {
   @IsString()
@@ -29,14 +29,17 @@ export class UpdateSimpleProductDto {
   barcode?: string;
 
   @IsNumber()
+  @Min(0)
   @IsOptional()
   purchasePrice?: number;
 
   @IsNumber()
+  @Min(0)
   @IsOptional()
   salePrice?: number;
 
   @IsNumber()
+  @Min(0)
   @IsOptional()
   wholesalePrice?: number | null;
 }
