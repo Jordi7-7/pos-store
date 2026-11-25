@@ -6,6 +6,8 @@ import { CreateVariableProductCommand } from '../../application/commands/create-
 import { CreateVariantCommand } from '../../application/commands/create-variant/create-variant.command';
 import { CreateAttributeDto } from '../dtos/create-attribute.dto';
 import { CreateAttributeCommand } from '../../application/commands/create-attribute/create-attribute.command';
+import { DeleteAttributeCommand } from '../../application/commands/delete-attribute/delete-attribute.command';
+import { DeleteAttributeValueCommand } from '../../application/commands/delete-attribute-value/delete-attribute-value.command';
 import { CreateAttributeValueDto } from '../dtos/create-attribute-value.dto';
 import { CreateAttributeValueCommand } from '../../application/commands/create-attribute-value/create-attribute-value.command';
 import { CreateCategoryDto } from '../dtos/create-category.dto';
@@ -181,6 +183,28 @@ export class ProductsController {
     return this.commandBus.execute<CreateAttributeValueCommand, AttributeValue>(
       new CreateAttributeValueCommand(tenantId, dto.attributeId, dto.value),
     );
+  }
+
+  /** Elimina una opción de un atributo. Va antes que `attributes/:id` para que `values` no se lea como un id. */
+  @Delete('attributes/values/:valueId')
+  @RequirePermissions(APP_PERMISSIONS.ATTRIBUTES_DELETE)
+  async deleteAttributeValue(
+    @CurrentUser('tenantId') tenantId: string,
+    @Param('valueId', ParseUUIDPipe) valueId: string,
+  ) {
+    await this.commandBus.execute<DeleteAttributeValueCommand, void>(new DeleteAttributeValueCommand(tenantId, valueId));
+    return { message: 'Opción eliminada.' };
+  }
+
+  /** Elimina un atributo con todas sus opciones si ninguna variante vigente lo usa. */
+  @Delete('attributes/:attributeId')
+  @RequirePermissions(APP_PERMISSIONS.ATTRIBUTES_DELETE)
+  async deleteAttribute(
+    @CurrentUser('tenantId') tenantId: string,
+    @Param('attributeId', ParseUUIDPipe) attributeId: string,
+  ) {
+    await this.commandBus.execute<DeleteAttributeCommand, void>(new DeleteAttributeCommand(tenantId, attributeId));
+    return { message: 'Atributo eliminado.' };
   }
 
   @Get('attributes')
