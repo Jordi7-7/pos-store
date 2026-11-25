@@ -27,6 +27,7 @@ import { DeleteProductHandler } from './application/commands/delete-product/dele
 import { CreateVariantHandler } from './application/commands/create-variant/create-variant.handler';
 import { DeleteVariantHandler } from './application/commands/delete-variant/delete-variant.handler';
 import { ImportProductsHandler } from './application/commands/import-products/import-products.handler';
+import { ImportVariantProductsHandler } from './application/commands/import-variant-products/import-variant-products.handler';
 import { ValidateImportProductsHandler } from './application/queries/validate-import-products/validate-import-products.handler';
 import { GetAttributesHandler } from './application/queries/get-attributes/get-attributes.handler';
 import { GetInventoryMovementsByVariantHandler } from './application/queries/get-inventory-movements-by-variant/get-inventory-movements-by-variant.handler';
@@ -93,6 +94,7 @@ import { ProductsController } from './infrastructure/controllers/products.contro
     CreateStockTransferHandler,
     GetStockCountSheetHandler,
     ImportProductsHandler,
+    ImportVariantProductsHandler,
     ValidateImportProductsHandler,
     GetAttributesHandler,
     GetInventoryMovementsByVariantHandler,

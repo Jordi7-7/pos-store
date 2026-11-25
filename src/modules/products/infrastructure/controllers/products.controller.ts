@@ -50,6 +50,9 @@ import { GetInventoryDocumentsQuery } from '../../application/queries/get-invent
 import { InventoryDocumentsFilterDto } from '../dtos/inventory-documents-filter.dto';
 import { GetInventoryDocumentQuery } from '../../application/queries/get-inventory-document/get-inventory-document.query';
 import { ValidateImportProductsDto, ImportProductsDto } from '../dtos/import-products.dto';
+import { ImportVariantProductsDto } from '../dtos/import-variant-products.dto';
+import { ImportVariantProductsCommand } from '../../application/commands/import-variant-products/import-variant-products.command';
+import { ImportVariantsReport } from '../../application/commands/import-variant-products/import-variant-products.handler';
 import { ImportProductsCommand } from '../../application/commands/import-products/import-products.command';
 import { ValidateImportProductsQuery } from '../../application/queries/validate-import-products/validate-import-products.query';
 import { GetAttributesQuery } from '../../application/queries/get-attributes/get-attributes.query';
@@ -542,6 +545,37 @@ export class ProductsController {
   ) {
     return this.queryBus.execute<ValidateImportProductsQuery, ImportValidationResult>(
       new ValidateImportProductsQuery(tenantId, dto.items),
+    );
+  }
+
+  /** Importa productos con variantes (una fila por variante). Con `dryRun` solo valida y devuelve el informe. */
+  @Post('import-variants')
+  @RequirePermissions(APP_PERMISSIONS.PRODUCTS_IMPORT)
+  async importVariantProducts(
+    @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser('sub') userId: string,
+    @Body() dto: ImportVariantProductsDto,
+  ) {
+    return this.commandBus.execute<ImportVariantProductsCommand, ImportVariantsReport>(
+      new ImportVariantProductsCommand(
+        tenantId,
+        userId,
+        dto.branchId,
+        dto.dryRun === true,
+        dto.rows.map((row) => ({
+          row: row.row,
+          name: row.name,
+          baseSku: row.baseSku ?? '',
+          category: row.category ?? '',
+          attributes: row.attributes ?? [],
+          sku: row.sku,
+          barcode: row.barcode ?? '',
+          purchasePrice: row.purchasePrice ?? null,
+          salePrice: row.salePrice ?? null,
+          wholesalePrice: row.wholesalePrice ?? null,
+          quantity: row.quantity ?? null,
+        })),
+      ),
     );
   }
 
