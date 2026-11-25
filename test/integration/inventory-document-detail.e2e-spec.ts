@@ -7,6 +7,8 @@ import { CreateStockTransferCommand } from '../../src/modules/products/applicati
 import { CreateStockTransferHandler } from '../../src/modules/products/application/commands/create-stock-transfer/create-stock-transfer.handler';
 import { GetInventoryDocumentHandler } from '../../src/modules/products/application/queries/get-inventory-document/get-inventory-document.handler';
 import { GetInventoryDocumentQuery } from '../../src/modules/products/application/queries/get-inventory-document/get-inventory-document.query';
+import { ProductVariant } from '../../src/modules/products/domain/entities/product-variant.entity';
+import { Product } from '../../src/modules/products/domain/entities/product.entity';
 import { User } from '../../src/modules/users/domain/entities/user.entity';
 import { redisStub, seedTenant, seedVariant, SeededTenant, startTestDatabase, TestDatabase } from './support/integration-database';
 
@@ -93,5 +95,34 @@ describe('Documento de inventario: detalle', () => {
   it('sin acceso a ninguna de las sucursales del documento: 403 BRANCH_ACCESS_DENIED y no se revela nada', async () => {
     await expect(detail(entryId, norteOnly, false)).rejects.toMatchObject({ code: 'BRANCH_ACCESS_DENIED', status: 403 });
     await expect(detail(entryId, nobody, false)).rejects.toMatchObject({ code: 'BRANCH_ACCESS_DENIED', status: 403 });
+  });
+
+  describe('lo borrado después sigue en el historial', () => {
+    it('un documento con un producto que se borró después se abre igual, con su SKU y su nombre', async () => {
+      const variant = await seedVariant(db, shop.tenantId, 'DET-BORRADO');
+      const document = await new CreateInventoryDocumentHandler(db.manager, redisStub).execute(
+        new CreateInventoryDocumentCommand(shop.tenantId, shop.ownerId, shop.branchId, InventoryDocumentKind.ENTRY, 'DONACION', [{ variantId: variant, quantity: 2 }]),
+      );
+      const productId = (await db.getRepository(ProductVariant).findOneByOrFail({ id: variant })).productId;
+      await db.getRepository(ProductVariant).softDelete(variant);
+      await db.getRepository(Product).softDelete(productId);
+
+      const result = await detail(document.id, shop.ownerId, true);
+
+      expect(result.lines).toMatchObject([{ sku: 'DET-BORRADO', productName: 'DET-BORRADO', type: 'IN', quantity: 2 }]);
+    });
+
+    it('un documento de una sucursal que se borró después se abre igual, con su nombre', async () => {
+      const sur = (await db.getRepository(Branch).save(db.getRepository(Branch).create({ tenantId: shop.tenantId, name: 'Sur', address: 'x', code: 3 }))).id;
+      const variant = await seedVariant(db, shop.tenantId, 'DET-SUR');
+      await new CreateInventoryDocumentHandler(db.manager, redisStub).execute(new CreateInventoryDocumentCommand(shop.tenantId, shop.ownerId, shop.branchId, InventoryDocumentKind.ENTRY, 'DONACION', [{ variantId: variant, quantity: 5 }]));
+      const transfer = await new CreateStockTransferHandler(db.manager, redisStub).execute(new CreateStockTransferCommand(shop.tenantId, shop.ownerId, shop.branchId, sur, 'TRASLADO', [{ variantId: variant, quantity: 3 }]));
+      await db.getRepository(Branch).softDelete(sur);
+
+      const result = await detail(transfer.id, shop.ownerId, true);
+
+      expect(result).toMatchObject({ branch: { name: 'Matriz' }, destinationBranch: { name: 'Sur' } });
+      expect(result.lines.map((l) => l.branchName).sort()).toEqual(['Matriz', 'Sur']);
+    });
   });
 });

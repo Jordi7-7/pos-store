@@ -2,6 +2,8 @@ import { DataSource } from 'typeorm';
 import { Branch } from '../../src/modules/branches/domain/entities/branch.entity';
 import { GetInventoryMovementsHandler } from '../../src/modules/products/application/queries/get-inventory-movements/get-inventory-movements.handler';
 import { GetInventoryMovementsQuery } from '../../src/modules/products/application/queries/get-inventory-movements/get-inventory-movements.query';
+import { ProductVariant } from '../../src/modules/products/domain/entities/product-variant.entity';
+import { Product } from '../../src/modules/products/domain/entities/product.entity';
 import { InventoryMovement } from '../../src/modules/products/domain/entities/inventory-movement.entity';
 import { User } from '../../src/modules/users/domain/entities/user.entity';
 import { InventoryMovementType } from '../../src/common/enums/inventory-movement-type.enum';
@@ -130,5 +132,17 @@ describe('Historial global de movimientos de inventario', () => {
       expect(page.data).toEqual([]);
       expect(page.meta.total).toBe(0);
     });
+  });
+
+  it('los movimientos de un producto que se borró después siguen en el historial (es un registro: no se pierde)', async () => {
+    const borrado = await seedVariant(db, shop.tenantId, 'BORRADO-1');
+    await move({ variantId: borrado, type: InventoryMovementType.IN, reason: 'COMPRA', quantity: 7, destination: leiza, at: '2026-11-05T10:00:00Z' });
+    const productId = (await db.getRepository(ProductVariant).findOneByOrFail({ id: borrado })).productId;
+    await db.getRepository(ProductVariant).softDelete(borrado);
+    await db.getRepository(Product).softDelete(productId);
+
+    const page = await history({ variantId: borrado });
+
+    expect(page.data.map((m) => [m.sku, m.quantity])).toEqual([['BORRADO-1', 7]]);
   });
 });
