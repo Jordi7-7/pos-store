@@ -32,6 +32,7 @@ import { GetAttributesHandler } from './application/queries/get-attributes/get-a
 import { GetInventoryMovementsByVariantHandler } from './application/queries/get-inventory-movements-by-variant/get-inventory-movements-by-variant.handler';
 import { GetInventoryMovementsHandler } from './application/queries/get-inventory-movements/get-inventory-movements.handler';
 import { GetInventoryDocumentHandler } from './application/queries/get-inventory-document/get-inventory-document.handler';
+import { GetInventoryDocumentsHandler } from './application/queries/get-inventory-documents/get-inventory-documents.handler';
 import { CreateInventoryDocumentHandler } from './application/commands/create-inventory-document/create-inventory-document.handler';
 import { CreateStockCountHandler } from './application/commands/create-stock-count/create-stock-count.handler';
 import { GetStockCountSheetHandler } from './application/queries/get-stock-count-sheet/get-stock-count-sheet.handler';
@@ -86,6 +87,7 @@ import { ProductsController } from './infrastructure/controllers/products.contro
     DeleteVariantHandler,
     GetInventoryMovementsHandler,
     GetInventoryDocumentHandler,
+    GetInventoryDocumentsHandler,
     CreateInventoryDocumentHandler,
     CreateStockCountHandler,
     CreateStockTransferHandler,

@@ -51,3 +51,26 @@ export interface InventoryDocumentDetail {
   destinationBranch: { id: string; name: string } | null;
   lines: InventoryDocumentDetailLine[];
 }
+
+/** Una fila de la lista de documentos de inventario, con cuántos productos y unidades movió. */
+export interface InventoryDocumentListItem {
+  id: string;
+  number: string;
+  kind: InventoryDocumentKind;
+  reason: string;
+  comment: string | null;
+  createdAt: Date;
+  userName: string | null;
+  branch: { id: string; name: string };
+  /** Solo en traslados: la sucursal que recibe (`branch` es la que envía). */
+  destinationBranch: { id: string; name: string } | null;
+  /** Productos (variantes) distintos del documento. */
+  productsCount: number;
+  /** Unidades movidas: en un traslado se cuentan una sola vez (no la salida y la entrada) y en un conteo, las diferencias. */
+  unitsCount: number;
+}
+
+export interface InventoryDocumentListPage {
+  data: InventoryDocumentListItem[];
+  meta: { total: number; page: number; limit: number; totalPages: number };
+}

@@ -408,6 +408,22 @@ describe('API por HTTP: flujo completo y contrato de errores', () => {
       expect((await api('get', `/products/inventory-movements?category=&${range}`, ownerToken)).status).toBe(200);
     });
 
+    it('la lista de documentos: 200 con un documento por fila y sus totales; un tipo inválido es 400 y uno en blanco se ignora', async () => {
+      const range = 'startDate=2020-01-01&endDate=2100-01-01';
+      const listed = await api('get', `/products/inventory-documents?${range}`, ownerToken);
+
+      expect(listed.status).toBe(200);
+      const rows = (listed.body as { data: Array<{ number: string; kind: string; productsCount: number; unitsCount: number }>; meta: { total: number } }).data;
+      expect(rows.length).toBeGreaterThan(0);
+      for (const row of rows) expect(row).toMatchObject({ number: expect.stringMatching(/^(ENT|SAL|CNT|TRS)-\d{6}$/) as string, productsCount: expect.any(Number) as number, unitsCount: expect.any(Number) as number });
+
+      const onlyEntries = await api('get', `/products/inventory-documents?kind=ENTRY&${range}`, ownerToken);
+      for (const row of (onlyEntries.body as { data: Array<{ kind: string }> }).data) expect(row.kind).toBe('ENTRY');
+
+      expectErrorEnvelope(await api('get', `/products/inventory-documents?kind=NOPE&${range}`, ownerToken), 400, 'VALIDATION_FAILED');
+      expect((await api('get', `/products/inventory-documents?kind=&${range}`, ownerToken)).status).toBe(200);
+    });
+
     it('un documento se abre por su id con todas sus líneas; un id inexistente es 404 y uno que no es UUID, 400', async () => {
       const created = await api('post', '/products/inventory-documents', ownerToken).send(body({ comment: 'Para abrir', lines: [{ variantId, quantity: 1 }] }));
       const id = (created.body as { id: string }).id;

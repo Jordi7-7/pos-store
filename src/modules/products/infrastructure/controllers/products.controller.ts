@@ -45,7 +45,9 @@ import { CreateStockCountDto } from '../dtos/create-stock-count.dto';
 import { CreateStockCountCommand } from '../../application/commands/create-stock-count/create-stock-count.command';
 import { CreateInventoryDocumentDto } from '../dtos/create-inventory-document.dto';
 import { CreateInventoryDocumentCommand } from '../../application/commands/create-inventory-document/create-inventory-document.command';
-import { InventoryDocumentDetail, InventoryDocumentResult } from '../../application/read-models/inventory-document';
+import { InventoryDocumentDetail, InventoryDocumentListPage, InventoryDocumentResult } from '../../application/read-models/inventory-document';
+import { GetInventoryDocumentsQuery } from '../../application/queries/get-inventory-documents/get-inventory-documents.query';
+import { InventoryDocumentsFilterDto } from '../dtos/inventory-documents-filter.dto';
 import { GetInventoryDocumentQuery } from '../../application/queries/get-inventory-document/get-inventory-document.query';
 import { ValidateImportProductsDto, ImportProductsDto } from '../dtos/import-products.dto';
 import { ImportProductsCommand } from '../../application/commands/import-products/import-products.command';
@@ -225,6 +227,28 @@ export class ProductsController {
         category: filters.category,
         reason: filters.reason,
         variantId: filters.variantId,
+        search: filters.search,
+        startDate: filters.startDate,
+        endDate: filters.endDate,
+      }),
+    );
+  }
+
+  /** Lista de documentos de inventario (uno por fila), con filtros. */
+  @Get('inventory-documents')
+  @RequirePermissions(APP_PERMISSIONS.PRODUCTS_GET)
+  async getInventoryDocuments(
+    @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser('sub') userId: string,
+    @CurrentUser('isOwner') isOwner: boolean,
+    @Query() filters: InventoryDocumentsFilterDto,
+  ) {
+    return this.queryBus.execute<GetInventoryDocumentsQuery, InventoryDocumentListPage>(
+      new GetInventoryDocumentsQuery(tenantId, userId, isOwner, {
+        page: parsePage(filters.page),
+        limit: parseLimit(filters.limit),
+        branchId: filters.branchId,
+        kind: filters.kind,
         search: filters.search,
         startDate: filters.startDate,
         endDate: filters.endDate,
