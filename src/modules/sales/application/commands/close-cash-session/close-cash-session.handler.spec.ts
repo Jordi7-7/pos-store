@@ -45,7 +45,7 @@ describe('CloseCashSessionHandler', () => {
       return Promise.resolve({ id: 's1', openingBalance: 50 } as unknown as CashSession);
     });
 
-    await handler.execute(new CloseCashSessionCommand('t1', 's1', 130));
+    await handler.execute(new CloseCashSessionCommand('t1', 'u1', 's1', 130));
 
     expect(calls[0]).toBe('query:FOR UPDATE');
     expect(calls.indexOf('findOne')).toBeGreaterThan(0);
@@ -54,7 +54,7 @@ describe('CloseCashSessionHandler', () => {
   it('calcula esperado y diferencia: apertura + efectivo - gastos - devoluciones', async () => {
     findOne.mockResolvedValue({ id: 's1', openingBalance: 50 } as unknown as CashSession);
 
-    const session = await handler.execute(new CloseCashSessionCommand('t1', 's1', 130));
+    const session = await handler.execute(new CloseCashSessionCommand('t1', 'u1', 's1', 130));
 
     expect(session.expectedBalance).toBe(135); // 50 + 100 - 10 - 5
     expect(session.difference).toBe(-5); // 130 - 135
@@ -64,7 +64,7 @@ describe('CloseCashSessionHandler', () => {
   it('falla si la sesión no está abierta o es de otro tenant', async () => {
     findOne.mockResolvedValue(null);
 
-    await expect(handler.execute(new CloseCashSessionCommand('t1', 's1', 0))).rejects.toMatchObject({ code: ErrorCode.CashSessionNotFound });
+    await expect(handler.execute(new CloseCashSessionCommand('t1', 'u1', 's1', 0))).rejects.toMatchObject({ code: ErrorCode.CashSessionNotFound });
     expect(save).not.toHaveBeenCalled();
   });
 });

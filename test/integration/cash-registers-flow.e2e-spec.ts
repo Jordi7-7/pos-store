@@ -34,7 +34,7 @@ describe('Cajas registradoras y apertura de turno', () => {
     new UpdateCashRegisterHandler(db.manager).execute(new UpdateCashRegisterCommand(tenantId, id, name, isActive));
   const open = (userId: string, cashRegisterId: string, openingBalance = 50, branchId = shop.branchId, tenantId = shop.tenantId) =>
     new OpenCashSessionHandler(db.manager, redisStub).execute(new OpenCashSessionCommand(tenantId, userId, branchId, openingBalance, cashRegisterId));
-  const close = (sessionId: string) => new CloseCashSessionHandler(db.manager).execute(new CloseCashSessionCommand(shop.tenantId, sessionId, 50));
+  const close = (sessionId: string, userId = shop.ownerId) => new CloseCashSessionHandler(db.manager).execute(new CloseCashSessionCommand(shop.tenantId, userId, sessionId, 50));
   const assign = (userId: string, registerId: string) => db.query(`INSERT INTO user_cash_registers (user_id, cash_register_id) VALUES ($1, $2)`, [userId, registerId]);
   const myRegisters = (userId: string, isOwner: boolean, branchId?: string) =>
     new GetMyCashRegistersHandler(db.manager).execute(new GetMyCashRegistersQuery(shop.tenantId, userId, isOwner, branchId));
@@ -181,6 +181,36 @@ describe('Cajas registradoras y apertura de turno', () => {
       const principal = await db.query(`SELECT id FROM cash_registers WHERE name = 'Principal'`);
       expect(await activeSession(cashierId, false, shop.branchId, principal[0].id)).toBeNull();
       expect(await activeSession(shop.ownerId, true, shop.branchId, principal[0].id)).toMatchObject({ cashRegisterName: 'Principal', openingBalance: 120.5 });
+    });
+  });
+
+  describe('quién puede cerrar el turno', () => {
+    it('quien no tiene asignada la caja no puede cerrar su turno, y el turno sigue abierto', async () => {
+      const mine = await createRegister('Cierre ajeno');
+      const session = await open(shop.ownerId, mine.id);
+
+      await expect(close(session.id, cashierId)).rejects.toMatchObject({ code: 'CASH_REGISTER_NOT_ASSIGNED' });
+
+      expect((await db.getRepository(CashSession).findOneByOrFail({ id: session.id })).status).toBe(CashSessionStatus.OPEN);
+    });
+
+    it('un cajero asignado a la caja sí puede cerrar el turno aunque lo abriera otro, y el propietario siempre', async () => {
+      const shared = await createRegister('Cierre compartido');
+      await assign(cashierId, shared.id);
+      const first = await open(shop.ownerId, shared.id);
+      await expect(close(first.id, cashierId)).resolves.toMatchObject({ status: CashSessionStatus.CLOSED });
+
+      const second = await open(cashierId, shared.id);
+      await expect(close(second.id, shop.ownerId)).resolves.toMatchObject({ status: CashSessionStatus.CLOSED });
+    });
+
+    it('un cajero asignado a la caja de otra sucursal tampoco puede cerrar este turno', async () => {
+      const north = await createRegister('Cierre norte', northBranchId);
+      const session = await open(shop.ownerId, north.id, 0, northBranchId);
+      const southOnly = await createRegister('Cierre sur');
+      await assign(cashierId, southOnly.id);
+
+      await expect(close(session.id, cashierId)).rejects.toMatchObject({ code: 'CASH_REGISTER_NOT_ASSIGNED' });
     });
   });
 });
