@@ -319,6 +319,19 @@ describe('Catálogo: editar producto, consulta por id, categorías, atributos y 
       await expect(addVariant(family.id, 'FAMBASE')).resolves.toMatchObject({ sku: 'FAMBASE' });
     });
 
+    it('añadir una variante con existencia inicial en una sucursal de otra tienda se rechaza y no deja nada guardado', async () => {
+      const product = await variable('Con existencia', 'CEX', ['CEX-1']);
+      const addWithStock = (branchId: string) =>
+        new CreateVariantHandler(db.manager).execute(new CreateVariantCommand(shop.tenantId, product.id, { sku: 'CEX-2', purchasePrice: 1, salePrice: 2, stocks: [{ branchId, quantity: 5 }] }));
+
+      await expect(addWithStock(other.branchId)).rejects.toMatchObject({ code: 'BRANCH_NOT_FOUND', details: { branchId: other.branchId } });
+
+      expect(await skusOf(product.id)).toEqual(['CEX-1']);
+      expect(await db.query(`SELECT 1 FROM product_stocks WHERE branch_id = $1`, [other.branchId])).toHaveLength(0);
+      expect(await db.query(`SELECT 1 FROM inventory_movements WHERE destination_branch_id = $1`, [other.branchId])).toHaveLength(0);
+      await expect(addWithStock(shop.branchId)).resolves.toMatchObject({ sku: 'CEX-2' });
+    });
+
     it('un producto eliminado libera su SKU base', async () => {
       const product = await variable('Temporal', 'TMP', ['TMP-1']);
       await new DeleteProductHandler(db.manager).execute(new DeleteProductCommand(shop.tenantId, product.id));

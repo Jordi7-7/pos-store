@@ -7,6 +7,7 @@ import { ProductVariant } from '../../../domain/entities/product-variant.entity'
 import { AttributeValue } from '../../../domain/entities/attribute-value.entity';
 import { ProductStock } from '../../../domain/entities/product-stock.entity';
 import { ProductImage } from '../../../domain/entities/product-image.entity';
+import { Branch } from '../../../../branches/domain/entities/branch.entity';
 import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
 import { recordInitialStock } from '../../services/initial-stock';
@@ -53,6 +54,16 @@ export class CreateVariantHandler implements ICommandHandler<CreateVariantComman
       }
 
       await assertSkusDoNotShadowBaseSku(transactionalManager, tenantId, [variantDto.sku], productId);
+
+      // La existencia inicial solo puede ir a sucursales de esta tienda (igual que al crear un producto simple o variable)
+      const stockBranchIds = [...new Set((variantDto.stocks ?? []).map((stock) => stock.branchId))];
+      if (stockBranchIds.length > 0) {
+        const found = new Set((await transactionalManager.getRepository(Branch).find({ where: { id: In(stockBranchIds), tenantId }, select: { id: true } })).map((branch) => branch.id));
+        const missing = stockBranchIds.find((id) => !found.has(id));
+        if (missing) {
+          throw new AppException(ErrorCode.BranchNotFound, `La sucursal con ID "${missing}" no existe o no pertenece al inquilino.`, HttpStatus.NOT_FOUND, { branchId: missing });
+        }
+      }
 
       // Validate no duplicate attribute combinations in existing product variants
       const valueIds = variantDto.attributeValues?.map((v) => v.attributeValueId) || [];
