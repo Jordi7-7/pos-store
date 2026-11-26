@@ -50,9 +50,9 @@ Vocabulario acordado con el dueño: `direction` (IN/OUT) + `category` (INITIAL, 
 
 ## Pendiente de la revisión del 2026-11-22
 - **Fila con tipo `INPUT` en desarrollo:** hay 1 movimiento (`INITIAL_STOCK`) con `type = 'INPUT'`, que no es ni `IN` ni `OUT`. Es de pruebas antiguas; la comprobación E2 del script la detecta. **Ejecutarla en producción antes de migrar** por si allí hubiera alguna.
-- **Hallazgos de seguridad de la auditoría** (sin corregir): cerrar un turno no comprueba quién lo cierra (`close-cash-session`), `create-variant` no valida la sucursal del stock inicial contra la tienda y el panel (`get-dashboard-metrics`) no filtra por las sucursales visibles. Cada uno necesita primero un test que falle.
-- **Migración `1794100000000`:** da conteo y traslado a todo rol que tenía «ajustar stock» (capacidades nuevas). Pendiente de decisión.
-- **Permiso `action:products.adjust_stock`:** el ajuste antiguo (`POST /products/stock-adjustments`) se retiró el 2026-11-24, así que ese permiso ya no abre ningún endpoint. Sigue en el catálogo y en los roles por compatibilidad; decidir si se retira de `APP_PERMISSIONS` y de los roles por defecto.
+- **Hallazgos de seguridad de la auditoría:** los tres se corrigieron el 2026-11-25 (ver «Hecho el 2026-11-25»).
+- **Migración `1794100000000`:** da conteo y traslado a todo rol que tenía «ajustar stock» (capacidades nuevas). El dueño indicó el 2026-11-25 que ya está aplicada en producción, así que no hay nada que decidir sobre la migración (una migración aplicada no se edita); solo queda revisar qué roles recibieron esos permisos.
+- **Permiso `action:products.adjust_stock`:** retirado el 2026-11-25 del catálogo, de los roles por defecto y de las constantes de la web y el móvil; la migración `1794200000000` lo quita de los roles y usuarios guardados (**pendiente de aplicar en producción**: va tras desplegar este cambio).
 - **Test intermitente:** `web-auth-flow` › «logout: revoca la sesión aunque el token de acceso haya vencido» falló 2 de ~12 ejecuciones (esperaba 401 y recibió 404 en `/auth/web/refresh`); no se reprodujo en 8 repeticiones seguidas con el cuerpo de la respuesta a la vista. El módulo de autenticación no se tocó en esos cambios.
 
 ## Decisiones de negocio por confirmar con el dueño (revisión del 2026-11-22; el código no se ha cambiado)
