@@ -34,7 +34,8 @@ export class UploadImageByUrlHandler implements ICommandHandler<UploadImageByUrl
 
     const saved = await this.entityManager.getRepository(ProductImage).save(image);
     this.logger.log(`Image uploaded by URL: ID ${saved.id} for Tenant ${tenantId}`);
-    return saved;
+    // Se vuelve a leer para devolver lo mismo que las lecturas: con la dirección pública y no con la clave guardada
+    return this.entityManager.getRepository(ProductImage).findOneByOrFail({ id: saved.id });
   }
 
   private filenameFrom(url: string): string {

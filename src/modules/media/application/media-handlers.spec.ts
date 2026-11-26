@@ -12,9 +12,11 @@ describe('Handlers de media', () => {
   const save = jest.fn();
   const remove = jest.fn();
   const getRawOne = jest.fn();
+  // Tras guardar, el handler vuelve a leer la imagen (así devuelve lo mismo que las lecturas); aquí devuelve lo guardado
+  const findOneByOrFail = jest.fn();
   const qb = { select: () => qb, from: () => qb, where: () => qb, limit: () => qb, getRawOne };
   const manager = {
-    getRepository: () => ({ findOne, save, remove }),
+    getRepository: () => ({ findOne, save, remove, findOneByOrFail }),
     createQueryBuilder: () => qb,
   } as unknown as EntityManager;
 
@@ -31,6 +33,7 @@ describe('Handlers de media', () => {
   beforeEach(() => {
     jest.resetAllMocks();
     save.mockImplementation((image: object) => Promise.resolve({ id: 'i1', ...image }));
+    findOneByOrFail.mockImplementation(() => Promise.resolve(save.mock.results[0]?.value ? (save.mock.results[0].value as Promise<object>) : undefined));
   });
 
   describe('RegisterImageHandler', () => {

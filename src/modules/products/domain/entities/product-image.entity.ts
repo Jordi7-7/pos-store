@@ -1,5 +1,6 @@
-import { Entity, Column, ManyToOne, JoinColumn, AfterLoad } from 'typeorm';
+import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
 import { BaseEntity } from '../../../../common/database/base.entity';
+import { publicUrlTransformer } from '../../../../common/storage/public-url';
 import { Tenant } from '../../../tenants/domain/entities/tenant.entity';
 
 @Entity('product_images')
@@ -11,18 +12,12 @@ export class ProductImage extends BaseEntity {
   @JoinColumn({ name: 'tenant_id' })
   tenant: Tenant;
 
-  @Column()
+  /** En la base va solo la clave del archivo; la entidad la ve como dirección pública (ver `public-url`). */
+  @Column({ transformer: publicUrlTransformer })
   url: string;
 
   @Column({ nullable: true })
   description?: string;
-
-  @AfterLoad()
-  updateUrl() {
-    if (this.url) {
-      this.url = `${process.env.AWS_S3_PUBLIC_URL}/${this.url}`;
-    }
-  }
 }
 
 
