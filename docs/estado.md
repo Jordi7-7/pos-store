@@ -8,7 +8,7 @@
 | `pnpm test` (unitarios) | 502 en verde, 77 suites | 2026-11-25 |
 | `pnpm test:integration` | 535 en verde, 36 suites (Postgres y Redis reales); `web-auth-flow` › logout y `http-flow` (`ECONNRESET` bajo carga) son intermitentes | 2026-11-25 |
 | `scripts/reconcile-inventory.sql` (base de desarrollo) | documentos y contadores coherentes; cadena de saldos del kardex sin anomalías; **7 de 7.502** filas de existencia no cuadran con las capas FIFO (ver abajo) | 2026-11-24 |
-| Supresiones de lint (`eslint-suppressions.json`) | 131 (empezó en 538) | 2026-11-22 |
+| Supresiones de lint (`eslint-suppressions.json`) | 127 (empezó en 538) | 2026-11-26 |
 
 Si una cifra baja o las supresiones suben, algo se rompió.
 

@@ -84,7 +84,7 @@ export class CreateVariantHandler implements ICommandHandler<CreateVariantComman
 
       // Create new variant
       const variant = new ProductVariant();
-      variant.product = product;
+      variant.productId = product.id;
       variant.sku = variantDto.sku;
       variant.barcode = variantDto.barcode || '';
       variant.purchasePrice = Number(variantDto.purchasePrice) || 0;
@@ -131,7 +131,6 @@ export class CreateVariantHandler implements ICommandHandler<CreateVariantComman
           const stock = new ProductStock();
           stock.branchId = stockDto.branchId;
           stock.quantity = Number(stockDto.quantity) || 0;
-          stock.variant = variant;
           variant.stocks.push(stock);
         }
       }
@@ -149,13 +148,6 @@ export class CreateVariantHandler implements ICommandHandler<CreateVariantComman
           unitCost: Number(savedVariant.purchasePrice),
         })),
       );
-
-      delete (savedVariant as any).product;
-      if (savedVariant.stocks) {
-        for (const stock of savedVariant.stocks) {
-          delete (stock as any).variant;
-        }
-      }
 
       return savedVariant;
     });
