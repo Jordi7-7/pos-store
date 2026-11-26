@@ -153,4 +153,16 @@ describe('Importación de productos con variantes', () => {
     await expect(run([])).rejects.toMatchObject({ code: 'IMPORT_EMPTY' });
     await expect(run(Array.from({ length: 2001 }, (_, index) => row({ sku: `MAX-${index}` })))).rejects.toMatchObject({ code: 'IMPORT_LIMIT_EXCEEDED' });
   });
+
+  it('una fila con cinco atributos (cuatro piezas de color y el cierre) crea la variante con los cinco', async () => {
+    const pieces = ['Frente', 'Bolsillo', 'Laterales', 'Base', 'Cierre'];
+    const backpack = (sku: string, zip: string) =>
+      row({ name: 'Mochila combinada', baseSku: 'MC', sku, attributes: pieces.map((name) => ({ name, value: name === 'Cierre' ? zip : 'Negro' })) });
+
+    const report = await run([backpack('MC-001', 'Negro'), backpack('MC-002', 'Rojo')]);
+
+    expect(report).toMatchObject({ valid: true, applied: true });
+    const variant = await db.getRepository(ProductVariant).findOneOrFail({ where: { sku: 'MC-002', tenantId: shop.tenantId }, relations: { attributeValues: { attribute: true } } });
+    expect(variant.attributeValues.map((value) => `${value.attribute.name}: ${value.value}`).sort()).toEqual(['Base: Negro', 'Bolsillo: Negro', 'Cierre: Rojo', 'Frente: Negro', 'Laterales: Negro']);
+  });
 });
