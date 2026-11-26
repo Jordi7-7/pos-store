@@ -3,7 +3,8 @@ import { Logger, HttpStatus } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { CreateAttributeValueCommand } from './create-attribute-value.command';
 import { Attribute } from '../../../domain/entities/attribute.entity';
-import { AttributeValue } from '../../../domain/entities/attribute-value.entity';
+import { AttributeValue, ATTRIBUTE_VALUE_INDEX } from '../../../domain/entities/attribute-value.entity';
+import { isUniqueViolation } from '../../../../../common/errors/database-errors';
 import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
 import { nextValueSortOrder } from '../../services/attribute-order';
@@ -34,23 +35,21 @@ export class CreateAttributeValueHandler implements ICommandHandler<CreateAttrib
     }
 
     // 2. Prevent duplicate values for the same Attribute
-    const existing = await valueRepo.findOne({
-      where: {
-        attributeId,
-        value: value,
-      },
-    });
-    if (existing) {
+    const valueTaken = () => {
       this.logger.warn(`Attribute value creation failed: value "${value}" already exists for Attribute ${attributeId}`);
-      throw new AppException(ErrorCode.AttributeValueTaken, `El valor "${value}" ya existe para este atributo.`, HttpStatus.CONFLICT, { value });
-    }
+      return new AppException(ErrorCode.AttributeValueTaken, `El valor "${value}" ya existe para este atributo.`, HttpStatus.CONFLICT, { value });
+    };
+    if (await valueRepo.findOne({ where: { attributeId, value } })) throw valueTaken();
 
     const attrValue = new AttributeValue();
     attrValue.attributeId = attributeId;
     attrValue.value = value;
     attrValue.sortOrder = await nextValueSortOrder(this.entityManager, attributeId);
 
-    const savedValue = await valueRepo.save(attrValue);
+    // Dos peticiones a la vez pueden pasar la comprobación: el índice único decide y se traduce al mismo error de negocio
+    const savedValue = await valueRepo.save(attrValue).catch((error: unknown) => {
+      throw isUniqueViolation(error, ATTRIBUTE_VALUE_INDEX) ? valueTaken() : error;
+    });
     this.logger.log(`Attribute value created successfully: "${savedValue.value}" (ID: ${savedValue.id})`);
 
     return savedValue;

@@ -2,10 +2,11 @@ import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { HttpStatus, Logger } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { UpdateRoleCommand } from './update-role.command';
-import { Role } from '../../../domain/entities/role.entity';
+import { Role, ROLE_NAME_INDEX } from '../../../domain/entities/role.entity';
 import { assertValidPermissions } from '../../../../../common/security/permissions.helper';
 import { assertCanGrant, loadActorPermissions } from '../../../../../common/security/privilege-escalation';
 import { AppException } from '../../../../../common/errors/app.exception';
+import { isUniqueViolation } from '../../../../../common/errors/database-errors';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
 
 @CommandHandler(UpdateRoleCommand)
@@ -32,11 +33,10 @@ export class UpdateRoleHandler implements ICommandHandler<UpdateRoleCommand> {
     }
 
     const name = command.name?.trim();
+    const nameTaken = () => new AppException(ErrorCode.RoleNameTaken, `Ya existe otro rol con el nombre "${name}".`, HttpStatus.CONFLICT);
     if (name && name !== role.name) {
       const duplicate = await roleRepo.findOne({ where: { tenantId, name } });
-      if (duplicate && duplicate.id !== role.id) {
-        throw new AppException(ErrorCode.RoleNameTaken, `Ya existe otro rol con el nombre "${name}".`, HttpStatus.CONFLICT);
-      }
+      if (duplicate && duplicate.id !== role.id) throw nameTaken();
       role.name = name;
     }
 
@@ -50,6 +50,9 @@ export class UpdateRoleHandler implements ICommandHandler<UpdateRoleCommand> {
       role.permissions = granted;
     }
 
-    return roleRepo.save(role);
+    // Dos peticiones a la vez pueden pasar la comprobación: el índice único decide y se traduce al mismo error de negocio
+    return roleRepo.save(role).catch((error: unknown) => {
+      throw isUniqueViolation(error, ROLE_NAME_INDEX) ? nameTaken() : error;
+    });
   }
 }

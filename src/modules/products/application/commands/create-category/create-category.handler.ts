@@ -2,7 +2,8 @@ import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { Logger, HttpStatus } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { CreateCategoryCommand } from './create-category.command';
-import { Category } from '../../../domain/entities/category.entity';
+import { Category, CATEGORY_NAME_INDEX } from '../../../domain/entities/category.entity';
+import { isUniqueViolation } from '../../../../../common/errors/database-errors';
 import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
 
@@ -18,20 +19,20 @@ export class CreateCategoryHandler implements ICommandHandler<CreateCategoryComm
 
     const categoryRepo = this.entityManager.getRepository(Category);
 
-    const existing = await categoryRepo.findOne({
-      where: { tenantId, name },
-    });
-
-    if (existing) {
+    const nameTaken = () => {
       this.logger.warn(`Category creation failed: Category name "${name}" already exists for Tenant ${tenantId}`);
-      throw new AppException(ErrorCode.CategoryNameTaken, `La categoría "${name}" ya existe.`, HttpStatus.CONFLICT, { name });
-    }
+      return new AppException(ErrorCode.CategoryNameTaken, `La categoría "${name}" ya existe.`, HttpStatus.CONFLICT, { name });
+    };
+    if (await categoryRepo.findOne({ where: { tenantId, name } })) throw nameTaken();
 
     const category = new Category();
     category.tenantId = tenantId;
     category.name = name;
 
-    const savedCategory = await categoryRepo.save(category);
+    // Dos peticiones a la vez pueden pasar la comprobación: el índice único decide y se traduce al mismo error de negocio
+    const savedCategory = await categoryRepo.save(category).catch((error: unknown) => {
+      throw isUniqueViolation(error, CATEGORY_NAME_INDEX) ? nameTaken() : error;
+    });
     this.logger.log(`Category created successfully: "${savedCategory.name}" (ID: ${savedCategory.id})`);
 
     return savedCategory;
