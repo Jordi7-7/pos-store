@@ -38,6 +38,9 @@ export class GetInventoryMovementsHandler implements IQueryHandler<GetInventoryM
     const qb = this.entityManager
       .getRepository(InventoryMovement)
       .createQueryBuilder('movement')
+      // El kardex es un registro: los movimientos de un producto o una sucursal que se borraron después siguen apareciendo.
+      // Va ANTES de los joins: TypeORM decide el filtro de borrados de cada join al declararlo.
+      .withDeleted()
       .innerJoin('movement.variant', 'variant')
       .innerJoin('variant.product', 'product')
       .leftJoin('movement.originBranch', 'originBranch')
@@ -73,6 +76,7 @@ export class GetInventoryMovementsHandler implements IQueryHandler<GetInventoryM
         'documentDestination.name',
       ])
       .where('movement.tenantId = :tenantId', { tenantId })
+      .andWhere('movement.deletedAt IS NULL')
       .andWhere('movement.createdAt BETWEEN :start AND :end', { start, end });
 
     if (branchId) {

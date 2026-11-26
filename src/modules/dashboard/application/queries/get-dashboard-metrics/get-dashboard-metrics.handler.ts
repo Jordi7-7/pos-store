@@ -1,10 +1,12 @@
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
 import { EntityManager } from 'typeorm';
+import { RedisService } from '../../../../../common/redis/redis.service';
 import { DateTime } from 'luxon';
 import { GetDashboardMetricsQuery } from './get-dashboard-metrics.query';
 import { Tenant } from '../../../../tenants/domain/entities/tenant.entity';
 import { DashboardMetricsDto } from './dashboard-metrics.read-model';
 import { resolveTimezone } from '../../../../../common/utils/timezone';
+import { assertUserCanAccessBranch, visibleBranchIds } from '../../../../../common/security/branch-access.helper';
 import { dashboardPeriods } from './dashboard-periods';
 import { DashboardReadQueries, DashboardScope } from './dashboard-read-queries';
 import {
@@ -23,10 +25,11 @@ export class GetDashboardMetricsHandler implements IQueryHandler<GetDashboardMet
   constructor(
     private readonly entityManager: EntityManager,
     private readonly reads: DashboardReadQueries,
+    private readonly redisService: RedisService,
   ) {}
 
   async execute(query: GetDashboardMetricsQuery): Promise<DashboardMetricsDto> {
-    const scope: DashboardScope = { tenantId: query.tenantId, branchId: query.branchId };
+    const scope = await this.scopeOf(query);
 
     // Hoy, ayer y la semana se calculan en la zona horaria del tenant
     const timezone = await this.timezoneOf(scope.tenantId);
@@ -51,6 +54,16 @@ export class GetDashboardMetricsHandler implements IQueryHandler<GetDashboardMet
       yesterdaySoldProducts: buildYesterdaySoldProducts(soldYesterday),
       weekSummary: buildWeekSummary(currentWeek, previousWeekTotal),
     };
+  }
+
+  /** Una sucursal elegida (si el usuario puede verla), o, sin elegir, todas las que puede ver (todas las de la tienda si es propietario). */
+  private async scopeOf(query: GetDashboardMetricsQuery): Promise<DashboardScope> {
+    const { tenantId, userId, isOwner, branchId } = query;
+    if (branchId) {
+      await assertUserCanAccessBranch(this.entityManager, this.redisService, { userId, isOwner, branchId, actionDescription: 'ver el panel' });
+      return { tenantId, branchIds: [branchId] };
+    }
+    return { tenantId, branchIds: await visibleBranchIds(this.entityManager, this.redisService, { userId, isOwner }) };
   }
 
   private async timezoneOf(tenantId: string): Promise<string> {

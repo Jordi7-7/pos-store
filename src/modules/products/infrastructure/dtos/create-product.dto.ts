@@ -1,4 +1,7 @@
-import { IsString, IsNotEmpty, IsOptional, IsArray, ValidateNested, IsNumber, IsUUID } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsArray, ValidateNested, IsNumber, IsUUID, Min, ArrayMaxSize } from 'class-validator';
+
+/** Tope de variantes de un producto en una sola petición (3 atributos de 7 valores ya son 343). */
+export const MAX_VARIANTS_PER_PRODUCT = 500;
 import { Type } from 'class-transformer';
 
 export class VariantAttributeValueDto {
@@ -11,6 +14,7 @@ export class ProductVariantStockDto {
   branchId: string;
 
   @IsNumber()
+  @Min(0)
   quantity: number;
 }
 
@@ -24,12 +28,15 @@ export class ProductVariantDto {
   barcode?: string;
 
   @IsNumber()
+  @Min(0)
   purchasePrice: number;
 
   @IsNumber()
+  @Min(0)
   salePrice: number;
 
   @IsNumber()
+  @Min(0)
   @IsOptional()
   wholesalePrice?: number;
 
@@ -73,6 +80,7 @@ export class CreateVariableProductDto {
 
   @IsArray()
   @IsNotEmpty()
+  @ArrayMaxSize(MAX_VARIANTS_PER_PRODUCT)
   @ValidateNested({ each: true })
   @Type(() => ProductVariantDto)
   variants: ProductVariantDto[];
@@ -97,12 +105,15 @@ export class CreateSimpleProductDto {
   barcode?: string;
 
   @IsNumber()
+  @Min(0)
   purchasePrice: number;
 
   @IsNumber()
+  @Min(0)
   salePrice: number;
 
   @IsNumber()
+  @Min(0)
   @IsOptional()
   wholesalePrice?: number;
 

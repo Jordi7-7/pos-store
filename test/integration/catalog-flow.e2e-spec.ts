@@ -11,6 +11,12 @@ import { CreateVariableProductCommand } from '../../src/modules/products/applica
 import { CreateVariableProductHandler } from '../../src/modules/products/application/commands/create-variable-product/create-variable-product.handler';
 import { CreateVariantCommand, VariantInput } from '../../src/modules/products/application/commands/create-variant/create-variant.command';
 import { CreateVariantHandler } from '../../src/modules/products/application/commands/create-variant/create-variant.handler';
+import { DeleteAttributeCommand } from '../../src/modules/products/application/commands/delete-attribute/delete-attribute.command';
+import { DeleteAttributeHandler } from '../../src/modules/products/application/commands/delete-attribute/delete-attribute.handler';
+import { DeleteAttributeValueCommand } from '../../src/modules/products/application/commands/delete-attribute-value/delete-attribute-value.command';
+import { DeleteAttributeValueHandler } from '../../src/modules/products/application/commands/delete-attribute-value/delete-attribute-value.handler';
+import { GetAttributesHandler } from '../../src/modules/products/application/queries/get-attributes/get-attributes.handler';
+import { GetAttributesQuery } from '../../src/modules/products/application/queries/get-attributes/get-attributes.query';
 import { DeleteProductCommand } from '../../src/modules/products/application/commands/delete-product/delete-product.command';
 import { DeleteProductHandler } from '../../src/modules/products/application/commands/delete-product/delete-product.handler';
 import { DeleteVariantCommand } from '../../src/modules/products/application/commands/delete-variant/delete-variant.command';
@@ -184,6 +190,38 @@ describe('Catálogo: productos, variantes e importación', () => {
       expect(await countProducts()).toBe(before);
     });
 
+    it('rechaza variantes que mezclan atributos distintos o repiten un atributo, y no crea nada', async () => {
+      const size = await newAttribute('Talla mezcla', ['S', 'M']);
+      const color = await newAttribute('Color mezcla', ['Rojo']);
+      const before = await countProducts();
+
+      await expect(
+        createVariable('Mezcla', [
+          { sku: 'MEZ-1', purchasePrice: 1, salePrice: 2, attributeValues: [{ attributeValueId: size.valueIds[0] }] },
+          { sku: 'MEZ-2', purchasePrice: 1, salePrice: 2, attributeValues: [{ attributeValueId: color.valueIds[0] }] },
+        ]),
+      ).rejects.toMatchObject({ code: 'VARIANT_ATTRIBUTES_INCONSISTENT' });
+      await expect(
+        createVariable('Repetida', [{ sku: 'REP-1', purchasePrice: 1, salePrice: 2, attributeValues: [{ attributeValueId: size.valueIds[0] }, { attributeValueId: size.valueIds[1] }] }]),
+      ).rejects.toMatchObject({ code: 'VARIANT_ATTRIBUTES_INCONSISTENT' });
+
+      expect(await countProducts()).toBe(before);
+      expect(await variantBySku('MEZ-1')).toBeNull();
+    });
+
+    it('el error de SKU repetido nombra cuáles son, para corregirlos sin buscarlos', async () => {
+      await createSimple('NOM-1');
+      await createSimple('NOM-2');
+
+      await expect(
+        createVariable('Nombra', [
+          { sku: 'nom-1', purchasePrice: 1, salePrice: 2 },
+          { sku: 'LIBRE-1', purchasePrice: 1, salePrice: 2 },
+          { sku: 'NOM-2', purchasePrice: 1, salePrice: 2 },
+        ]),
+      ).rejects.toMatchObject({ code: 'SKU_TAKEN', details: { skus: ['NOM-1', 'NOM-2'] } });
+    });
+
     it('rechaza un SKU que ya existe y exige al menos una variante y un SKU base', async () => {
       await createSimple('VAR-TAKEN');
 
@@ -200,6 +238,16 @@ describe('Catálogo: productos, variantes e importación', () => {
       await expect(add({ sku: 'ZAP-40', purchasePrice: 5, salePrice: 12, attributeValues: [{ attributeValueId: size.valueIds[1] }] })).resolves.toBeDefined();
       await expect(add({ sku: 'ZAP-X', purchasePrice: 5, salePrice: 12, attributeValues: [{ attributeValueId: size.valueIds[0] }] })).rejects.toMatchObject({ code: 'DUPLICATE_VARIANT_COMBINATION' });
       await expect(add({ sku: 'ZAP-40', purchasePrice: 5, salePrice: 12 })).rejects.toMatchObject({ code: 'SKU_TAKEN' });
+    });
+
+    it('añadir una variante con otros atributos que las del producto se rechaza', async () => {
+      const size = await newAttribute('Talla add', ['S', 'M']);
+      const color = await newAttribute('Color add', ['Rojo']);
+      const product = await createVariable('Chaqueta', [{ sku: 'CHA-S', purchasePrice: 5, salePrice: 12, attributeValues: [{ attributeValueId: size.valueIds[0] }] }]);
+      const add = (variant: VariantInput) => new CreateVariantHandler(db.manager).execute(new CreateVariantCommand(shop.tenantId, product.id, variant));
+
+      await expect(add({ sku: 'CHA-R', purchasePrice: 5, salePrice: 12, attributeValues: [{ attributeValueId: color.valueIds[0] }] })).rejects.toMatchObject({ code: 'VARIANT_ATTRIBUTES_INCONSISTENT' });
+      await expect(add({ sku: 'CHA-M', purchasePrice: 5, salePrice: 12, attributeValues: [{ attributeValueId: size.valueIds[1] }] })).resolves.toBeDefined();
     });
   });
 
@@ -362,6 +410,60 @@ describe('Catálogo: productos, variantes e importación', () => {
       await create('Bebidas');
       await expect(create('Bebidas')).rejects.toMatchObject({ code: 'CATEGORY_NAME_TAKEN' });
       await expect(create('Bebidas', other.tenantId)).resolves.toBeDefined();
+    });
+
+    describe('eliminar atributos y opciones', () => {
+      const removeAttribute = (id: string, tenantId = shop.tenantId) => new DeleteAttributeHandler(db.manager).execute(new DeleteAttributeCommand(tenantId, id));
+      const removeValue = (id: string, tenantId = shop.tenantId) => new DeleteAttributeValueHandler(db.manager).execute(new DeleteAttributeValueCommand(tenantId, id));
+      const listed = async (tenantId = shop.tenantId) => new GetAttributesHandler(db.manager).execute(new GetAttributesQuery(tenantId));
+
+      it('un atributo sin usar se elimina con sus opciones y su nombre queda libre', async () => {
+        const unused = await newAttribute('Sin uso', ['A', 'B']);
+
+        await removeAttribute(unused.attributeId);
+
+        expect((await listed()).map((attribute) => attribute.name)).not.toContain('Sin uso');
+        const again = await newAttribute('Sin uso', ['C']);
+        const recreated = (await listed()).find((attribute) => attribute.id === again.attributeId);
+        expect(recreated?.values.map((value) => value.value)).toEqual(['C']);
+      });
+
+      it('si una variante vigente lo usa no se elimina y dice cuántas; al eliminar el producto, sí', async () => {
+        const used = await newAttribute('En uso', ['X', 'Y']);
+        const product = await createVariable('Con atributo', [
+          { sku: 'USO-X', purchasePrice: 1, salePrice: 2, attributeValues: [{ attributeValueId: used.valueIds[0] }] },
+          { sku: 'USO-Y', purchasePrice: 1, salePrice: 2, attributeValues: [{ attributeValueId: used.valueIds[1] }] },
+        ]);
+
+        await expect(removeAttribute(used.attributeId)).rejects.toMatchObject({ code: 'ATTRIBUTE_IN_USE', details: { variants: 2 } });
+        await expect(removeValue(used.valueIds[0])).rejects.toMatchObject({ code: 'ATTRIBUTE_IN_USE', details: { variants: 1 } });
+        expect((await listed()).find((attribute) => attribute.id === used.attributeId)?.values).toHaveLength(2);
+
+        await deleteProduct(product.id);
+        await expect(removeAttribute(used.attributeId)).resolves.toBeUndefined();
+      });
+
+      it('una opción sin usar se elimina y las demás quedan; no se puede crear un producto con una opción eliminada', async () => {
+        const size = await newAttribute('Talla quitar', ['S', 'M', 'XXL']);
+
+        await removeValue(size.valueIds[2]);
+
+        const remaining = (await listed()).find((attribute) => attribute.id === size.attributeId);
+        expect(remaining?.values.map((value) => value.value).sort()).toEqual(['M', 'S']);
+        await expect(
+          createVariable('Con opción borrada', [{ sku: 'BORR-1', purchasePrice: 1, salePrice: 2, attributeValues: [{ attributeValueId: size.valueIds[2] }] }]),
+        ).rejects.toMatchObject({ code: 'ATTRIBUTE_VALUES_NOT_FOUND' });
+      });
+
+      it('lo de otra tienda o inexistente responde no encontrado', async () => {
+        const foreign = await newAttribute('Ajeno quitar', ['Z']);
+        const missing = '00000000-0000-4000-8000-000000000000';
+
+        await expect(removeAttribute(foreign.attributeId, other.tenantId)).rejects.toMatchObject({ code: 'ATTRIBUTE_NOT_FOUND' });
+        await expect(removeValue(foreign.valueIds[0], other.tenantId)).rejects.toMatchObject({ code: 'ATTRIBUTE_VALUES_NOT_FOUND' });
+        await expect(removeAttribute(missing)).rejects.toMatchObject({ code: 'ATTRIBUTE_NOT_FOUND' });
+        expect((await listed()).map((attribute) => attribute.id)).toContain(foreign.attributeId);
+      });
     });
 
     it('un valor de atributo es único dentro de su atributo y el atributo debe ser de la tienda', async () => {

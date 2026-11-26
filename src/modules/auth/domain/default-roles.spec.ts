@@ -20,10 +20,9 @@ describe('roles por defecto de una tienda nueva', () => {
     expect(ADMIN_PERMISSIONS).toContain(APP_PERMISSIONS.USERS_EDIT);
   });
 
-  it('el cajero puede vender y abrir caja pero no reembolsar ni ajustar stock', () => {
+  it('el cajero puede vender y abrir caja pero no reembolsar', () => {
     expect(CASHIER_PERMISSIONS).toEqual(expect.arrayContaining([APP_PERMISSIONS.POS_SELL, APP_PERMISSIONS.CASH_OPEN_CLOSE]));
     expect(CASHIER_PERMISSIONS).not.toContain(APP_PERMISSIONS.SALES_REFUND);
-    expect(CASHIER_PERMISSIONS).not.toContain(APP_PERMISSIONS.PRODUCTS_ADJUST_STOCK);
   });
 
   it('las entradas, salidas, conteos y traslados de inventario van al gerente y al administrador, nunca al cajero', () => {

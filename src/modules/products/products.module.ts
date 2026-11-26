@@ -26,12 +26,17 @@ import { UpdateVariantHandler } from './application/commands/update-variant/upda
 import { DeleteProductHandler } from './application/commands/delete-product/delete-product.handler';
 import { CreateVariantHandler } from './application/commands/create-variant/create-variant.handler';
 import { DeleteVariantHandler } from './application/commands/delete-variant/delete-variant.handler';
+import { DeleteAttributeHandler } from './application/commands/delete-attribute/delete-attribute.handler';
+import { DeleteAttributeValueHandler } from './application/commands/delete-attribute-value/delete-attribute-value.handler';
+import { ReorderAttributeValuesHandler } from './application/commands/reorder-attribute-values/reorder-attribute-values.handler';
 import { ImportProductsHandler } from './application/commands/import-products/import-products.handler';
+import { ImportVariantProductsHandler } from './application/commands/import-variant-products/import-variant-products.handler';
 import { ValidateImportProductsHandler } from './application/queries/validate-import-products/validate-import-products.handler';
 import { GetAttributesHandler } from './application/queries/get-attributes/get-attributes.handler';
 import { GetInventoryMovementsByVariantHandler } from './application/queries/get-inventory-movements-by-variant/get-inventory-movements-by-variant.handler';
 import { GetInventoryMovementsHandler } from './application/queries/get-inventory-movements/get-inventory-movements.handler';
 import { GetInventoryDocumentHandler } from './application/queries/get-inventory-document/get-inventory-document.handler';
+import { GetInventoryDocumentsHandler } from './application/queries/get-inventory-documents/get-inventory-documents.handler';
 import { CreateInventoryDocumentHandler } from './application/commands/create-inventory-document/create-inventory-document.handler';
 import { CreateStockCountHandler } from './application/commands/create-stock-count/create-stock-count.handler';
 import { GetStockCountSheetHandler } from './application/queries/get-stock-count-sheet/get-stock-count-sheet.handler';
@@ -86,11 +91,16 @@ import { ProductsController } from './infrastructure/controllers/products.contro
     DeleteVariantHandler,
     GetInventoryMovementsHandler,
     GetInventoryDocumentHandler,
+    GetInventoryDocumentsHandler,
     CreateInventoryDocumentHandler,
     CreateStockCountHandler,
     CreateStockTransferHandler,
     GetStockCountSheetHandler,
     ImportProductsHandler,
+    DeleteAttributeHandler,
+    ReorderAttributeValuesHandler,
+    DeleteAttributeValueHandler,
+    ImportVariantProductsHandler,
     ValidateImportProductsHandler,
     GetAttributesHandler,
     GetInventoryMovementsByVariantHandler,

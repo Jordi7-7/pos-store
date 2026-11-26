@@ -30,9 +30,11 @@ Forma de toda respuesta de error:
 
 | Código | HTTP | Módulo | Mensaje (ejemplo) | `details` |
 |---|---|---|---|---|
+| `ATTRIBUTE_IN_USE` | 409 | products | {what} lo usan {variants} variante(s) de productos; quítalo de ellas antes de eliminarlo. | `variants` |
 | `ATTRIBUTE_NAME_TAKEN` | 409 | products | El atributo "{name}" ya existe. | `name` |
 | `ATTRIBUTE_NOT_FOUND` | 404 | products | Atributo no encontrado. | `attributeId` |
-| `ATTRIBUTE_VALUES_NOT_FOUND` | 404 | products | Uno o más valores de atributo no existen. | — |
+| `ATTRIBUTE_ORDER_STALE` | 409 | products | La lista de opciones cambió mientras la ordenabas; recárgala y vuelve a intentarlo. | `problem` |
+| `ATTRIBUTE_VALUES_NOT_FOUND` | 404 | products | Uno o más valores de atributo no existen. | `valueId` |
 | `ATTRIBUTE_VALUE_TAKEN` | 409 | products | El valor "{value}" ya existe para este atributo. | `value` |
 | `AUTH_TOKEN_INVALID` | 401 | auth | El token de autenticación no es válido o expiró. | — |
 | `AUTH_TOKEN_MISSING` | 401 | auth | Falta el token de autenticación. | — |
@@ -69,6 +71,7 @@ Forma de toda respuesta de error:
 | `IDEMPOTENCY_KEY_REUSED` | 409 | products, sales | Ese identificador ya se usó en otro movimiento distinto. | — |
 | `IMAGES_NOT_FOUND` | 404 | products | Una o más imágenes de la variante no existen. | — |
 | `IMPORT_EMPTY` | 400 | products, purchases | No se proporcionaron registros para importar. | — |
+| `IMPORT_INVALID` | 400 | products | El archivo tiene {errors.length} problema(s); corrígelos y vuelve a importar. | `errors`, `total` |
 | `IMPORT_LIMIT_EXCEEDED` | 400 | products, purchases | El archivo contiene {items.length} filas. El límite máximo permitido por importación es de 3,000 registros. | `max`, `received` |
 | `INSUFFICIENT_PAYMENT` | 400 (DomainError) | sales | El monto pagado (${paid.toString()}) es menor al total de la venta (${total.toString()}). | — |
 | `INSUFFICIENT_STOCK` | 409 | products, purchases | No hay stock suficiente para cancelar: la variante quedaría en negativo. | `available`, `branchId`, `lines`, `requested`, `variantId` |
@@ -135,5 +138,6 @@ Forma de toda respuesta de error:
 | `USER_NOT_VALID` | 403 | common | Usuario no válido para {actionDescription}. | — |
 | `VALIDATION_FAILED` | 400 | batches | Tipo de lote no válido: {unknown.join(', ')}. | `originTypes` |
 | `VARIANTS_REQUIRED` | 400 | products | Un producto variable debe tener al menos una variante. | — |
+| `VARIANT_ATTRIBUTES_INCONSISTENT` | 400 | products | Una variante no puede tener dos valores del mismo atributo (por ejemplo, dos tallas). | `problem` |
 | `VARIANT_HAS_STOCK` | 409 | products | No se puede eliminar la variante porque tiene existencias activas o saldos negativos en inventario. Todas las cantidades deben estar en 0. | — |
 | `VARIANT_NOT_FOUND` | 404 | products, purchases, sales | Variante no encontrada. | `sku`, `variantId`, `variantIds` |

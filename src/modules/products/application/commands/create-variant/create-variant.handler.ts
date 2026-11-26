@@ -7,11 +7,13 @@ import { ProductVariant } from '../../../domain/entities/product-variant.entity'
 import { AttributeValue } from '../../../domain/entities/attribute-value.entity';
 import { ProductStock } from '../../../domain/entities/product-stock.entity';
 import { ProductImage } from '../../../domain/entities/product-image.entity';
+import { Branch } from '../../../../branches/domain/entities/branch.entity';
 import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
 import { recordInitialStock } from '../../services/initial-stock';
 import { translatingSkuConflict } from '../../services/sku-conflict';
 import { assertSkusDoNotShadowBaseSku } from '../../services/base-sku';
+import { assertVariantAttributesAreConsistent } from '../../services/variant-attributes';
 import { normalizeSku } from '../../../domain/sku';
 
 @CommandHandler(CreateVariantCommand)
@@ -54,6 +56,16 @@ export class CreateVariantHandler implements ICommandHandler<CreateVariantComman
 
       await assertSkusDoNotShadowBaseSku(transactionalManager, tenantId, [variantDto.sku], productId);
 
+      // La existencia inicial solo puede ir a sucursales de esta tienda (igual que al crear un producto simple o variable)
+      const stockBranchIds = [...new Set((variantDto.stocks ?? []).map((stock) => stock.branchId))];
+      if (stockBranchIds.length > 0) {
+        const found = new Set((await transactionalManager.getRepository(Branch).find({ where: { id: In(stockBranchIds), tenantId }, select: { id: true } })).map((branch) => branch.id));
+        const missing = stockBranchIds.find((id) => !found.has(id));
+        if (missing) {
+          throw new AppException(ErrorCode.BranchNotFound, `La sucursal con ID "${missing}" no existe o no pertenece al inquilino.`, HttpStatus.NOT_FOUND, { branchId: missing });
+        }
+      }
+
       // Validate no duplicate attribute combinations in existing product variants
       const valueIds = variantDto.attributeValues?.map((v) => v.attributeValueId) || [];
       const newCombinationKey = [...valueIds].sort().join(',');
@@ -72,7 +84,7 @@ export class CreateVariantHandler implements ICommandHandler<CreateVariantComman
 
       // Create new variant
       const variant = new ProductVariant();
-      variant.product = product;
+      variant.productId = product.id;
       variant.sku = variantDto.sku;
       variant.barcode = variantDto.barcode || '';
       variant.purchasePrice = Number(variantDto.purchasePrice) || 0;
@@ -105,6 +117,9 @@ export class CreateVariantHandler implements ICommandHandler<CreateVariantComman
           throw new AppException(ErrorCode.AttributeValuesNotFound, 'Uno o más valores de atributo no existen.', HttpStatus.NOT_FOUND);
         }
         variant.attributeValues = attributeValues;
+        // Debe usar los mismos atributos que las variantes que el producto ya tiene (las antiguas sin atributos no cuentan)
+        const existingSets = product.variants.map((existing) => (existing.attributeValues ?? []).map((value) => value.attributeId)).filter((ids) => ids.length > 0);
+        assertVariantAttributesAreConsistent([...existingSets, attributeValues.map((value) => value.attributeId)]);
       } else {
         variant.attributeValues = [];
       }
@@ -116,7 +131,6 @@ export class CreateVariantHandler implements ICommandHandler<CreateVariantComman
           const stock = new ProductStock();
           stock.branchId = stockDto.branchId;
           stock.quantity = Number(stockDto.quantity) || 0;
-          stock.variant = variant;
           variant.stocks.push(stock);
         }
       }
@@ -134,13 +148,6 @@ export class CreateVariantHandler implements ICommandHandler<CreateVariantComman
           unitCost: Number(savedVariant.purchasePrice),
         })),
       );
-
-      delete (savedVariant as any).product;
-      if (savedVariant.stocks) {
-        for (const stock of savedVariant.stocks) {
-          delete (stock as any).variant;
-        }
-      }
 
       return savedVariant;
     });

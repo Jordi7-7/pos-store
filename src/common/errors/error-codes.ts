@@ -77,6 +77,7 @@ export enum ErrorCode {
   LastVariantCannotBeDeleted = 'LAST_VARIANT_CANNOT_BE_DELETED',
   DuplicateVariantCombination = 'DUPLICATE_VARIANT_COMBINATION',
   VariantsRequired = 'VARIANTS_REQUIRED',
+  VariantAttributesInconsistent = 'VARIANT_ATTRIBUTES_INCONSISTENT',
   BaseSkuRequired = 'BASE_SKU_REQUIRED',
   BaseSkuTaken = 'BASE_SKU_TAKEN',
   SkuTaken = 'SKU_TAKEN',
@@ -85,8 +86,10 @@ export enum ErrorCode {
   CategoryNotFound = 'CATEGORY_NOT_FOUND',
   CategoryNameTaken = 'CATEGORY_NAME_TAKEN',
   AttributeNotFound = 'ATTRIBUTE_NOT_FOUND',
+  AttributeInUse = 'ATTRIBUTE_IN_USE',
   AttributeNameTaken = 'ATTRIBUTE_NAME_TAKEN',
   AttributeValueTaken = 'ATTRIBUTE_VALUE_TAKEN',
+  AttributeOrderStale = 'ATTRIBUTE_ORDER_STALE',
   AttributeValuesNotFound = 'ATTRIBUTE_VALUES_NOT_FOUND',
   ImagesNotFound = 'IMAGES_NOT_FOUND',
 
@@ -106,6 +109,7 @@ export enum ErrorCode {
   // Importaciones
   ImportEmpty = 'IMPORT_EMPTY',
   ImportLimitExceeded = 'IMPORT_LIMIT_EXCEEDED',
+  ImportInvalid = 'IMPORT_INVALID',
 
   // Compras y proveedores
   SupplierNotFound = 'SUPPLIER_NOT_FOUND',

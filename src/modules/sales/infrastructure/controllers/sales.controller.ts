@@ -174,12 +174,14 @@ export class SalesController {
   @RequirePermissions(APP_PERMISSIONS.CASH_OPEN_CLOSE)
   async closeSession(
     @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser('sub') userId: string,
     @Param('id') id: string,
     @Body() dto: CloseCashSessionDto,
   ) {
     return this.commandBus.execute(
       new CloseCashSessionCommand(
         tenantId,
+        userId,
         id,
         dto.closingBalance,
       ),

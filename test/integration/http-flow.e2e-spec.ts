@@ -234,6 +234,34 @@ describe('API por HTTP: flujo completo y contrato de errores', () => {
       expectErrorEnvelope(await api('get', '/branches', 'no-es-un-token'), 401, 'AUTH_TOKEN_INVALID');
     });
 
+    it('editar un producto simple o una variante con precios negativos se rechaza y no cambia nada', async () => {
+      const created = await api('post', '/products/simple', ownerToken).send({ name: 'Editable', description: 'x', sku: 'HTTP-EDIT', purchasePrice: 2, salePrice: 5 });
+      const product = created.body as { id: string; variants: Array<{ id: string }> };
+      const variantId = product.variants[0]?.id ?? '';
+
+      const simple = await api('put', `/products/${product.id}/simple`, ownerToken).send({ salePrice: -5 });
+      const variant = await api('put', `/products/variants/${variantId}`, ownerToken).send({ purchasePrice: -1 });
+      const wholesale = await api('put', `/products/variants/${variantId}`, ownerToken).send({ wholesalePrice: -3 });
+
+      for (const response of [simple, variant, wholesale]) expect(response.status).toBe(400);
+      const after = await api('get', `/products/${product.id}`, ownerToken);
+      expect((after.body as { variants: Array<{ salePrice: number; purchasePrice: number }> }).variants[0]).toMatchObject({ salePrice: 5, purchasePrice: 2 });
+    });
+
+    it('precios o existencias negativos y demasiadas variantes se rechazan con VALIDATION_FAILED', async () => {
+      const negativePrice = await api('post', '/products/simple', ownerToken).send({ name: 'Negativo', description: 'x', sku: 'HTTP-NEG', purchasePrice: -1, salePrice: 2 });
+      const negativeStock = await api('post', '/products/simple', ownerToken).send({ name: 'Negativo', description: 'x', sku: 'HTTP-NEG2', purchasePrice: 1, salePrice: 2, stocks: [{ branchId, quantity: -5 }] });
+      const tooMany = await api('post', '/products/variable', ownerToken).send({
+        name: 'Enorme', description: 'x', baseSku: 'ENORME',
+        variants: Array.from({ length: 501 }, (_, index) => ({ sku: `ENORME-${index}`, purchasePrice: 1, salePrice: 2, attributeValues: [] })),
+      });
+
+      for (const response of [negativePrice, negativeStock, tooMany]) {
+        expect(response.status).toBe(400);
+        expect(response.body).toMatchObject({ code: expect.stringMatching(/VALIDATION_FAILED|BAD_REQUEST/) as string });
+      }
+    });
+
     it('cuerpo inválido: 400 VALIDATION_FAILED con la lista de errores por campo', async () => {
       const response = await api('post', '/products/simple', ownerToken).send({ name: 'Sin SKU', description: 'x', purchasePrice: 'caro', salePrice: 10 });
 
@@ -406,6 +434,22 @@ describe('API por HTTP: flujo completo y contrato de errores', () => {
 
       expectErrorEnvelope(await api('get', `/products/inventory-movements?category=NOPE&${range}`, ownerToken), 400, 'VALIDATION_FAILED');
       expect((await api('get', `/products/inventory-movements?category=&${range}`, ownerToken)).status).toBe(200);
+    });
+
+    it('la lista de documentos: 200 con un documento por fila y sus totales; un tipo inválido es 400 y uno en blanco se ignora', async () => {
+      const range = 'startDate=2020-01-01&endDate=2100-01-01';
+      const listed = await api('get', `/products/inventory-documents?${range}`, ownerToken);
+
+      expect(listed.status).toBe(200);
+      const rows = (listed.body as { data: Array<{ number: string; kind: string; productsCount: number; unitsCount: number }>; meta: { total: number } }).data;
+      expect(rows.length).toBeGreaterThan(0);
+      for (const row of rows) expect(row).toMatchObject({ number: expect.stringMatching(/^(ENT|SAL|CNT|TRS)-\d{6}$/) as string, productsCount: expect.any(Number) as number, unitsCount: expect.any(Number) as number });
+
+      const onlyEntries = await api('get', `/products/inventory-documents?kind=ENTRY&${range}`, ownerToken);
+      for (const row of (onlyEntries.body as { data: Array<{ kind: string }> }).data) expect(row.kind).toBe('ENTRY');
+
+      expectErrorEnvelope(await api('get', `/products/inventory-documents?kind=NOPE&${range}`, ownerToken), 400, 'VALIDATION_FAILED');
+      expect((await api('get', `/products/inventory-documents?kind=&${range}`, ownerToken)).status).toBe(200);
     });
 
     it('un documento se abre por su id con todas sus líneas; un id inexistente es 404 y uno que no es UUID, 400', async () => {

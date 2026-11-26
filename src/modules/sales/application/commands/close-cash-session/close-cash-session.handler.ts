@@ -10,6 +10,7 @@ import { Expense } from '../../../domain/entities/expense.entity';
 import { Refund } from '../../../domain/entities/refund.entity';
 import { cashDifference, expectedCashBalance } from '../../../domain/services/cash-closing';
 import { lockCashSession } from '../shared/cash-session-lock';
+import { assertUserAssignedToCashRegister } from '../shared/cash-register-access';
 import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
 
@@ -20,7 +21,7 @@ export class CloseCashSessionHandler implements ICommandHandler<CloseCashSession
   constructor(private readonly entityManager: EntityManager) {}
 
   async execute(command: CloseCashSessionCommand): Promise<CashSession> {
-    const { tenantId, id, closingBalance } = command;
+    const { tenantId, userId, id, closingBalance } = command;
     this.logger.log(`Closing cash session ID: ${id} for Tenant: ${tenantId} (Reported Closing: ${closingBalance})`);
 
     return this.entityManager.transaction(async (transactionalManager) => {
@@ -43,6 +44,14 @@ export class CloseCashSessionHandler implements ICommandHandler<CloseCashSession
         this.logger.warn(`Cash session closure failed: active cash session ID ${id} not found or belongs to another tenant`);
         throw new AppException(ErrorCode.CashSessionNotFound, 'Sesión de caja activa no encontrada.', HttpStatus.NOT_FOUND, { id });
       }
+
+      // Cerrar el turno es operar la caja: solo quien la tiene asignada (o el propietario), igual que vender, devolver o registrar gastos
+      await assertUserAssignedToCashRegister(transactionalManager, {
+        tenantId,
+        userId,
+        cashRegisterId: session.cashRegisterId,
+        actionDescription: 'cerrar el turno',
+      });
 
       // 2. Compute expected cash balance in drawer directly from database
       // Misma regla que el detalle de la sesión (summarizeCashSession): una venta sin pagos registrados

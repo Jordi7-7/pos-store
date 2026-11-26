@@ -216,7 +216,7 @@ describe('Flujo de dinero: venta, devolución y cierre de caja', () => {
 
     await expect(refund(sale.id, sessionId, 1)).rejects.toThrow(/ya ha sido devuelta/);
 
-    const closed = await new CloseCashSessionHandler(db.manager).execute(new CloseCashSessionCommand(tenantId, sessionId, 49.5));
+    const closed = await new CloseCashSessionHandler(db.manager).execute(new CloseCashSessionCommand(tenantId, userId, sessionId, 49.5));
     expect(closed).toMatchObject({ expectedBalance: 50, closingBalance: 49.5, difference: -0.5, status: CashSessionStatus.CLOSED });
 
     const movements = await db.getRepository(InventoryMovement).findBy({ tenantId, variantId });
@@ -232,7 +232,7 @@ describe('Flujo de dinero: venta, devolución y cierre de caja', () => {
 
     expect(refunds.map((item) => item.totalRefunded)).toEqual([3.33, 3.34, 3.33]);
 
-    await new CloseCashSessionHandler(db.manager).execute(new CloseCashSessionCommand(tenantId, sessionId, 0));
+    await new CloseCashSessionHandler(db.manager).execute(new CloseCashSessionCommand(tenantId, userId, sessionId, 0));
   });
 
   it('solo puede haber una sesión abierta por caja', async () => {
@@ -240,7 +240,7 @@ describe('Flujo de dinero: venta, devolución y cierre de caja', () => {
 
     await expect(openSession(0)).rejects.toThrow(/UQ_cash_sessions_open_per_register/);
 
-    await new CloseCashSessionHandler(db.manager).execute(new CloseCashSessionCommand(tenantId, sessionId, 0));
+    await new CloseCashSessionHandler(db.manager).execute(new CloseCashSessionCommand(tenantId, userId, sessionId, 0));
   });
 
   it('un pago insuficiente no deja rastro: ni venta, ni stock, ni número de factura', async () => {
@@ -257,7 +257,7 @@ describe('Flujo de dinero: venta, devolución y cierre de caja', () => {
       registerBefore.nextInvoiceNumber,
     );
 
-    await new CloseCashSessionHandler(db.manager).execute(new CloseCashSessionCommand(tenantId, sessionId, 0));
+    await new CloseCashSessionHandler(db.manager).execute(new CloseCashSessionCommand(tenantId, userId, sessionId, 0));
   });
 
   it('el listado de sesiones suma ventas menos devoluciones solo de cada sesión', async () => {
@@ -281,7 +281,7 @@ describe('Flujo de dinero: venta, devolución y cierre de caja', () => {
       });
       expect(list.length).toBeLessThanOrEqual(100);
     } finally {
-      await new CloseCashSessionHandler(db.manager).execute(new CloseCashSessionCommand(tenantId, sessionId, 20));
+      await new CloseCashSessionHandler(db.manager).execute(new CloseCashSessionCommand(tenantId, userId, sessionId, 20));
     }
   });
 
@@ -301,7 +301,7 @@ describe('Flujo de dinero: venta, devolución y cierre de caja', () => {
 
       expect((await saleById(sale.id)).payments.map((p) => p.amount)).toEqual([30]);
       expect((await details(sessionId)).session.expectedBalance).toBe(130);
-      const closed = await new CloseCashSessionHandler(db.manager).execute(new CloseCashSessionCommand(tenantId, sessionId, 130));
+      const closed = await new CloseCashSessionHandler(db.manager).execute(new CloseCashSessionCommand(tenantId, userId, sessionId, 130));
       expect(closed).toMatchObject({ expectedBalance: 130, difference: 0 });
     });
 
@@ -315,7 +315,7 @@ describe('Flujo de dinero: venta, devolución y cierre de caja', () => {
       const { kpis, session } = await details(sessionId);
       expect(kpis).toMatchObject({ grossSales: 40, cashSales: 15, cardSales: 25 });
       expect(session.expectedBalance).toBe(15);
-      expect(await new CloseCashSessionHandler(db.manager).execute(new CloseCashSessionCommand(tenantId, sessionId, 15))).toMatchObject({ expectedBalance: 15 });
+      expect(await new CloseCashSessionHandler(db.manager).execute(new CloseCashSessionCommand(tenantId, userId, sessionId, 15))).toMatchObject({ expectedBalance: 15 });
     });
 
     it('el cierre y el detalle coinciden también con una venta antigua sin pagos registrados (cuenta como efectivo)', async () => {
@@ -325,7 +325,7 @@ describe('Flujo de dinero: venta, devolución y cierre de caja', () => {
       await db.query(`DELETE FROM sale_payments WHERE sale_id = $1`, [legacy.id]);
 
       const shown = (await details(sessionId)).session.expectedBalance;
-      const closed = await new CloseCashSessionHandler(db.manager).execute(new CloseCashSessionCommand(tenantId, sessionId, 30));
+      const closed = await new CloseCashSessionHandler(db.manager).execute(new CloseCashSessionCommand(tenantId, userId, sessionId, 30));
       expect(shown).toBe(30); // 10 apertura + 20 de la venta antigua
       expect(closed.expectedBalance).toBe(shown);
     });
@@ -360,7 +360,7 @@ describe('Flujo de dinero: venta, devolución y cierre de caja', () => {
       expect(details.refunds[0]).toMatchObject({ totalRefunded: 10, sale: { id: sale.id } });
       expect(details.expenses[0]).toMatchObject({ amount: 5, description: 'Bolsas' });
     } finally {
-      await new CloseCashSessionHandler(db.manager).execute(new CloseCashSessionCommand(tenantId, sessionId, 115));
+      await new CloseCashSessionHandler(db.manager).execute(new CloseCashSessionCommand(tenantId, userId, sessionId, 115));
     }
   });
 
@@ -386,7 +386,7 @@ describe('Flujo de dinero: venta, devolución y cierre de caja', () => {
       expect(mine[0]).toMatchObject({ name: 'Gorra', soldQuantity: 4, currentStock: 6, salePrice: 9.5, totalRevenue: 38 });
       expect(rows.every((row) => row.soldQuantity > 0)).toBe(true);
     } finally {
-      await new CloseCashSessionHandler(db.manager).execute(new CloseCashSessionCommand(tenantId, sessionId, 38));
+      await new CloseCashSessionHandler(db.manager).execute(new CloseCashSessionCommand(tenantId, userId, sessionId, 38));
     }
   });
 
@@ -421,7 +421,7 @@ describe('Flujo de dinero: venta, devolución y cierre de caja', () => {
       expect(detail?.payments).toHaveLength(2);
       expect(details.kpis).toMatchObject({ grossSales: 26, cashSales: 6, cardSales: 20, salesCount: 1 });
     } finally {
-      await new CloseCashSessionHandler(db.manager).execute(new CloseCashSessionCommand(tenantId, sessionId, 6));
+      await new CloseCashSessionHandler(db.manager).execute(new CloseCashSessionCommand(tenantId, userId, sessionId, 6));
     }
   });
 
@@ -565,8 +565,8 @@ describe('Flujo de dinero: venta, devolución y cierre de caja', () => {
 
   describe('dashboard', () => {
     const metrics = (scopeBranchId?: string) =>
-      new GetDashboardMetricsHandler(db.manager, new DashboardReadQueries(db.manager)).execute(
-        new GetDashboardMetricsQuery(tenantId, scopeBranchId),
+      new GetDashboardMetricsHandler(db.manager, new DashboardReadQueries(db.manager), redis).execute(
+        new GetDashboardMetricsQuery(tenantId, userId, true, scopeBranchId),
       );
 
     it('refleja una venta y una devolución del día en todas las secciones del panel', async () => {
@@ -591,7 +591,7 @@ describe('Flujo de dinero: venta, devolución y cierre de caja', () => {
         // Sin sucursal agrega todas las del tenant
         expect((await metrics()).today.totalSales).toBe(after.today.totalSales);
       } finally {
-        await new CloseCashSessionHandler(db.manager).execute(new CloseCashSessionCommand(tenantId, sessionId, 10));
+        await new CloseCashSessionHandler(db.manager).execute(new CloseCashSessionCommand(tenantId, userId, sessionId, 10));
       }
     });
 
@@ -645,7 +645,7 @@ describe('Flujo de dinero: venta, devolución y cierre de caja', () => {
 
       expect(await quantityOf(id)).toBe(2);
       expect(new Set(sales.map((sale) => sale.invoiceNumber)).size).toBe(4);
-      await new CloseCashSessionHandler(db.manager).execute(new CloseCashSessionCommand(tenantId, sessionId, 80));
+      await new CloseCashSessionHandler(db.manager).execute(new CloseCashSessionCommand(tenantId, userId, sessionId, 80));
     });
 
     it('ventas simultáneas con los mismos productos en orden cruzado no se bloquean entre sí', async () => {
@@ -663,7 +663,7 @@ describe('Flujo de dinero: venta, devolución y cierre de caja', () => {
 
       expect(await quantityOf(a)).toBe(40);
       expect(await quantityOf(b)).toBe(40);
-      await new CloseCashSessionHandler(db.manager).execute(new CloseCashSessionCommand(tenantId, sessionId, 200));
+      await new CloseCashSessionHandler(db.manager).execute(new CloseCashSessionCommand(tenantId, userId, sessionId, 200));
     });
 
     it('vender sin stock lo deja negativo y la siguiente entrada salda la deuda', async () => {
@@ -680,7 +680,7 @@ describe('Flujo de dinero: venta, devolución y cierre de caja', () => {
       expect(await quantityOf(id)).toBe(2);
       const batches = await db.getRepository(ProductBatch).findBy({ variantId: id });
       expect(batches.map((batch) => batch.remainingQuantity)).toEqual([2]);
-      await new CloseCashSessionHandler(db.manager).execute(new CloseCashSessionCommand(tenantId, sessionId, 30));
+      await new CloseCashSessionHandler(db.manager).execute(new CloseCashSessionCommand(tenantId, userId, sessionId, 30));
     });
 
     it('un ajuste de salida no puede dejar el stock en negativo', async () => {
@@ -707,7 +707,7 @@ describe('Flujo de dinero: venta, devolución y cierre de caja', () => {
         (batch) => batch.remainingQuantity,
       );
       expect(remaining).toEqual([0, 1]);
-      await new CloseCashSessionHandler(db.manager).execute(new CloseCashSessionCommand(tenantId, sessionId, 30));
+      await new CloseCashSessionHandler(db.manager).execute(new CloseCashSessionCommand(tenantId, userId, sessionId, 30));
     });
   });
 });

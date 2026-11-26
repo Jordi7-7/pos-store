@@ -5,10 +5,10 @@
 ## Cifras medidas
 | Comprobación | Resultado | Fecha |
 |---|---|---|
-| `pnpm test` (unitarios) | 488 en verde, 75 suites | 2026-11-24 |
-| `pnpm test:integration` | 499 en verde, 33 suites (Postgres y Redis reales); `web-auth-flow` › logout es intermitente (ver abajo) | 2026-11-24 |
+| `pnpm test` (unitarios) | 502 en verde, 77 suites | 2026-11-25 |
+| `pnpm test:integration` | 535 en verde, 36 suites (Postgres y Redis reales); `web-auth-flow` › logout y `http-flow` (`ECONNRESET` bajo carga) son intermitentes | 2026-11-25 |
 | `scripts/reconcile-inventory.sql` (base de desarrollo) | documentos y contadores coherentes; cadena de saldos del kardex sin anomalías; **7 de 7.502** filas de existencia no cuadran con las capas FIFO (ver abajo) | 2026-11-24 |
-| Supresiones de lint (`eslint-suppressions.json`) | 131 (empezó en 538) | 2026-11-22 |
+| Supresiones de lint (`eslint-suppressions.json`) | 127 (empezó en 538) | 2026-11-26 |
 
 Si una cifra baja o las supresiones suben, algo se rompió.
 
@@ -17,6 +17,14 @@ Si una cifra baja o las supresiones suben, algo se rompió.
 - **Offline (solo ventas, móvil):** `POST /sales/offline`, `GET /products/pos/catalog` y `GET /products/pos/stock?branchId=` hechos y commiteados (2026-11-11). Detalle en `deployment.md`.
 - **Documentos de inventario y kardex completo:** entradas, salidas, conteos y traslados, con las migraciones `1794…` (comiteado el 2026-11-24).
 - **Filtro de existencias del listado de productos:** `GET /products?stockStatus=IN_STOCK|ZERO|NEGATIVE`, resuelto en SQL (`stock-status-filter.ts`). El parámetro antiguo `inStockOnly` se mantiene como alias de `IN_STOCK` hasta que no quede una web que lo envíe.
+
+## Hecho el 2026-11-25
+- **Lista de documentos de inventario:** `GET /products/inventory-documents` (una fila por documento, con totales; filtros de sucursal, tipo, fechas y búsqueda por número, comentario o SKU). Los documentos y el kardex siguen abriéndose aunque el producto o la sucursal se borren después (`withDeleted` **antes** de los joins).
+- **Tres hallazgos de seguridad cerrados** (cada uno con su test): cerrar un turno exige tener la caja asignada; `create-variant` rechaza existencias en sucursales de otra tienda; el panel solo suma las sucursales que el usuario puede ver (403 si pide una ajena).
+- **Productos con variantes más estrictos:** precios y existencias ≥ 0, máximo 500 variantes por producto, todas las variantes del producto usan los mismos atributos (`VARIANT_ATTRIBUTES_INCONSISTENT`) y `SKU_TAKEN` nombra los SKU repetidos (`details.skus`). Los códigos de barras **siguen pudiendo repetirse** (decisión previa, índice no único).
+- **Borrado de atributos y opciones:** `DELETE /products/attributes/:id` y `/products/attributes/values/:id` (permiso `attributes.delete`); se rechaza con `ATTRIBUTE_IN_USE` (dice cuántas variantes) si alguna variante vigente los usa; las variantes eliminadas no cuentan. Los DTO de **editar** variante y producto simple ya rechazan precios negativos.
+- **Orden de las opciones de un atributo:** columna `attribute_values.sort_order` (migración `1794300000000`, **pendiente de aplicar en producción**), `GET /products/attributes` las devuelve ordenadas y `PUT /products/attributes/:id/values/order` fija el orden (exige la lista completa; `ATTRIBUTE_ORDER_STALE` si cambió). Las opciones nuevas, a mano o por importación, van al final. El test de migraciones de proveedores ya no depende de cuántas migraciones hay después de la suya.
+- **Importación por variantes:** `POST /products/import-variants` (una fila por variante; `dryRun` valida y cuenta sin escribir; informe de errores por fila; crea categorías, atributos y valores que falten y todo en una transacción). Planificador puro en `domain/import-plan.ts`. Máximo 2.000 filas. Reutiliza los casos de uso de alta, así que valida igual que la pantalla. El importador antiguo de productos simples (`/products/import`) sigue como estaba.
 
 ## Conciliación de inventario
 `scripts/reconcile-inventory.sql` (solo lectura) compara la existencia (`product_stocks`) con las capas FIFO y revisa los documentos y su numeración. En la base de **desarrollo** hay 7 filas de la tienda de pruebas que no cuadran (CAM-001, HL6895, HM-130, HM130, HM131, KH8784, WA0436); son anteriores a los documentos de inventario (último movimiento entre agosto y octubre) y el dueño decidió **dejarlas** porque son datos de prueba (2026-11-22). Ejecutar el script en producción antes y después de migrar (`deployment.md` §4).
@@ -43,9 +51,9 @@ Vocabulario acordado con el dueño: `direction` (IN/OUT) + `category` (INITIAL, 
 
 ## Pendiente de la revisión del 2026-11-22
 - **Fila con tipo `INPUT` en desarrollo:** hay 1 movimiento (`INITIAL_STOCK`) con `type = 'INPUT'`, que no es ni `IN` ni `OUT`. Es de pruebas antiguas; la comprobación E2 del script la detecta. **Ejecutarla en producción antes de migrar** por si allí hubiera alguna.
-- **Hallazgos de seguridad de la auditoría** (sin corregir): cerrar un turno no comprueba quién lo cierra (`close-cash-session`), `create-variant` no valida la sucursal del stock inicial contra la tienda y el panel (`get-dashboard-metrics`) no filtra por las sucursales visibles. Cada uno necesita primero un test que falle.
-- **Migración `1794100000000`:** da conteo y traslado a todo rol que tenía «ajustar stock» (capacidades nuevas). Pendiente de decisión.
-- **Permiso `action:products.adjust_stock`:** el ajuste antiguo (`POST /products/stock-adjustments`) se retiró el 2026-11-24, así que ese permiso ya no abre ningún endpoint. Sigue en el catálogo y en los roles por compatibilidad; decidir si se retira de `APP_PERMISSIONS` y de los roles por defecto.
+- **Hallazgos de seguridad de la auditoría:** los tres se corrigieron el 2026-11-25 (ver «Hecho el 2026-11-25»).
+- **Migración `1794100000000`:** da conteo y traslado a todo rol que tenía «ajustar stock» (capacidades nuevas). El dueño indicó el 2026-11-25 que ya está aplicada en producción, así que no hay nada que decidir sobre la migración (una migración aplicada no se edita); solo queda revisar qué roles recibieron esos permisos.
+- **Permiso `action:products.adjust_stock`:** retirado el 2026-11-25 del catálogo, de los roles por defecto y de las constantes de la web y el móvil; la migración `1794200000000` lo quita de los roles y usuarios guardados (**pendiente de aplicar en producción**: va tras desplegar este cambio).
 - **Test intermitente:** `web-auth-flow` › «logout: revoca la sesión aunque el token de acceso haya vencido» falló 2 de ~12 ejecuciones (esperaba 401 y recibió 404 en `/auth/web/refresh`); no se reprodujo en 8 repeticiones seguidas con el cuerpo de la respuesta a la vista. El módulo de autenticación no se tocó en esos cambios.
 
 ## Decisiones de negocio por confirmar con el dueño (revisión del 2026-11-22; el código no se ha cambiado)

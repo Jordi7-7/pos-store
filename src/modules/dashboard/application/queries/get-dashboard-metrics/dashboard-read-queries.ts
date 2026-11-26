@@ -15,8 +15,8 @@ import {
 
 export interface DashboardScope {
   tenantId: string;
-  /** Sin sucursal, el panel agrega todas las del tenant. */
-  branchId?: string;
+  /** Sucursales que agrega el panel: `null` = todas las de la tienda; una lista = solo esas (vacía = ninguna). */
+  branchIds: readonly string[] | null;
 }
 
 const TOP_PRODUCTS_LIMIT = 5;
@@ -35,9 +35,9 @@ export class DashboardReadQueries {
   private scoped(scope: DashboardScope) {
     const params = new SqlParams();
     const tenant = params.add(scope.tenantId);
-    const branch = scope.branchId ? params.add(scope.branchId) : null;
-    const branchFilter = (alias: string): string => (branch ? `AND ${alias}.branch_id = ${branch}` : '');
-    return { params, tenant, branch, branchFilter };
+    const branches = scope.branchIds ? params.add([...scope.branchIds]) : null;
+    const branchFilter = (alias: string): string => (branches ? `AND ${alias}.branch_id = ANY(${branches}::uuid[])` : '');
+    return { params, tenant, branchFilter };
   }
 
   /** Ventas brutas del rango y unidades vendidas (no cuenta las ventas devueltas por completo). */
@@ -170,7 +170,7 @@ export class DashboardReadQueries {
 
   /** Variantes con poco stock que tuvieron actividad (alta o lote) desde la fecha indicada. */
   lowStockProducts(scope: DashboardScope, activeSince: Date): Promise<LowStockRow[]> {
-    const { params, tenant, branch } = this.scoped(scope);
+    const { params, tenant, branchFilter } = this.scoped(scope);
     const since = params.add(activeSince);
 
     return this.entityManager.query<LowStockRow[]>(
@@ -182,7 +182,7 @@ export class DashboardReadQueries {
         COALESCE(SUM(ps.quantity), 0) AS "stock"
       FROM product_variants pv
       INNER JOIN products p ON p.id = pv.product_id AND p.deleted_at IS NULL
-      LEFT JOIN product_stocks ps ON ps.variant_id = pv.id ${branch ? `AND ps.branch_id = ${branch}` : ''}
+      LEFT JOIN product_stocks ps ON ps.variant_id = pv.id ${branchFilter('ps')}
       WHERE pv.tenant_id = ${tenant}
         AND pv.deleted_at IS NULL
         AND (
@@ -191,7 +191,7 @@ export class DashboardReadQueries {
             SELECT 1 FROM product_batches pb
             WHERE pb.variant_id = pv.id
               AND pb.created_at >= ${since}
-              ${branch ? `AND pb.branch_id = ${branch}` : ''}
+              ${branchFilter('pb')}
           )
         )
       GROUP BY pv.id, p.name, pv.sku
@@ -205,7 +205,7 @@ export class DashboardReadQueries {
 
   /** Variantes vendidas en el rango con su stock actual. */
   soldInRangeWithStock(scope: DashboardScope, range: DateRange): Promise<SoldYesterdayRow[]> {
-    const { params, tenant, branch, branchFilter } = this.scoped(scope);
+    const { params, tenant, branchFilter } = this.scoped(scope);
     const refunded = params.add(SaleStatus.REFUNDED);
     const from = params.add(range.from);
     const to = params.add(range.to);
@@ -230,7 +230,7 @@ export class DashboardReadQueries {
       FROM sold
       INNER JOIN product_variants pv ON pv.id = sold.variant_id
       INNER JOIN products p ON p.id = pv.product_id
-      LEFT JOIN product_stocks ps ON ps.variant_id = pv.id ${branch ? `AND ps.branch_id = ${branch}` : ''}
+      LEFT JOIN product_stocks ps ON ps.variant_id = pv.id ${branchFilter('ps')}
       GROUP BY pv.id, p.name, pv.sku
       ORDER BY p.name ASC
       `,

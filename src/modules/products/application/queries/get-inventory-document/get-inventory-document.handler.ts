@@ -21,9 +21,11 @@ export class GetInventoryDocumentHandler implements IQueryHandler<GetInventoryDo
   async execute(query: GetInventoryDocumentQuery): Promise<InventoryDocumentDetail> {
     const { tenantId, userId, isOwner, documentId } = query;
 
+    // Un documento es un registro histórico: sigue abriéndose aunque el producto, la sucursal o el usuario se hayan borrado después
     const document = await this.entityManager.getRepository(InventoryDocument).findOne({
       where: { id: documentId, tenantId },
       relations: { branch: true, destinationBranch: true, user: true },
+      withDeleted: true,
     });
     if (!document) {
       throw new AppException(ErrorCode.InventoryDocumentNotFound, 'Documento de inventario no encontrado.', HttpStatus.NOT_FOUND, { documentId });
@@ -33,6 +35,7 @@ export class GetInventoryDocumentHandler implements IQueryHandler<GetInventoryDo
     const movements = await this.entityManager.getRepository(InventoryMovement).find({
       where: { documentId: document.id, tenantId },
       relations: { variant: { product: true }, originBranch: true, destinationBranch: true },
+      withDeleted: true,
     });
 
     return {

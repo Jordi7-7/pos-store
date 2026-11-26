@@ -6,6 +6,10 @@ import { CreateVariableProductCommand } from '../../application/commands/create-
 import { CreateVariantCommand } from '../../application/commands/create-variant/create-variant.command';
 import { CreateAttributeDto } from '../dtos/create-attribute.dto';
 import { CreateAttributeCommand } from '../../application/commands/create-attribute/create-attribute.command';
+import { DeleteAttributeCommand } from '../../application/commands/delete-attribute/delete-attribute.command';
+import { DeleteAttributeValueCommand } from '../../application/commands/delete-attribute-value/delete-attribute-value.command';
+import { ReorderAttributeValuesDto } from '../dtos/reorder-attribute-values.dto';
+import { ReorderAttributeValuesCommand } from '../../application/commands/reorder-attribute-values/reorder-attribute-values.command';
 import { CreateAttributeValueDto } from '../dtos/create-attribute-value.dto';
 import { CreateAttributeValueCommand } from '../../application/commands/create-attribute-value/create-attribute-value.command';
 import { CreateCategoryDto } from '../dtos/create-category.dto';
@@ -45,9 +49,14 @@ import { CreateStockCountDto } from '../dtos/create-stock-count.dto';
 import { CreateStockCountCommand } from '../../application/commands/create-stock-count/create-stock-count.command';
 import { CreateInventoryDocumentDto } from '../dtos/create-inventory-document.dto';
 import { CreateInventoryDocumentCommand } from '../../application/commands/create-inventory-document/create-inventory-document.command';
-import { InventoryDocumentDetail, InventoryDocumentResult } from '../../application/read-models/inventory-document';
+import { InventoryDocumentDetail, InventoryDocumentListPage, InventoryDocumentResult } from '../../application/read-models/inventory-document';
+import { GetInventoryDocumentsQuery } from '../../application/queries/get-inventory-documents/get-inventory-documents.query';
+import { InventoryDocumentsFilterDto } from '../dtos/inventory-documents-filter.dto';
 import { GetInventoryDocumentQuery } from '../../application/queries/get-inventory-document/get-inventory-document.query';
 import { ValidateImportProductsDto, ImportProductsDto } from '../dtos/import-products.dto';
+import { ImportVariantProductsDto } from '../dtos/import-variant-products.dto';
+import { ImportVariantProductsCommand } from '../../application/commands/import-variant-products/import-variant-products.command';
+import { ImportVariantsReport } from '../../application/commands/import-variant-products/import-variant-products.handler';
 import { ImportProductsCommand } from '../../application/commands/import-products/import-products.command';
 import { ValidateImportProductsQuery } from '../../application/queries/validate-import-products/validate-import-products.query';
 import { GetAttributesQuery } from '../../application/queries/get-attributes/get-attributes.query';
@@ -178,6 +187,40 @@ export class ProductsController {
     );
   }
 
+  /** Fija el orden de las opciones de un atributo; la lista debe traer todas las opciones vigentes. */
+  @Put('attributes/:attributeId/values/order')
+  @RequirePermissions(APP_PERMISSIONS.ATTRIBUTES_EDIT)
+  async reorderAttributeValues(
+    @CurrentUser('tenantId') tenantId: string,
+    @Param('attributeId', ParseUUIDPipe) attributeId: string,
+    @Body() dto: ReorderAttributeValuesDto,
+  ) {
+    await this.commandBus.execute<ReorderAttributeValuesCommand, void>(new ReorderAttributeValuesCommand(tenantId, attributeId, dto.valueIds));
+    return { message: 'Orden guardado.' };
+  }
+
+  /** Elimina una opción de un atributo. Va antes que `attributes/:id` para que `values` no se lea como un id. */
+  @Delete('attributes/values/:valueId')
+  @RequirePermissions(APP_PERMISSIONS.ATTRIBUTES_DELETE)
+  async deleteAttributeValue(
+    @CurrentUser('tenantId') tenantId: string,
+    @Param('valueId', ParseUUIDPipe) valueId: string,
+  ) {
+    await this.commandBus.execute<DeleteAttributeValueCommand, void>(new DeleteAttributeValueCommand(tenantId, valueId));
+    return { message: 'Opción eliminada.' };
+  }
+
+  /** Elimina un atributo con todas sus opciones si ninguna variante vigente lo usa. */
+  @Delete('attributes/:attributeId')
+  @RequirePermissions(APP_PERMISSIONS.ATTRIBUTES_DELETE)
+  async deleteAttribute(
+    @CurrentUser('tenantId') tenantId: string,
+    @Param('attributeId', ParseUUIDPipe) attributeId: string,
+  ) {
+    await this.commandBus.execute<DeleteAttributeCommand, void>(new DeleteAttributeCommand(tenantId, attributeId));
+    return { message: 'Atributo eliminado.' };
+  }
+
   @Get('attributes')
   @RequirePermissions(APP_PERMISSIONS.ATTRIBUTES_GET)
   async findAttributes(@CurrentUser('tenantId') tenantId: string) {
@@ -225,6 +268,28 @@ export class ProductsController {
         category: filters.category,
         reason: filters.reason,
         variantId: filters.variantId,
+        search: filters.search,
+        startDate: filters.startDate,
+        endDate: filters.endDate,
+      }),
+    );
+  }
+
+  /** Lista de documentos de inventario (uno por fila), con filtros. */
+  @Get('inventory-documents')
+  @RequirePermissions(APP_PERMISSIONS.PRODUCTS_GET)
+  async getInventoryDocuments(
+    @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser('sub') userId: string,
+    @CurrentUser('isOwner') isOwner: boolean,
+    @Query() filters: InventoryDocumentsFilterDto,
+  ) {
+    return this.queryBus.execute<GetInventoryDocumentsQuery, InventoryDocumentListPage>(
+      new GetInventoryDocumentsQuery(tenantId, userId, isOwner, {
+        page: parsePage(filters.page),
+        limit: parseLimit(filters.limit),
+        branchId: filters.branchId,
+        kind: filters.kind,
         search: filters.search,
         startDate: filters.startDate,
         endDate: filters.endDate,
@@ -518,6 +583,37 @@ export class ProductsController {
   ) {
     return this.queryBus.execute<ValidateImportProductsQuery, ImportValidationResult>(
       new ValidateImportProductsQuery(tenantId, dto.items),
+    );
+  }
+
+  /** Importa productos con variantes (una fila por variante). Con `dryRun` solo valida y devuelve el informe. */
+  @Post('import-variants')
+  @RequirePermissions(APP_PERMISSIONS.PRODUCTS_IMPORT)
+  async importVariantProducts(
+    @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser('sub') userId: string,
+    @Body() dto: ImportVariantProductsDto,
+  ) {
+    return this.commandBus.execute<ImportVariantProductsCommand, ImportVariantsReport>(
+      new ImportVariantProductsCommand(
+        tenantId,
+        userId,
+        dto.branchId,
+        dto.dryRun === true,
+        dto.rows.map((row) => ({
+          row: row.row,
+          name: row.name,
+          baseSku: row.baseSku ?? '',
+          category: row.category ?? '',
+          attributes: row.attributes ?? [],
+          sku: row.sku,
+          barcode: row.barcode ?? '',
+          purchasePrice: row.purchasePrice ?? null,
+          salePrice: row.salePrice ?? null,
+          wholesalePrice: row.wholesalePrice ?? null,
+          quantity: row.quantity ?? null,
+        })),
+      ),
     );
   }
 
