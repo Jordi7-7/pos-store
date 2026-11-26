@@ -6,6 +6,7 @@ import { Attribute } from '../../../domain/entities/attribute.entity';
 import { AttributeValue } from '../../../domain/entities/attribute-value.entity';
 import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
+import { nextValueSortOrder } from '../../services/attribute-order';
 
 @CommandHandler(CreateAttributeValueCommand)
 export class CreateAttributeValueHandler implements ICommandHandler<CreateAttributeValueCommand> {
@@ -47,6 +48,7 @@ export class CreateAttributeValueHandler implements ICommandHandler<CreateAttrib
     const attrValue = new AttributeValue();
     attrValue.attributeId = attributeId;
     attrValue.value = value;
+    attrValue.sortOrder = await nextValueSortOrder(this.entityManager, attributeId);
 
     const savedValue = await valueRepo.save(attrValue);
     this.logger.log(`Attribute value created successfully: "${savedValue.value}" (ID: ${savedValue.id})`);

@@ -28,6 +28,7 @@ import { CreateVariantHandler } from './application/commands/create-variant/crea
 import { DeleteVariantHandler } from './application/commands/delete-variant/delete-variant.handler';
 import { DeleteAttributeHandler } from './application/commands/delete-attribute/delete-attribute.handler';
 import { DeleteAttributeValueHandler } from './application/commands/delete-attribute-value/delete-attribute-value.handler';
+import { ReorderAttributeValuesHandler } from './application/commands/reorder-attribute-values/reorder-attribute-values.handler';
 import { ImportProductsHandler } from './application/commands/import-products/import-products.handler';
 import { ImportVariantProductsHandler } from './application/commands/import-variant-products/import-variant-products.handler';
 import { ValidateImportProductsHandler } from './application/queries/validate-import-products/validate-import-products.handler';
@@ -97,6 +98,7 @@ import { ProductsController } from './infrastructure/controllers/products.contro
     GetStockCountSheetHandler,
     ImportProductsHandler,
     DeleteAttributeHandler,
+    ReorderAttributeValuesHandler,
     DeleteAttributeValueHandler,
     ImportVariantProductsHandler,
     ValidateImportProductsHandler,

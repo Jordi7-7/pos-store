@@ -13,4 +13,8 @@ export class AttributeValue extends BaseEntity {
 
   @Column()
   value: string;
+
+  /** Posición de la opción dentro de su atributo (S, M, L, XL…): menor sale primero. */
+  @Column({ name: 'sort_order', type: 'int', default: 0 })
+  sortOrder: number;
 }

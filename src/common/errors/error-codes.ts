@@ -89,6 +89,7 @@ export enum ErrorCode {
   AttributeInUse = 'ATTRIBUTE_IN_USE',
   AttributeNameTaken = 'ATTRIBUTE_NAME_TAKEN',
   AttributeValueTaken = 'ATTRIBUTE_VALUE_TAKEN',
+  AttributeOrderStale = 'ATTRIBUTE_ORDER_STALE',
   AttributeValuesNotFound = 'ATTRIBUTE_VALUES_NOT_FOUND',
   ImagesNotFound = 'IMAGES_NOT_FOUND',
 

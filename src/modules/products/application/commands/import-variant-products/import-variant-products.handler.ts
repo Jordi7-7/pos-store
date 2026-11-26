@@ -18,6 +18,7 @@ import { CreateSimpleProductHandler } from '../create-simple-product/create-simp
 import { CreateVariableProductCommand } from '../create-variable-product/create-variable-product.command';
 import { CreateVariableProductHandler } from '../create-variable-product/create-variable-product.handler';
 import { ImportVariantProductsCommand } from './import-variant-products.command';
+import { nextValueSortOrder } from '../../services/attribute-order';
 
 export const MAX_IMPORT_ROWS = 2000;
 const CHUNK = 500;
@@ -195,7 +196,7 @@ export class ImportVariantProductsHandler implements ICommandHandler<ImportVaria
             catalog.attributes.set(lower(name), entry);
           }
           if (!entry.values.has(lower(value))) {
-            entry.values.set(lower(value), await manager.getRepository(AttributeValue).save(manager.getRepository(AttributeValue).create({ attributeId: entry.attribute.id, value })));
+            entry.values.set(lower(value), await manager.getRepository(AttributeValue).save(manager.getRepository(AttributeValue).create({ attributeId: entry.attribute.id, value, sortOrder: await nextValueSortOrder(manager, entry.attribute.id) })));
           }
         }
       }

@@ -14,6 +14,8 @@ export class GetAttributesHandler implements IQueryHandler<GetAttributesQuery> {
       relations: {
         values: true,
       },
+      // Las opciones salen en el orden que la tienda les dio (S, M, L…); a igualdad, las más antiguas primero
+      order: { values: { sortOrder: 'ASC', createdAt: 'ASC', id: 'ASC' } },
     });
   }
 }

@@ -33,6 +33,7 @@ Forma de toda respuesta de error:
 | `ATTRIBUTE_IN_USE` | 409 | products | {what} lo usan {variants} variante(s) de productos; quítalo de ellas antes de eliminarlo. | `variants` |
 | `ATTRIBUTE_NAME_TAKEN` | 409 | products | El atributo "{name}" ya existe. | `name` |
 | `ATTRIBUTE_NOT_FOUND` | 404 | products | Atributo no encontrado. | `attributeId` |
+| `ATTRIBUTE_ORDER_STALE` | 409 | products | La lista de opciones cambió mientras la ordenabas; recárgala y vuelve a intentarlo. | `problem` |
 | `ATTRIBUTE_VALUES_NOT_FOUND` | 404 | products | Uno o más valores de atributo no existen. | `valueId` |
 | `ATTRIBUTE_VALUE_TAKEN` | 409 | products | El valor "{value}" ya existe para este atributo. | `value` |
 | `AUTH_TOKEN_INVALID` | 401 | auth | El token de autenticación no es válido o expiró. | — |

@@ -97,9 +97,9 @@ describe('Proveedores', () => {
 
   describe('migración del índice único', () => {
     it('se detiene con un mensaje claro si ya hay documentos repetidos, y se aplica cuando se resuelven', async () => {
-      // Se deshacen las migraciones hasta quitar el índice para simular una base con datos antiguos
+      // Se deshacen las migraciones hasta quitar el índice para simular una base con datos antiguos (el tope solo evita un bucle sin fin: cada migración nueva obliga a deshacer una más)
       const indexExists = async () => (await db.query(`SELECT 1 FROM pg_indexes WHERE indexname = 'UQ_suppliers_tenant_identity'`)).length > 0;
-      for (let undone = 0; undone < 10 && (await indexExists()); undone++) {
+      for (let undone = 0; undone < 50 && (await indexExists()); undone++) {
         await db.undoLastMigration();
       }
       await db.query(`INSERT INTO suppliers (tenant_id, identity_number, name) VALUES ($1, 'DUP-1', 'Uno'), ($1, 'DUP-1', 'Dos')`, [shop.tenantId]);

@@ -8,6 +8,8 @@ import { CreateAttributeDto } from '../dtos/create-attribute.dto';
 import { CreateAttributeCommand } from '../../application/commands/create-attribute/create-attribute.command';
 import { DeleteAttributeCommand } from '../../application/commands/delete-attribute/delete-attribute.command';
 import { DeleteAttributeValueCommand } from '../../application/commands/delete-attribute-value/delete-attribute-value.command';
+import { ReorderAttributeValuesDto } from '../dtos/reorder-attribute-values.dto';
+import { ReorderAttributeValuesCommand } from '../../application/commands/reorder-attribute-values/reorder-attribute-values.command';
 import { CreateAttributeValueDto } from '../dtos/create-attribute-value.dto';
 import { CreateAttributeValueCommand } from '../../application/commands/create-attribute-value/create-attribute-value.command';
 import { CreateCategoryDto } from '../dtos/create-category.dto';
@@ -183,6 +185,18 @@ export class ProductsController {
     return this.commandBus.execute<CreateAttributeValueCommand, AttributeValue>(
       new CreateAttributeValueCommand(tenantId, dto.attributeId, dto.value),
     );
+  }
+
+  /** Fija el orden de las opciones de un atributo; la lista debe traer todas las opciones vigentes. */
+  @Put('attributes/:attributeId/values/order')
+  @RequirePermissions(APP_PERMISSIONS.ATTRIBUTES_EDIT)
+  async reorderAttributeValues(
+    @CurrentUser('tenantId') tenantId: string,
+    @Param('attributeId', ParseUUIDPipe) attributeId: string,
+    @Body() dto: ReorderAttributeValuesDto,
+  ) {
+    await this.commandBus.execute<ReorderAttributeValuesCommand, void>(new ReorderAttributeValuesCommand(tenantId, attributeId, dto.valueIds));
+    return { message: 'Orden guardado.' };
   }
 
   /** Elimina una opción de un atributo. Va antes que `attributes/:id` para que `values` no se lea como un id. */
