@@ -1,11 +1,9 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import { Logger, HttpStatus } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { CreateCashRegisterCommand } from './create-cash-register.command';
 import { CashRegister } from '../../../domain/entities/cash-register.entity';
-import { Branch } from '../../../../branches/domain/entities/branch.entity';
-import { AppException } from '../../../../../common/errors/app.exception';
-import { ErrorCode } from '../../../../../common/errors/error-codes';
+import { findBranchOrFail } from '../../../../branches/application/services/branch-lookup';
 
 @CommandHandler(CreateCashRegisterCommand)
 export class CreateCashRegisterHandler implements ICommandHandler<CreateCashRegisterCommand> {
@@ -18,15 +16,9 @@ export class CreateCashRegisterHandler implements ICommandHandler<CreateCashRegi
     this.logger.log(`Creating cash register "${name}" for Branch: ${branchId}, Tenant: ${tenantId}`);
 
     return this.entityManager.transaction(async (transactionalManager) => {
-      const branchRepo = transactionalManager.getRepository(Branch);
       const registerRepo = transactionalManager.getRepository(CashRegister);
 
-      const branch = await branchRepo.findOne({
-        where: { id: branchId, tenantId },
-      });
-      if (!branch) {
-        throw new AppException(ErrorCode.BranchNotFound, 'Sucursal no encontrada', HttpStatus.NOT_FOUND);
-      }
+      await findBranchOrFail(transactionalManager, tenantId, branchId);
 
       // Altas simultáneas en la misma sucursal: se serializan para no repetir el código correlativo
       await transactionalManager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`cash-registers:${tenantId}:${branchId}`]);

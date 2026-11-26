@@ -5,7 +5,7 @@ import { OpenCashSessionCommand } from './open-cash-session.command';
 import { CashSession } from '../../../domain/entities/cash-session.entity';
 import { CashSessionStatus } from '../../../domain/enums/cash-session-status.enum';
 import { CashRegister } from '../../../domain/entities/cash-register.entity';
-import { Branch } from '../../../../branches/domain/entities/branch.entity';
+import { findBranchOrFail } from '../../../../branches/application/services/branch-lookup';
 import { User } from '../../../../users/domain/entities/user.entity';
 import { RedisService } from '../../../../../common/redis/redis.service';
 import { assertUserCanAccessBranch } from '../../../../../common/security/branch-access.helper';
@@ -40,18 +40,11 @@ export class OpenCashSessionHandler implements ICommandHandler<OpenCashSessionCo
     this.logger.log(`Opening cash session for User: ${userId} in Branch: ${branchId} for Tenant: ${tenantId}`);
 
     return this.entityManager.transaction(async (transactionalManager) => {
-      const branchRepo = transactionalManager.getRepository(Branch);
       const cashSessionRepo = transactionalManager.getRepository(CashSession);
       const registerRepo = transactionalManager.getRepository(CashRegister);
 
       // 1. Verify branch exists and belongs to this tenant
-      const branch = await branchRepo.findOne({
-        where: { id: branchId, tenantId },
-      });
-      if (!branch) {
-        this.logger.warn(`Cash session opening failed: Branch ID ${branchId} not found under Tenant ${tenantId}`);
-        throw new AppException(ErrorCode.BranchNotFound, 'Sucursal no encontrada.', HttpStatus.NOT_FOUND, { branchId });
-      }
+      const branch = await findBranchOrFail(transactionalManager, tenantId, branchId);
 
       // 1.1 Verify user exists
       const userRepo = transactionalManager.getRepository(User);

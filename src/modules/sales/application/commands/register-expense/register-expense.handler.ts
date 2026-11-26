@@ -3,7 +3,7 @@ import { Logger, HttpStatus } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { RegisterExpenseCommand } from './register-expense.command';
 import { Expense } from '../../../domain/entities/expense.entity';
-import { Branch } from '../../../../branches/domain/entities/branch.entity';
+import { findBranchOrFail } from '../../../../branches/application/services/branch-lookup';
 import { CashSession } from '../../../domain/entities/cash-session.entity';
 import { CashSessionStatus } from '../../../domain/enums/cash-session-status.enum';
 import { lockCashSession } from '../shared/cash-session-lock';
@@ -22,18 +22,11 @@ export class RegisterExpenseHandler implements ICommandHandler<RegisterExpenseCo
     this.logger.log(`Registering expense: $${amount} (${category}) in Branch: ${branchId} for Tenant: ${tenantId}`);
 
     return this.entityManager.transaction(async (transactionalManager) => {
-      const branchRepo = transactionalManager.getRepository(Branch);
       const cashSessionRepo = transactionalManager.getRepository(CashSession);
       const expenseRepo = transactionalManager.getRepository(Expense);
 
       // 1. Verify branch exists and belongs to this tenant
-      const branch = await branchRepo.findOne({
-        where: { id: branchId, tenantId },
-      });
-      if (!branch) {
-        this.logger.warn(`Expense registration failed: Branch ID ${branchId} not found under Tenant ${tenantId}`);
-        throw new AppException(ErrorCode.BranchNotFound, 'Sucursal no encontrada.', HttpStatus.NOT_FOUND, { branchId });
-      }
+      await findBranchOrFail(transactionalManager, tenantId, branchId);
 
       // 2. Verify there is an active open cash session at this branch
       //    Si el cliente indica una sesión concreta, debe ser de esta sucursal/tenant y estar abierta

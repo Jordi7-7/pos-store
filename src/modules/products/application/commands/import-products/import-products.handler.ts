@@ -10,7 +10,7 @@ import { ProductStock } from '../../../domain/entities/product-stock.entity';
 import { ProductBatch } from '../../../domain/entities/product-batch.entity';
 import { Batch, BatchOriginType } from '../../../../batches/domain/entities/batch.entity';
 import { InventoryMovement } from '../../../domain/entities/inventory-movement.entity';
-import { Branch } from '../../../../branches/domain/entities/branch.entity';
+import { findBranchOrFail } from '../../../../branches/application/services/branch-lookup';
 import { InventoryMovementCategory } from '../../../../../common/enums/inventory-movement-category.enum';
 import { InventoryMovementReason } from '../../../../../common/enums/inventory-movement-reason.enum';
 import { InventoryMovementType } from '../../../../../common/enums/inventory-movement-type.enum';
@@ -78,14 +78,10 @@ export class ImportProductsHandler implements ICommandHandler<ImportProductsComm
       const stockRepo = tm.getRepository(ProductStock);
       const batchRepo = tm.getRepository(ProductBatch);
       const movementRepo = tm.getRepository(InventoryMovement);
-      const branchRepo = tm.getRepository(Branch);
 
       // Verify branch if branchId is provided
       if (branchId) {
-        const branch = await branchRepo.findOne({ where: { id: branchId, tenantId } });
-        if (!branch) {
-          throw new AppException(ErrorCode.BranchNotFound, `La sucursal destino con ID ${branchId} no existe.`, HttpStatus.NOT_FOUND, { branchId });
-        }
+        await findBranchOrFail(tm, tenantId, branchId);
       }
 
       // Check if any SKU already exists in this Tenant (chunked to prevent Postgres param limits)

@@ -45,6 +45,18 @@ describe('Reglas de capas', () => {
     expect(found).toEqual([]);
   });
 
+  it('los servicios de aplicación no conocen commands ni queries: declaran su propia entrada', () => {
+    const services = layerFiles('application').filter((file) => file.includes(`${path.sep}application${path.sep}services${path.sep}`));
+    expect(services.length).toBeGreaterThan(5);
+    const found = violations(services, (specifier) => /(^|\/)(commands|queries)\//.test(specifier));
+    expect(found).toEqual([]);
+  });
+
+  it('nada en application importa un handler: lo que comparten dos casos de uso va a un servicio', () => {
+    const found = violations(layerFiles('application'), (specifier) => specifier.endsWith('.handler'));
+    expect(found).toEqual([]);
+  });
+
   it('los DTOs viven en infrastructure/dtos', () => {
     const misplaced = sourceFiles(MODULES_DIR)
       .filter((file) => file.endsWith('.dto.ts') && !file.includes(`infrastructure${path.sep}dtos`))

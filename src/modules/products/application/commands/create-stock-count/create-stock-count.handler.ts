@@ -17,7 +17,8 @@ import { isManualReason, sameTotals, totalsByVariant } from '../../../domain/ser
 import { CountAdjustment, duplicatedVariants, planStockCount } from '../../../domain/services/stock-count-rules';
 import { InventoryDocumentResult } from '../../read-models/inventory-document';
 import { buildMovement, saveDocumentBatch, saveInventoryDocument, toDocumentResult } from '../../services/inventory-document';
-import { assertLineCount, findBranchOrFail, findDocumentReplay, findVariantsOrFail, invalidReason, runOnce, toResultLines } from '../../services/inventory-document-support';
+import { assertLineCount, findDocumentReplay, findVariantsOrFail, invalidReason, runOnce, toResultLines } from '../../services/inventory-document-support';
+import { findBranchOrFail } from '../../../../branches/application/services/branch-lookup';
 import { consumeStock, lockBranchStock, receiveStock } from '../../services/inventory-stock';
 import { CreateStockCountCommand } from './create-stock-count.command';
 

@@ -12,7 +12,7 @@ import { RegisterPurchaseCommand } from './register-purchase.command';
 import { PurchaseOrder } from '../../../domain/entities/purchase-order.entity';
 import { Supplier } from '../../../domain/entities/supplier.entity';
 import { PurchaseOrderItem } from '../../../domain/entities/purchase-order-item.entity';
-import { Branch } from '../../../../branches/domain/entities/branch.entity';
+import { findBranchOrFail } from '../../../../branches/application/services/branch-lookup';
 import { ProductVariant } from '../../../../products/domain/entities/product-variant.entity';
 import { ProductStock } from '../../../../products/domain/entities/product-stock.entity';
 import { InventoryMovement } from '../../../../products/domain/entities/inventory-movement.entity';
@@ -50,7 +50,6 @@ export class RegisterPurchaseHandler implements ICommandHandler<RegisterPurchase
 
       // 1. Grouped Repository Initialization (Pattern 3)
       const supplierRepo = transactionalManager.getRepository(Supplier);
-      const branchRepo = transactionalManager.getRepository(Branch);
       const purchaseRepo = transactionalManager.getRepository(PurchaseOrder);
       const variantRepo = transactionalManager.getRepository(ProductVariant);
       const stockRepo = transactionalManager.getRepository(ProductStock);
@@ -85,13 +84,7 @@ export class RegisterPurchaseHandler implements ICommandHandler<RegisterPurchase
       }
 
       // 3. Validate Branch belongs to Tenant
-      const branch = await branchRepo.findOne({
-        where: { id: branchId, tenantId },
-      });
-      if (!branch) {
-        this.logger.warn(`Purchase failed: Branch ID ${branchId} not found under Tenant ${tenantId}`);
-        throw new AppException(ErrorCode.BranchNotFound, 'Sucursal no encontrada.', HttpStatus.NOT_FOUND, { branchId });
-      }
+      await findBranchOrFail(transactionalManager, tenantId, branchId);
 
       // 4. Calculate total amount
       const totalAmount = Money.sum(items.map((item) => Money.ofLine(item.purchasePrice, item.quantity))).toNumber();

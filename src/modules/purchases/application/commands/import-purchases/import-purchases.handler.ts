@@ -11,7 +11,7 @@ import { ImportPurchasesCommand } from './import-purchases.command';
 import { PurchaseOrder } from '../../../domain/entities/purchase-order.entity';
 import { PurchaseOrderItem } from '../../../domain/entities/purchase-order-item.entity';
 import { Supplier } from '../../../domain/entities/supplier.entity';
-import { Branch } from '../../../../branches/domain/entities/branch.entity';
+import { findBranchOrFail } from '../../../../branches/application/services/branch-lookup';
 import { ProductVariant } from '../../../../products/domain/entities/product-variant.entity';
 import { Batch, BatchOriginType } from '../../../../batches/domain/entities/batch.entity';
 import { InventoryMovement } from '../../../../products/domain/entities/inventory-movement.entity';
@@ -55,16 +55,12 @@ export class ImportPurchasesHandler implements ICommandHandler<ImportPurchasesCo
       const purchaseRepo = tm.getRepository(PurchaseOrder);
       const itemRepo = tm.getRepository(PurchaseOrderItem);
       const supplierRepo = tm.getRepository(Supplier);
-      const branchRepo = tm.getRepository(Branch);
       const variantRepo = tm.getRepository(ProductVariant);
       const batchHeaderRepo = tm.getRepository(Batch);
       const movementRepo = tm.getRepository(InventoryMovement);
 
       // Verify branch exists
-      const branch = await branchRepo.findOne({ where: { id: branchId, tenantId } });
-      if (!branch) {
-        throw new AppException(ErrorCode.BranchNotFound, `La sucursal destino con ID ${branchId} no existe.`, HttpStatus.NOT_FOUND, { branchId });
-      }
+      await findBranchOrFail(tm, tenantId, branchId);
 
       // Resolve supplier (by supplierId or default to GENERICO)
       let supplier: Supplier | null = null;

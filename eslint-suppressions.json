@@ -114,14 +114,6 @@
       "count": 3
     }
   },
-  "src/modules/products/application/commands/create-simple-product/create-simple-product.handler.ts": {
-    "@typescript-eslint/no-explicit-any": {
-      "count": 1
-    },
-    "@typescript-eslint/no-unsafe-member-access": {
-      "count": 1
-    }
-  },
   "src/modules/products/application/commands/delete-variant/delete-variant.handler.ts": {
     "@typescript-eslint/no-unused-vars": {
       "count": 1
