@@ -18,6 +18,8 @@ import { CreateAttributeValueHandler } from './application/commands/create-attri
 import { CreateCategoryHandler } from './application/commands/create-category/create-category.handler';
 import { GetCategoriesHandler } from './application/queries/get-categories/get-categories.handler';
 import { GetProductsHandler } from './application/queries/get-products/get-products.handler';
+import { MatchImageFilesHandler } from './application/queries/match-image-files/match-image-files.handler';
+import { AssignProductImagesHandler } from './application/commands/assign-product-images/assign-product-images.handler';
 import { GetProductByIdHandler } from './application/queries/get-product-by-id/get-product-by-id.handler';
 import { GetVariantBySkuHandler } from './application/queries/get-variant-by-sku/get-variant-by-sku.handler';
 import { UpdateProductHandler } from './application/commands/update-product/update-product.handler';
@@ -115,6 +117,8 @@ import { ProductsController } from './infrastructure/controllers/products.contro
     GetPosStockHandler,
     GetProductsBySkuAndBarcodeHandler,
     GetProductsByNameHandler,
+    MatchImageFilesHandler,
+    AssignProductImagesHandler,
   ],
 })
 export class ProductsModule {}

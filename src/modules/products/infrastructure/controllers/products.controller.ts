@@ -65,6 +65,11 @@ import { GetTagsQuery } from '../../application/queries/get-tags/get-tags.query'
 import { CreateTagCommand } from '../../application/commands/create-tag/create-tag.command';
 import { UpdateVariantTagsCommand } from '../../application/commands/update-variant-tags/update-variant-tags.command';
 import { Product } from '../../domain/entities/product.entity';
+import { AssignProductImagesDto, MatchImageFilesDto } from '../dtos/image-files.dto';
+import { MatchImageFilesQuery } from '../../application/queries/match-image-files/match-image-files.query';
+import { AssignProductImagesCommand } from '../../application/commands/assign-product-images/assign-product-images.command';
+import { AssignProductImagesResult } from '../../application/commands/assign-product-images/assign-product-images.handler';
+import { FileMatch } from '../../domain/image-file-match';
 import { ProductVariant } from '../../domain/entities/product-variant.entity';
 import { Category } from '../../domain/entities/category.entity';
 import { Attribute } from '../../domain/entities/attribute.entity';
@@ -135,6 +140,20 @@ export class ProductsController {
 
 
 
+
+  /** Subida masiva de fotos: a qué producto o variante corresponde cada nombre de archivo. No escribe nada. */
+  @Post('image-files/match')
+  @RequirePermissions(APP_PERMISSIONS.PRODUCTS_EDIT, APP_PERMISSIONS.MEDIA_UPLOAD)
+  async matchImageFiles(@CurrentUser('tenantId') tenantId: string, @Body() dto: MatchImageFilesDto) {
+    return this.queryBus.execute<MatchImageFilesQuery, FileMatch[]>(new MatchImageFilesQuery(tenantId, dto.fileNames));
+  }
+
+  /** Agrega a productos y variantes las fotos ya subidas a la galería. */
+  @Post('image-files/assign')
+  @RequirePermissions(APP_PERMISSIONS.PRODUCTS_EDIT, APP_PERMISSIONS.MEDIA_UPLOAD)
+  async assignImageFiles(@CurrentUser('tenantId') tenantId: string, @Body() dto: AssignProductImagesDto) {
+    return this.commandBus.execute<AssignProductImagesCommand, AssignProductImagesResult>(new AssignProductImagesCommand(tenantId, dto.items));
+  }
 
   @Post(':productId/variants')
   @RequirePermissions(APP_PERMISSIONS.PRODUCTS_CREATE)
