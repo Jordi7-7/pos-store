@@ -40,9 +40,10 @@ Forma de toda respuesta de error:
 | `AUTH_TOKEN_MISSING` | 401 | auth | Falta el token de autenticación. | — |
 | `BASE_SKU_REQUIRED` | 400 | products | El SKU base es obligatorio para un producto variable. | — |
 | `BASE_SKU_TAKEN` | 409 | products | El SKU base "{baseSku.trim().toUpperCase()}" ya lo usa otro producto. | `baseSku` |
+| `BATCH_NOT_FOUND` | 404 | batches | El lote no existe. | — |
 | `BRANCH_ACCESS_DENIED` | 403 | common | No tienes permisos para {actionDescription} en la sucursal seleccionada. | `branchId` |
 | `BRANCH_NAME_TAKEN` | 409 | branches | Ya existe otra sucursal con el nombre "{name.trim()}". | `name` |
-| `BRANCH_NOT_FOUND` | 404 | branches, products, purchases, sales | La sucursal destino con ID {branchId} no existe. | `branchId` |
+| `BRANCH_NOT_FOUND` | 404 | branches | La sucursal con ID "{branchId}" no existe o no pertenece a la tienda. | `branchId` |
 | `BRANCH_REQUIRED` | 400 | common | Debes seleccionar una sucursal para {actionDescription}. | — |
 | `CANNOT_DEACTIVATE_SELF` | 400 | users | No puedes desactivar tu propia cuenta mientras estás en sesión. | — |
 | `CASH_REGISTER_BUSY` | 409 | sales | La {register.name} ya tiene un turno abierto (por {openedByName}). Debes cerrar ese turno o seleccionar otra caja. | `cashRegisterName`, `openedBy` |
@@ -63,7 +64,7 @@ Forma de toda respuesta de error:
 | `DEFAULT_SUPPLIER_NOT_FOUND` | 404 | purchases | No se encontró un proveedor configurado para este tenant. | — |
 | `DUPLICATE_COUNT_LINE` | 400 | products | Un producto aparece más de una vez en el conteo. | `variantIds` |
 | `DUPLICATE_SKU_IN_IMPORT` | 400 | products | El archivo repite estos SKUs: {repeated.slice(0, 10).join(', ')} | `skus` |
-| `DUPLICATE_VARIANT_COMBINATION` | 409 | products | No se permiten múltiples variantes con la misma combinación de atributos en un mismo producto. | — |
+| `DUPLICATE_VARIANT_COMBINATION` | 409 | products | Ya existe una variante con la misma combinación de atributos para este producto. | — |
 | `EMAIL_TAKEN` | 409 | auth, users | Ese correo ya está registrado en otra cuenta. | `email` |
 | `EMPTY_INVENTORY_DOCUMENT` | 400 | products | El {noun} debe tener al menos un producto. | — |
 | `EMPTY_PURCHASE` | 400 | purchases | La compra debe tener al menos un producto. | — |

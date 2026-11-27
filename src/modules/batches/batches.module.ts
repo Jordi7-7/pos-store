@@ -6,8 +6,9 @@ import { ProductBatch } from '../products/domain/entities/product-batch.entity';
 import { BatchesController } from './infrastructure/controllers/batches.controller';
 import { GetBatchesHandler } from './application/queries/get-batches/get-batches.handler';
 import { GetBatchesByVariantHandler } from './application/queries/get-batches-by-variant/get-batches-by-variant.handler';
+import { GetBatchLabelsHandler } from './application/queries/get-batch-labels/get-batch-labels.handler';
 
-export const QueryHandlers = [GetBatchesHandler, GetBatchesByVariantHandler];
+export const QueryHandlers = [GetBatchesHandler, GetBatchesByVariantHandler, GetBatchLabelsHandler];
 
 @Module({
   imports: [

@@ -3,6 +3,8 @@ import { GetBatchesHandler } from '../../src/modules/batches/application/queries
 import { GetBatchesQuery } from '../../src/modules/batches/application/queries/get-batches/get-batches.query';
 import { GetBatchesByVariantHandler } from '../../src/modules/batches/application/queries/get-batches-by-variant/get-batches-by-variant.handler';
 import { GetBatchesByVariantQuery } from '../../src/modules/batches/application/queries/get-batches-by-variant/get-batches-by-variant.query';
+import { GetBatchLabelsHandler } from '../../src/modules/batches/application/queries/get-batch-labels/get-batch-labels.handler';
+import { GetBatchLabelsQuery } from '../../src/modules/batches/application/queries/get-batch-labels/get-batch-labels.query';
 import { BatchOriginType, BatchStatus } from '../../src/modules/batches/domain/entities/batch.entity';
 import { Branch } from '../../src/modules/branches/domain/entities/branch.entity';
 import { RegisterPurchaseCommand } from '../../src/modules/purchases/application/commands/register-purchase/register-purchase.command';
@@ -210,6 +212,60 @@ describe('Tienda y lotes', () => {
       );
 
       expect(data[0].items.map((item) => item.sku)).toEqual(['ABC-1', 'ORD-2', 'ORD-10']);
+    });
+
+    describe('etiquetas de un lote', () => {
+      const labels = (batchId: string, args: Partial<{ tenantId: string; userId: string; isOwner: boolean }> = {}) =>
+        new GetBatchLabelsHandler(db.manager, redisStub).execute(
+          new GetBatchLabelsQuery(args.tenantId ?? other.tenantId, batchId, args.userId ?? other.ownerId, args.isOwner ?? true),
+        );
+      let batchId: string;
+      let removedId: string;
+
+      beforeAll(async () => {
+        const second = await seedVariant(db, other.tenantId, 'ETQ-10');
+        const first = await seedVariant(db, other.tenantId, 'ETQ-2');
+        removedId = await seedVariant(db, other.tenantId, 'ETQ-BORRADA');
+        await new RegisterPurchaseHandler(db.manager, redisStub).execute(
+          new RegisterPurchaseCommand(other.tenantId, other.ownerId, other.supplierId, other.branchId, 'FAC-ETQ', [
+            { variantId: second, quantity: 3, purchasePrice: 1 },
+            { variantId: first, quantity: 5, purchasePrice: 1 },
+            { variantId: removedId, quantity: 2, purchasePrice: 1 },
+          ]),
+        );
+        const [row] = await db.query<Array<{ id: string }>>(`SELECT b.id FROM batches b JOIN purchase_orders p ON p.id = b.purchase_order_id WHERE p.invoice_number = 'FAC-ETQ'`);
+        batchId = row.id;
+        // Ya se vendió parte: las etiquetas siguen siendo por lo que entró
+        await db.query(`UPDATE product_batches SET remaining_quantity = 0 WHERE batch_id = $1`, [batchId]);
+      });
+
+      it('devuelve cada variante con las unidades que entraron y su precio de venta, ordenadas por SKU', async () => {
+        const [price] = await db.query<Array<{ sale_price: string }>>(`SELECT sale_price FROM product_variants WHERE tenant_id = $1 AND sku = 'ETQ-2'`, [other.tenantId]);
+        const result = await labels(batchId);
+        expect(result.unavailable).toBe(0);
+        expect(result.lines.map((line) => [line.sku, line.quantity])).toEqual([['ETQ-2', 5], ['ETQ-10', 3], ['ETQ-BORRADA', 2]]);
+        expect(result.lines[0]).toMatchObject({ salePrice: Number(price.sale_price), attributes: [] });
+      });
+
+      it('una variante eliminada no se etiqueta y se cuenta aparte', async () => {
+        await db.query(`UPDATE product_variants SET deleted_at = now() WHERE id = $1`, [removedId]);
+        const result = await labels(batchId);
+        expect(result.lines.map((line) => line.sku)).toEqual(['ETQ-2', 'ETQ-10']);
+        expect(result.unavailable).toBe(1);
+      });
+
+      it('no entrega el lote de otra tienda ni uno inexistente', async () => {
+        await expect(labels(batchId, { tenantId: shop.tenantId, userId: shop.ownerId })).rejects.toMatchObject({ code: 'BATCH_NOT_FOUND' });
+        await expect(labels('00000000-0000-0000-0000-000000000000')).rejects.toMatchObject({ code: 'BATCH_NOT_FOUND' });
+      });
+
+      it('quien no es propietario solo puede con los lotes de sus sucursales', async () => {
+        const [foreign] = await db.query<Array<{ id: string }>>(`SELECT id FROM batches WHERE tenant_id = $1 AND branch_id = $2 LIMIT 1`, [shop.tenantId, secondBranchId]);
+        const [own] = await db.query<Array<{ id: string }>>(`SELECT id FROM batches WHERE tenant_id = $1 AND branch_id = $2 LIMIT 1`, [shop.tenantId, shop.branchId]);
+        const cashier = { tenantId: shop.tenantId, userId: cashierId, isOwner: false };
+        await expect(labels(foreign.id, cashier)).rejects.toMatchObject({ code: 'BRANCH_ACCESS_DENIED' });
+        await expect(labels(own.id, cashier)).resolves.toMatchObject({ batchId: own.id });
+      });
     });
 
     it('los lotes de una variante muestran lo comprado y lo consumido', async () => {
