@@ -106,6 +106,8 @@ export enum ErrorCode {
   CommentRequired = 'COMMENT_REQUIRED',
   InventoryDocumentNotFound = 'INVENTORY_DOCUMENT_NOT_FOUND',
 
+  BatchNotFound = 'BATCH_NOT_FOUND',
+
   // Importaciones
   ImportEmpty = 'IMPORT_EMPTY',
   ImportLimitExceeded = 'IMPORT_LIMIT_EXCEEDED',

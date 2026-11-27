@@ -1,10 +1,12 @@
-import { HttpStatus, Controller, Get, Param, Query } from '@nestjs/common';
+import { HttpStatus, Controller, Get, Param, ParseUUIDPipe, Query } from '@nestjs/common';
 import { QueryBus } from '@nestjs/cqrs';
 import { CurrentUser } from '../../../auth/decorators/current-user.decorator';
 import { RequirePermissions } from '../../../auth/decorators/permissions.decorator';
 import { APP_PERMISSIONS } from '../../../../common/enums/permissions.enum';
 import { GetBatchesQuery } from '../../application/queries/get-batches/get-batches.query';
 import { GetBatchesByVariantQuery } from '../../application/queries/get-batches-by-variant/get-batches-by-variant.query';
+import { GetBatchLabelsQuery } from '../../application/queries/get-batch-labels/get-batch-labels.query';
+import { BatchLabels } from '../../application/queries/get-batch-labels/get-batch-labels.handler';
 import { BatchOriginType } from '../../domain/entities/batch.entity';
 import { AppException } from '../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../common/errors/error-codes';
@@ -48,6 +50,18 @@ export class BatchesController {
         isOwner,
       ),
     );
+  }
+
+  /** Todo lo que entró en un lote, para imprimir sus etiquetas (sin los filtros del listado). */
+  @Get(':batchId/labels')
+  @RequirePermissions(APP_PERMISSIONS.PRODUCTS_GET, APP_PERMISSIONS.PRODUCTS_PRINT_BARCODES)
+  async getBatchLabels(
+    @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser('sub') userId: string,
+    @CurrentUser('isOwner') isOwner: boolean,
+    @Param('batchId', ParseUUIDPipe) batchId: string,
+  ) {
+    return this.queryBus.execute<GetBatchLabelsQuery, BatchLabels>(new GetBatchLabelsQuery(tenantId, batchId, userId, isOwner));
   }
 
   @Get()
