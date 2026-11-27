@@ -1,6 +1,10 @@
 import { DataSource } from 'typeorm';
 import { ImportVariantProductsCommand } from '../../src/modules/products/application/commands/import-variant-products/import-variant-products.command';
 import { ImportVariantProductsHandler } from '../../src/modules/products/application/commands/import-variant-products/import-variant-products.handler';
+import { Batch } from '../../src/modules/batches/domain/entities/batch.entity';
+import { CreateVariableProductCommand } from '../../src/modules/products/application/commands/create-variable-product/create-variable-product.command';
+import { CreateVariableProductHandler } from '../../src/modules/products/application/commands/create-variable-product/create-variable-product.handler';
+import { AttributeValue } from '../../src/modules/products/domain/entities/attribute-value.entity';
 import { Attribute } from '../../src/modules/products/domain/entities/attribute.entity';
 import { Category } from '../../src/modules/products/domain/entities/category.entity';
 import { ProductStock } from '../../src/modules/products/domain/entities/product-stock.entity';
@@ -152,6 +156,60 @@ describe('Importación de productos con variantes', () => {
     await expect(run([row({ baseSku: 'PER', sku: 'PER-1' })], { userId: cashierId })).rejects.toMatchObject({ code: 'BRANCH_ACCESS_DENIED' });
     await expect(run([])).rejects.toMatchObject({ code: 'IMPORT_EMPTY' });
     await expect(run(Array.from({ length: 2001 }, (_, index) => row({ sku: `MAX-${index}` })))).rejects.toMatchObject({ code: 'IMPORT_LIMIT_EXCEEDED' });
+  });
+
+  it('todo el archivo queda en un solo lote, y cada importación abre el suyo', async () => {
+    const tenant = await seedTenant(db, 'lote-import');
+    const lots = () => db.getRepository(Batch).find({ where: { tenantId: tenant.tenantId }, relations: { items: { variant: true } }, order: { createdAt: 'ASC' } });
+    const contents = (lot: Batch | undefined) => (lot?.items ?? []).map((item) => [item.variant.sku, Number(item.initialQuantity)]).sort();
+
+    await run(
+      [
+        row({ name: 'Mochila KTM', baseSku: 'KTM', sku: 'KTM-01', attributes: [{ name: 'Diseño', value: '01' }], quantity: 4 }),
+        row({ name: 'Mochila KTM', baseSku: 'KTM', sku: 'KTM-02', attributes: [{ name: 'Diseño', value: '02' }], quantity: 2 }),
+        row({ name: 'Mochila KTM', baseSku: 'KTM', sku: 'KTM-03', attributes: [{ name: 'Diseño', value: '03' }], quantity: 0 }),
+        row({ name: 'Mochila Honda', baseSku: 'HON', sku: 'HON-01', attributes: [{ name: 'Diseño', value: '01' }], quantity: 5 }),
+        row({ name: 'Llavero', baseSku: '', sku: 'LLAVERO', attributes: [], quantity: 9 }),
+      ],
+      { tenant },
+    );
+
+    const [first, ...rest] = await lots();
+    expect(rest).toHaveLength(0);
+    expect(first).toMatchObject({ branchId: tenant.branchId, originType: 'INITIAL_STOCK', purchaseOrderId: null });
+    expect(first?.code).toMatch(/^IMP-VAR-/);
+    expect(contents(first)).toEqual([['HON-01', 5], ['KTM-01', 4], ['KTM-02', 2], ['LLAVERO', 9]]);
+
+    // Sin existencias no se abre un lote vacío
+    await run([row({ name: 'Gorra', baseSku: 'GOR', sku: 'GOR-1', quantity: 0 })], { tenant });
+    expect(await lots()).toHaveLength(1);
+
+    await run([row({ name: 'Canguro', baseSku: 'CAN', sku: 'CAN-1', quantity: 3 })], { tenant });
+    const after = await lots();
+    expect(after).toHaveLength(2);
+    expect(contents(after[1])).toEqual([['CAN-1', 3]]);
+  });
+
+  it('la pantalla de alta deja todas las variantes de un producto en un solo lote', async () => {
+    const tenant = await seedTenant(db, 'lote-alta');
+    await run([row({ name: 'Semilla', baseSku: 'SEM', sku: 'SEM-1', quantity: 0, attributes: [{ name: 'Diseño', value: '01' }] }), row({ name: 'Semilla', baseSku: 'SEM', sku: 'SEM-2', quantity: 0, attributes: [{ name: 'Diseño', value: '02' }] })], { tenant });
+    const values = await db.getRepository(AttributeValue).find({ where: { attribute: { tenantId: tenant.tenantId } }, order: { value: 'ASC' } });
+    const variant = (sku: string, index: number, quantity: number) => ({
+      sku,
+      purchasePrice: 5,
+      salePrice: 12,
+      attributeValues: [{ attributeValueId: values[index]?.id }],
+      stocks: [{ branchId: tenant.branchId, quantity }],
+    });
+
+    await new CreateVariableProductHandler(db.manager).execute(
+      new CreateVariableProductCommand(tenant.tenantId, 'Mochila KTM', '', [variant('ALTA-01', 0, 4), variant('ALTA-02', 1, 2)], undefined, undefined, 'ALTA'),
+    );
+
+    const lots = await db.getRepository(Batch).find({ where: { tenantId: tenant.tenantId }, relations: { items: { variant: true } } });
+    expect(lots).toHaveLength(1);
+    expect(lots[0]).toMatchObject({ code: 'LOT-INIT-ALTA', originType: 'INITIAL_STOCK', branchId: tenant.branchId });
+    expect(lots[0]?.items.map((item) => [item.variant.sku, Number(item.initialQuantity)]).sort()).toEqual([['ALTA-01', 4], ['ALTA-02', 2]]);
   });
 
   it('una fila con cinco atributos (cuatro piezas de color y el cierre) crea la variante con los cinco', async () => {

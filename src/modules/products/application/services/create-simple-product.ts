@@ -9,7 +9,7 @@ import { assertBranchesExist } from '../../../branches/application/services/bran
 import { ProductType } from '../../domain/enums/product-type.enum';
 import { AppException } from '../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../common/errors/error-codes';
-import { recordInitialStock } from './initial-stock';
+import { recordInitialStock, SharedInitialLot } from './initial-stock';
 import { translatingSkuConflict } from './sku-conflict';
 import { normalizeSku } from '../../domain/sku';
 
@@ -27,6 +27,8 @@ export interface NewSimpleProduct {
   categoryId?: string;
   imageIds?: string[];
   stocks?: { branchId: string; quantity: number }[];
+  /** Lote en el que entran las existencias iniciales; sin él, el producto abre el suyo. */
+  initialLot?: SharedInitialLot;
 }
 
 /**
@@ -141,6 +143,7 @@ async function register(entityManager: EntityManager, input: NewSimpleProduct): 
         quantity: Number(stock.quantity),
         unitCost: Number(savedVariant.purchasePrice),
       })),
+      input.initialLot,
     );
 
     savedProduct.variants = [savedVariant];

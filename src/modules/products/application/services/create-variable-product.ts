@@ -14,7 +14,7 @@ import { AppException } from '../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../common/errors/error-codes';
 import { translatingSkuConflict } from './sku-conflict';
 import { assertBaseSkuAvailable, assertSkusDoNotShadowBaseSku } from './base-sku';
-import { recordInitialStock } from './initial-stock';
+import { recordInitialStock, SharedInitialLot } from './initial-stock';
 import { assertVariantAttributesAreConsistent } from './variant-attributes';
 
 /** Todo lo que viene del cliente por id, ya comprobado contra la tienda y cargado de una vez. */
@@ -34,6 +34,8 @@ export interface NewVariableProduct {
   imageIds?: string[];
   categoryId?: string;
   baseSku?: string;
+  /** Lote en el que entran las existencias iniciales; sin él, el producto abre uno para todas sus variantes. */
+  initialLot?: SharedInitialLot;
 }
 
 /**
@@ -93,6 +95,8 @@ async function register(manager: EntityManager, input: NewVariableProduct, baseS
         unitCost: Number(variant.purchasePrice),
       })),
     ),
+    // El código de la columna admite 100 caracteres
+    input.initialLot ?? new SharedInitialLot(`LOT-INIT-${baseSku}`.slice(0, 100)),
   );
 
   savedProduct.variants = savedVariants;

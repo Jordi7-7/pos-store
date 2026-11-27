@@ -15,6 +15,7 @@ import { ProductType } from '../../../domain/enums/product-type.enum';
 import { ImportRowError, PlannedProduct, planImport } from '../../../domain/import-plan';
 import { createSimpleProduct } from '../../services/create-simple-product';
 import { createVariableProduct } from '../../services/create-variable-product';
+import { SharedInitialLot } from '../../services/initial-stock';
 import { ImportVariantProductsCommand } from './import-variant-products.command';
 import { nextValueSortOrder } from '../../services/attribute-order';
 
@@ -198,6 +199,9 @@ export class ImportVariantProductsHandler implements ICommandHandler<ImportVaria
       }
     }
 
+    // Todo el archivo es una sola llegada de mercancía: un único lote
+    const initialLot = new SharedInitialLot(`IMP-VAR-${Date.now().toString().slice(-6)}`);
+
     // Cada producto con los mismos casos de uso que la pantalla de alta (mismas reglas y mismos errores)
     for (const product of products) {
       const categoryId = product.category ? catalog.categories.get(lower(product.category))?.id : undefined;
@@ -216,6 +220,7 @@ export class ImportVariantProductsHandler implements ICommandHandler<ImportVaria
           wholesalePrice: only.wholesalePrice ?? undefined,
           categoryId,
           stocks: stocksOf(only.quantity),
+          initialLot,
         });
       } else {
         await createVariableProduct(manager, {
@@ -224,6 +229,7 @@ export class ImportVariantProductsHandler implements ICommandHandler<ImportVaria
           description: '',
           categoryId,
           baseSku: product.baseSku,
+          initialLot,
           variants: product.variants.map((variant) => ({
             sku: variant.sku,
             barcode: variant.barcode || undefined,
