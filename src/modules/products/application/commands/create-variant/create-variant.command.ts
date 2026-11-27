@@ -1,13 +1,6 @@
-export interface VariantInput {
-  sku: string;
-  barcode?: string;
-  purchasePrice: number;
-  salePrice: number;
-  wholesalePrice?: number | null;
-  imageIds?: string[];
-  attributeValues?: Array<{ attributeValueId: string }>;
-  stocks?: Array<{ branchId: string; quantity: number }>;
-}
+import { VariantInput } from '../../../domain/variant-input';
+
+export type { VariantInput };
 
 export class CreateVariantCommand {
   constructor(

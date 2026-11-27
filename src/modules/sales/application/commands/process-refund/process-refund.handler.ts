@@ -9,7 +9,7 @@ import { RefundItem } from '../../../domain/entities/refund-item.entity';
 import { Sale } from '../../../domain/entities/sale.entity';
 import { CashSession } from '../../../domain/entities/cash-session.entity';
 import { CashSessionStatus } from '../../../domain/enums/cash-session-status.enum';
-import { Branch } from '../../../../branches/domain/entities/branch.entity';
+import { findBranchOrFail } from '../../../../branches/application/services/branch-lookup';
 import { InventoryMovement } from '../../../../products/domain/entities/inventory-movement.entity';
 import { Batch, BatchOriginType } from '../../../../batches/domain/entities/batch.entity';
 
@@ -55,7 +55,6 @@ export class ProcessRefundHandler implements ICommandHandler<ProcessRefundComman
       });
 
       // 1. Grouped Repository Initialization (Pattern 3)
-      const branchRepo = transactionalManager.getRepository(Branch);
       const cashSessionRepo = transactionalManager.getRepository(CashSession);
       const saleRepo = transactionalManager.getRepository(Sale);
       const saleItemRepo = transactionalManager.getRepository(SaleItem);
@@ -63,13 +62,7 @@ export class ProcessRefundHandler implements ICommandHandler<ProcessRefundComman
       const inventoryRepo = transactionalManager.getRepository(InventoryMovement);
 
       // 2. Validate Branch belongs to Tenant
-      const branch = await branchRepo.findOne({
-        where: { id: branchId, tenantId },
-      });
-      if (!branch) {
-        this.logger.warn(`Refund failed: Branch ID ${branchId} not found under Tenant ${tenantId}`);
-        throw new AppException(ErrorCode.BranchNotFound, 'Sucursal no encontrada.', HttpStatus.NOT_FOUND, { branchId });
-      }
+      await findBranchOrFail(transactionalManager, tenantId, branchId);
 
       await lockCashSession(transactionalManager, cashSessionId, 'share');
 

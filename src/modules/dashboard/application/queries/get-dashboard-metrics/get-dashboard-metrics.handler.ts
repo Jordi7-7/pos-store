@@ -1,3 +1,4 @@
+import { publicBaseUrl } from '../../../../../common/storage/public-url';
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
 import { EntityManager } from 'typeorm';
 import { RedisService } from '../../../../../common/redis/redis.service';
@@ -49,7 +50,7 @@ export class GetDashboardMetricsHandler implements IQueryHandler<GetDashboardMet
     return {
       today: buildToday(sales, refunds),
       paymentMethods: buildPaymentMethods(payments),
-      topProducts: buildTopProducts(topProducts, process.env.AWS_S3_PUBLIC_URL || ''),
+      topProducts: buildTopProducts(topProducts, publicBaseUrl()),
       lowStockProducts: buildLowStockProducts(lowStock),
       yesterdaySoldProducts: buildYesterdaySoldProducts(soldYesterday),
       weekSummary: buildWeekSummary(currentWeek, previousWeekTotal),

@@ -27,6 +27,7 @@ export class RegisterImageHandler implements ICommandHandler<RegisterImageComman
 
     const saved = await this.entityManager.getRepository(ProductImage).save(image);
     this.logger.log(`Image registered: ID ${saved.id} for Tenant ${tenantId}`);
-    return saved;
+    // Se vuelve a leer para devolver lo mismo que las lecturas: con la dirección pública y no con la clave guardada
+    return this.entityManager.getRepository(ProductImage).findOneByOrFail({ id: saved.id });
   }
 }

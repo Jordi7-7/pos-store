@@ -60,6 +60,20 @@ process(@CurrentUser('tenantId') tenantId: string, @CurrentUser('sub') userId: s
 - Nombres y comentarios en español, comentarios que explican el **porqué**, no el qué.
 - Nada de `any` (ni `as any`) ni silenciar el lint en código nuevo. La deuda heredada solo baja: si una infracción desaparece, `pnpm lint:prune`.
 
+### Dónde va cada cosa
+
+| Pieza | Hace | No hace |
+|---|---|---|
+| **Controller** (`infrastructure/controllers`) | Valida la entrada (DTO) y despacha el command o la query | Lógica de negocio |
+| **Handler** (`application/commands`, `application/queries`) | Orquesta **un** caso de uso y abre la transacción | Importar o instanciar otro handler |
+| **Servicio de aplicación** (`application/services`) | Lógica con base de datos que usan **dos o más** handlers | Conocer commands, queries o DTOs |
+| **Domain** (`domain/`) | Reglas puras (dinero, stock, combinaciones) con test unitario | Consultar la base o leer el entorno |
+
+- **No se crea un servicio porque sí.** Si la lógica la usa un solo handler, se queda en él, partida en métodos privados con nombre. Si la usan dos, va a un servicio. Si es una regla sin base de datos, va a `domain`.
+- Un servicio **declara su propia entrada** (`NewSimpleProduct`, `NewVariableProduct`, `NewInventoryDocument`); el handler le pasa el command, que encaja con esa forma. Quien lo reutiliza (una importación) le pasa un objeto con nombres y, si todo debe quedar en una transacción, su propio `EntityManager`.
+- Un tipo que comparten un command y un servicio va a `domain` (`variant-input.ts`); una forma de respuesta compartida, a `application/read-models`.
+- `architecture.spec.ts` comprueba que `application/services` no importe de `commands/` ni `queries/` y que nada en `application` importe un handler.
+
 ---
 
 ## 3. Aislamiento por tienda (tenant) — **explícito**

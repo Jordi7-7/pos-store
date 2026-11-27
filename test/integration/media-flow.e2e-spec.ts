@@ -81,6 +81,23 @@ describe('Media: galería de imágenes', () => {
       expect(await db.getRepository(ProductImage).countBy({ tenantId: shop.tenantId })).toBe(1);
     });
 
+    it('devuelve al registrar la misma dirección pública que luego devuelve el listado, y en la base queda solo la clave', async () => {
+      const key = ownKey(shop, 'consistente.png');
+      const registered = await register(shop, `https://cdn.example.com/${key}`, 'Consistente');
+      const listed = (await list(shop, 1, 50, 'Consistente')).data[0];
+
+      expect(registered.url).toBe(`https://cdn.example.com/${key}`);
+      expect(listed?.url).toBe(registered.url);
+      const [row] = await db.query<Array<{ url: string }>>('SELECT url FROM product_images WHERE id = $1', [registered.id]);
+      expect(row?.url).toBe(key);
+
+      // Leer una imagen y volver a guardarla no acumula el dominio en la clave
+      await db.getRepository(ProductImage).save(listed);
+      const [again] = await db.query<Array<{ url: string }>>('SELECT url FROM product_images WHERE id = $1', [registered.id]);
+      expect(again?.url).toBe(key);
+      await remove(shop, registered.id);
+    });
+
     it('lista solo la galería de la tienda, la más reciente primero, con paginación', async () => {
       await register(shop, `https://cdn.example.com/${ownKey(shop, 'b.png')}`, 'Pantalón azul');
       await register(shop, `https://cdn.example.com/${ownKey(shop, 'c.png')}`, '100% algodón');

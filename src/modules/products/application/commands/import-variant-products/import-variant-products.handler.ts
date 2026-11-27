@@ -5,7 +5,7 @@ import { RedisService } from '../../../../../common/redis/redis.service';
 import { assertUserCanOperateInBranch } from '../../../../../common/security/branch-access.helper';
 import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
-import { Branch } from '../../../../branches/domain/entities/branch.entity';
+import { assertBranchesExist } from '../../../../branches/application/services/branch-lookup';
 import { Attribute } from '../../../domain/entities/attribute.entity';
 import { AttributeValue } from '../../../domain/entities/attribute-value.entity';
 import { Category } from '../../../domain/entities/category.entity';
@@ -13,10 +13,8 @@ import { Product } from '../../../domain/entities/product.entity';
 import { ProductVariant } from '../../../domain/entities/product-variant.entity';
 import { ProductType } from '../../../domain/enums/product-type.enum';
 import { ImportRowError, PlannedProduct, planImport } from '../../../domain/import-plan';
-import { CreateSimpleProductCommand } from '../create-simple-product/create-simple-product.command';
-import { CreateSimpleProductHandler } from '../create-simple-product/create-simple-product.handler';
-import { CreateVariableProductCommand } from '../create-variable-product/create-variable-product.command';
-import { CreateVariableProductHandler } from '../create-variable-product/create-variable-product.handler';
+import { createSimpleProduct } from '../../services/create-simple-product';
+import { createVariableProduct } from '../../services/create-variable-product';
 import { ImportVariantProductsCommand } from './import-variant-products.command';
 import { nextValueSortOrder } from '../../services/attribute-order';
 
@@ -75,9 +73,7 @@ export class ImportVariantProductsHandler implements ICommandHandler<ImportVaria
     return this.entityManager.transaction(async (manager) => {
       if (branchId) {
         await assertUserCanOperateInBranch(manager, this.redisService, { tenantId, userId, branchId, actionDescription: 'importar productos' });
-        if (!(await manager.getRepository(Branch).existsBy({ id: branchId, tenantId }))) {
-          throw new AppException(ErrorCode.BranchNotFound, `La sucursal con ID "${branchId}" no existe.`, HttpStatus.NOT_FOUND, { branchId });
-        }
+        await assertBranchesExist(manager, tenantId, [branchId]);
       }
 
       const plan = planImport(rows);
@@ -203,35 +199,41 @@ export class ImportVariantProductsHandler implements ICommandHandler<ImportVaria
     }
 
     // Cada producto con los mismos casos de uso que la pantalla de alta (mismas reglas y mismos errores)
-    const simple = new CreateSimpleProductHandler(manager);
-    const variable = new CreateVariableProductHandler(manager);
     for (const product of products) {
       const categoryId = product.category ? catalog.categories.get(lower(product.category))?.id : undefined;
       const stocksOf = (quantity: number) => (branchId && quantity > 0 ? [{ branchId, quantity }] : undefined);
       if (product.kind === 'SIMPLE') {
         const [only] = product.variants;
         if (!only) continue;
-        await simple.execute(new CreateSimpleProductCommand(tenantId, product.name, '', only.sku, only.barcode, only.purchasePrice, only.salePrice, only.wholesalePrice ?? undefined, categoryId, undefined, stocksOf(only.quantity)));
+        await createSimpleProduct(manager, {
+          tenantId,
+          name: product.name,
+          description: '',
+          sku: only.sku,
+          barcode: only.barcode,
+          purchasePrice: only.purchasePrice,
+          salePrice: only.salePrice,
+          wholesalePrice: only.wholesalePrice ?? undefined,
+          categoryId,
+          stocks: stocksOf(only.quantity),
+        });
       } else {
-        await variable.execute(
-          new CreateVariableProductCommand(
-            tenantId,
-            product.name,
-            '',
-            product.variants.map((variant) => ({
-              sku: variant.sku,
-              barcode: variant.barcode || undefined,
-              purchasePrice: variant.purchasePrice,
-              salePrice: variant.salePrice,
-              wholesalePrice: variant.wholesalePrice,
-              attributeValues: variant.attributes.map(({ name, value }) => ({ attributeValueId: (catalog.attributes.get(lower(name))?.values.get(lower(value)) as AttributeValue).id })),
-              stocks: stocksOf(variant.quantity),
-            })),
-            undefined,
-            categoryId,
-            product.baseSku,
-          ),
-        );
+        await createVariableProduct(manager, {
+          tenantId,
+          name: product.name,
+          description: '',
+          categoryId,
+          baseSku: product.baseSku,
+          variants: product.variants.map((variant) => ({
+            sku: variant.sku,
+            barcode: variant.barcode || undefined,
+            purchasePrice: variant.purchasePrice,
+            salePrice: variant.salePrice,
+            wholesalePrice: variant.wholesalePrice,
+            attributeValues: variant.attributes.map(({ name, value }) => ({ attributeValueId: (catalog.attributes.get(lower(name))?.values.get(lower(value)) as AttributeValue).id })),
+            stocks: stocksOf(variant.quantity),
+          })),
+        });
       }
     }
   }

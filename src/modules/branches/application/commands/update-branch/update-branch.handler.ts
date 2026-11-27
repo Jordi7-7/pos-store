@@ -3,6 +3,7 @@ import { EntityManager, Not } from 'typeorm';
 import { Logger, HttpStatus } from '@nestjs/common';
 import { UpdateBranchCommand } from './update-branch.command';
 import { Branch } from '../../../domain/entities/branch.entity';
+import { findBranchOrFail } from '../../services/branch-lookup';
 import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
 
@@ -17,13 +18,7 @@ export class UpdateBranchHandler implements ICommandHandler<UpdateBranchCommand>
     this.logger.log(`Updating branch ${branchId} for Tenant ${tenantId}`);
     const branchRepo = this.entityManager.getRepository(Branch);
 
-    const branch = await branchRepo.findOne({
-      where: { id: branchId, tenantId },
-    });
-    if (!branch) {
-      this.logger.warn(`Branch update rejected: ${branchId} not found in Tenant ${tenantId}`);
-      throw new AppException(ErrorCode.BranchNotFound, 'Sucursal no encontrada.', HttpStatus.NOT_FOUND);
-    }
+    const branch = await findBranchOrFail(this.entityManager, tenantId, branchId);
 
     if (name !== undefined && name.trim() !== '') {
       const existing = await branchRepo.findOne({

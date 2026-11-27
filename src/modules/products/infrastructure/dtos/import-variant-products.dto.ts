@@ -1,6 +1,9 @@
 import { Type } from 'class-transformer';
 import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsInt, IsNumber, IsOptional, IsString, IsUUID, Min, ValidateNested } from 'class-validator';
 
+/** Atributos que admite una fila (p. ej. las cuatro piezas de color de una mochila y el cierre). La web tiene el mismo tope. */
+export const MAX_ATTRIBUTES_PER_ROW = 5;
+
 export class ImportAttributeDto {
   @IsString()
   name: string;
@@ -27,7 +30,7 @@ export class ImportVariantRowDto {
   category?: string;
 
   @IsArray()
-  @ArrayMaxSize(4)
+  @ArrayMaxSize(MAX_ATTRIBUTES_PER_ROW)
   @ValidateNested({ each: true })
   @Type(() => ImportAttributeDto)
   @IsOptional()

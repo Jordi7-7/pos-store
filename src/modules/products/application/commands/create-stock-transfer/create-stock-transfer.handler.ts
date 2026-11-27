@@ -15,7 +15,8 @@ import { ProductVariant } from '../../../domain/entities/product-variant.entity'
 import { DocumentLine, isManualReason, mergeDocumentLines, sameTotals, totalsByVariant } from '../../../domain/services/inventory-document-rules';
 import { InventoryDocumentResult } from '../../read-models/inventory-document';
 import { buildMovement, saveDocumentBatch, saveInventoryDocument, toDocumentResult } from '../../services/inventory-document';
-import { assertLineCount, findBranchOrFail, findDocumentReplay, findVariantsOrFail, invalidReason, runOnce, toResultLines } from '../../services/inventory-document-support';
+import { assertLineCount, findDocumentReplay, findVariantsOrFail, invalidReason, runOnce, toResultLines } from '../../services/inventory-document-support';
+import { findBranchOrFail } from '../../../../branches/application/services/branch-lookup';
 import { consumeStock, lockBranchStock, receiveStock } from '../../services/inventory-stock';
 import { CreateStockTransferCommand } from './create-stock-transfer.command';
 

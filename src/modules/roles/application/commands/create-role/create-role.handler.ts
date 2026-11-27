@@ -2,10 +2,11 @@ import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { HttpStatus, Logger } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { CreateRoleCommand } from './create-role.command';
-import { Role } from '../../../domain/entities/role.entity';
+import { Role, ROLE_NAME_INDEX } from '../../../domain/entities/role.entity';
 import { assertValidPermissions } from '../../../../../common/security/permissions.helper';
 import { assertCanGrant, loadActorPermissions } from '../../../../../common/security/privilege-escalation';
 import { AppException } from '../../../../../common/errors/app.exception';
+import { isUniqueViolation } from '../../../../../common/errors/database-errors';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
 
 @CommandHandler(CreateRoleCommand)
@@ -23,11 +24,11 @@ export class CreateRoleHandler implements ICommandHandler<CreateRoleCommand> {
     const granted = assertValidPermissions(permissions);
     assertCanGrant(await loadActorPermissions(this.entityManager, tenantId, command.currentUserId), granted);
 
-    const existing = await roleRepo.findOne({ where: { tenantId, name } });
-    if (existing) {
+    const nameTaken = () => {
       this.logger.warn(`Role creation failed: name already used in Tenant ${tenantId}`);
-      throw new AppException(ErrorCode.RoleNameTaken, `Ya existe un rol con el nombre "${name}".`, HttpStatus.CONFLICT);
-    }
+      return new AppException(ErrorCode.RoleNameTaken, `Ya existe un rol con el nombre "${name}".`, HttpStatus.CONFLICT);
+    };
+    if (await roleRepo.findOne({ where: { tenantId, name } })) throw nameTaken();
 
     const role = new Role();
     role.tenantId = tenantId;
@@ -36,7 +37,10 @@ export class CreateRoleHandler implements ICommandHandler<CreateRoleCommand> {
     role.permissions = granted;
     role.isSystem = false;
 
-    const saved = await roleRepo.save(role);
+    // Dos peticiones a la vez pueden pasar la comprobación: el índice único decide y se traduce al mismo error de negocio
+    const saved = await roleRepo.save(role).catch((error: unknown) => {
+      throw isUniqueViolation(error, ROLE_NAME_INDEX) ? nameTaken() : error;
+    });
     this.logger.log(`Role created: ID ${saved.id}`);
     return saved;
   }

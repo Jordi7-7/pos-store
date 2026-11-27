@@ -2,7 +2,7 @@ import { IQueryHandler, QueryBus, QueryHandler } from '@nestjs/cqrs';
 import { FindPosVariantsBySkuQuery } from './find-pos-variants-by-sku.query';
 import { GetPosVariantBySkuQuery } from '../get-pos-variant-by-sku/get-pos-variant-by-sku.query';
 import { GetPosVariantsByBaseSkuQuery } from '../get-pos-variants-by-base-sku/get-pos-variants-by-base-sku.query';
-import { PosVariableProductResponse } from '../get-pos-variants-by-base-sku/get-pos-variants-by-base-sku.handler';
+import { PosVariableProductResponse } from '../../read-models/pos-variable-product-response';
 import { PosVariantResponse } from '../../read-models/pos-variant-response';
 
 export type PosSkuSearchResult = PosVariantResponse[] | PosVariableProductResponse;

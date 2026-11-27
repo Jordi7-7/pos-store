@@ -5,7 +5,6 @@ import { InventoryMovementType } from '../../../../common/enums/inventory-moveme
 import { AppException } from '../../../../common/errors/app.exception';
 import { isUniqueViolation } from '../../../../common/errors/database-errors';
 import { ErrorCode } from '../../../../common/errors/error-codes';
-import { Branch } from '../../../branches/domain/entities/branch.entity';
 import { INVENTORY_DOCUMENT_CLIENT_REQUEST_INDEX, InventoryDocument } from '../../domain/entities/inventory-document.entity';
 import { InventoryMovement } from '../../domain/entities/inventory-movement.entity';
 import { ProductVariant } from '../../domain/entities/product-variant.entity';
@@ -38,14 +37,6 @@ export function assertLineCount(count: number, noun: string): void {
   if (count > MAX_DOCUMENT_LINES) {
     throw new AppException(ErrorCode.InventoryDocumentTooLarge, `Un movimiento admite hasta ${MAX_DOCUMENT_LINES} productos.`, HttpStatus.BAD_REQUEST, { max: MAX_DOCUMENT_LINES, received: count });
   }
-}
-
-export async function findBranchOrFail(manager: EntityManager, tenantId: string, branchId: string): Promise<Branch> {
-  const branch = await manager.getRepository(Branch).findOne({ where: { id: branchId, tenantId } });
-  if (!branch) {
-    throw new AppException(ErrorCode.BranchNotFound, `La sucursal con ID ${branchId} no existe para este tenant.`, HttpStatus.NOT_FOUND, { branchId });
-  }
-  return branch;
 }
 
 /** Las variantes pedidas por id, todas de la tienda; si falta alguna (o es de otra tienda) no se sigue. */

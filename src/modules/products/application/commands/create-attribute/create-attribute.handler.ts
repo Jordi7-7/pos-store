@@ -2,7 +2,8 @@ import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { Logger, HttpStatus } from '@nestjs/common';
 import { EntityManager } from 'typeorm';
 import { CreateAttributeCommand } from './create-attribute.command';
-import { Attribute } from '../../../domain/entities/attribute.entity';
+import { Attribute, ATTRIBUTE_NAME_INDEX } from '../../../domain/entities/attribute.entity';
+import { isUniqueViolation } from '../../../../../common/errors/database-errors';
 import { AppException } from '../../../../../common/errors/app.exception';
 import { ErrorCode } from '../../../../../common/errors/error-codes';
 
@@ -18,24 +19,20 @@ export class CreateAttributeHandler implements ICommandHandler<CreateAttributeCo
 
     const attributeRepo = this.entityManager.getRepository(Attribute);
 
-    // Case-insensitive name match to prevent duplicate attributes (e.g. "Color" and "color")
-    const existing = await attributeRepo.findOne({
-      where: {
-        tenantId,
-        name: name,
-      },
-    });
-
-    if (existing) {
+    const nameTaken = () => {
       this.logger.warn(`Attribute creation failed: attribute "${name}" already exists for Tenant ${tenantId}`);
-      throw new AppException(ErrorCode.AttributeNameTaken, `El atributo "${name}" ya existe.`, HttpStatus.CONFLICT, { name });
-    }
+      return new AppException(ErrorCode.AttributeNameTaken, `El atributo "${name}" ya existe.`, HttpStatus.CONFLICT, { name });
+    };
+    if (await attributeRepo.findOne({ where: { tenantId, name } })) throw nameTaken();
 
     const attribute = new Attribute();
     attribute.tenantId = tenantId;
     attribute.name = name;
 
-    const savedAttribute = await attributeRepo.save(attribute);
+    // Dos peticiones a la vez pueden pasar la comprobación: el índice único decide y se traduce al mismo error de negocio
+    const savedAttribute = await attributeRepo.save(attribute).catch((error: unknown) => {
+      throw isUniqueViolation(error, ATTRIBUTE_NAME_INDEX) ? nameTaken() : error;
+    });
     this.logger.log(`Attribute created successfully: "${savedAttribute.name}" (ID: ${savedAttribute.id})`);
 
     return savedAttribute;

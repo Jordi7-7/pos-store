@@ -3,8 +3,11 @@ import { BaseEntity } from '../../../../common/database/base.entity';
 import { Tenant } from '../../../tenants/domain/entities/tenant.entity';
 import { User } from '../../../users/domain/entities/user.entity';
 
+/** Índice único del nombre de rol por tienda; lo crea la migración `AddUniqueCatalogNames` (antes solo estaba declarado aquí, no existía en la base). */
+export const ROLE_NAME_INDEX = 'UQ_roles_tenant_name';
+
 @Entity('roles')
-@Index(['tenantId', 'name'], { unique: true })
+@Index(ROLE_NAME_INDEX, ['tenantId', 'name'], { unique: true, where: 'deleted_at IS NULL' })
 export class Role extends BaseEntity {
   @Column({ name: 'tenant_id', type: 'uuid' })
   tenantId: string;
