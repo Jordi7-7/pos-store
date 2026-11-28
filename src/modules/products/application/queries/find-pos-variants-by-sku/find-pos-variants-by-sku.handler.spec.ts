@@ -1,4 +1,6 @@
 import { QueryBus } from '@nestjs/cqrs';
+import { EntityManager } from 'typeorm';
+import { RedisService } from '../../../../../common/redis/redis.service';
 import { GetPosVariantBySkuQuery } from '../get-pos-variant-by-sku/get-pos-variant-by-sku.query';
 import { GetPosVariantsByBaseSkuQuery } from '../get-pos-variants-by-base-sku/get-pos-variants-by-base-sku.query';
 import { FindPosVariantsBySkuHandler } from './find-pos-variants-by-sku.handler';
@@ -6,8 +8,9 @@ import { FindPosVariantsBySkuQuery } from './find-pos-variants-by-sku.query';
 
 describe('FindPosVariantsBySkuHandler', () => {
   const execute = jest.fn();
-  const handler = new FindPosVariantsBySkuHandler({ execute } as unknown as QueryBus);
-  const query = new FindPosVariantsBySkuQuery('t1', 'ABC', 'b1');
+  // Propietaria: el acceso a la sucursal se prueba contra la base en `pos-scan-contract`
+  const handler = new FindPosVariantsBySkuHandler({ execute } as unknown as QueryBus, {} as unknown as EntityManager, {} as unknown as RedisService);
+  const query = new FindPosVariantsBySkuQuery('t1', 'ABC', 'b1', 'u1', true);
 
   beforeEach(() => execute.mockReset());
 

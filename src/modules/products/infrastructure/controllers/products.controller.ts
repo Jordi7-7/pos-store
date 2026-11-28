@@ -446,12 +446,12 @@ export class ProductsController {
   @Get('pos/variant/sku/:sku')
   @RequireAnyPermissions(APP_PERMISSIONS.PRODUCTS_GET, APP_PERMISSIONS.POS_SELL)
   async findPosVariantBySku(
-    @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser() user: JwtUserPayload,
     @Param('sku') sku: string,
-    @Query('branchId') branchId: string,
+    @Query('branchId', new ParseUUIDPipe()) branchId: string,
   ) {
     return this.queryBus.execute<FindPosVariantsBySkuQuery, PosSkuSearchResult>(
-      new FindPosVariantsBySkuQuery(tenantId, sku, branchId),
+      new FindPosVariantsBySkuQuery(user.tenantId, sku, branchId, user.sub, user.isOwner === true),
     );
   }
 
