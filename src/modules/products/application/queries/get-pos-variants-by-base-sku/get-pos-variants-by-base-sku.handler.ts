@@ -4,7 +4,9 @@ import { GetPosVariantsByBaseSkuQuery } from './get-pos-variants-by-base-sku.que
 import { Product } from '../../../domain/entities/product.entity';
 import { ProductType } from '../../../domain/enums/product-type.enum';
 import { normalizeSku } from '../../../domain/sku';
-import { PosVariableProductAttribute, PosVariableProductResponse } from '../../read-models/pos-variable-product-response';
+import { buildSelectorAttributes, sortBySku, sortCombination } from '../../../domain/services/pos-variant-view';
+import { PosVariableProductResponse } from '../../read-models/pos-variable-product-response';
+import { posSaleVariantQuery, toPosSaleVariant } from '../../services/pos-sale-variant';
 
 @QueryHandler(GetPosVariantsByBaseSkuQuery)
 export class GetPosVariantsByBaseSkuHandler implements IQueryHandler<GetPosVariantsByBaseSkuQuery> {
@@ -12,97 +14,47 @@ export class GetPosVariantsByBaseSkuHandler implements IQueryHandler<GetPosVaria
 
   async execute(query: GetPosVariantsByBaseSkuQuery): Promise<PosVariableProductResponse | null> {
     const { tenantId, baseSku, branchId } = query;
-    const searchString = normalizeSku(baseSku);
-    const productRepo = this.entityManager.getRepository(Product);
 
-    // Indexed lookup on (tenant_id, base_sku)
-    const product = await productRepo.createQueryBuilder('product')
-      .leftJoinAndSelect('product.images', 'productImage')
-      .innerJoinAndSelect('product.variants', 'variant')
-      .leftJoinAndSelect('variant.images', 'variantImage')
-      .leftJoinAndSelect('variant.attributeValues', 'attributeValue')
-      .leftJoinAndSelect('attributeValue.attribute', 'attribute')
-      .leftJoinAndSelect('variant.stocks', 'stock', 'stock.branchId = :branchId', { branchId })
+    // Búsqueda indexada por (tenant_id, base_sku). Las variantes van en otra consulta: unir aquí las fotos del
+    // producto con las variantes multiplicaría las filas
+    const product = await this.entityManager
+      .getRepository(Product)
+      .createQueryBuilder('product')
+      .select(['product.id', 'product.name', 'product.type', 'product.baseSku'])
+      .leftJoin('product.images', 'image')
+      .addSelect(['image.id', 'image.url'])
       .where('product.tenantId = :tenantId', { tenantId })
-      .andWhere('product.baseSku = :searchString', { searchString })
+      .andWhere('product.baseSku = :baseSku', { baseSku: normalizeSku(baseSku) })
       .andWhere('product.type = :productType', { productType: ProductType.VARIABLE })
       .getOne();
+    if (!product) return null;
 
-    if (!product || !product.variants || product.variants.length === 0) {
-      return null;
-    }
+    const variants = sortBySku(
+      await posSaleVariantQuery(this.entityManager, branchId)
+        .where('variant.tenantId = :tenantId', { tenantId })
+        .andWhere('variant.productId = :productId', { productId: product.id })
+        .getMany(),
+    );
+    if (variants.length === 0) return null;
 
-    // Build unique dynamic attributes list from variants
-    const attributesMap = new Map<string, { id: string; name: string; valuesMap: Map<string, string> }>();
-
-    const mappedVariants = product.variants.map((variant) => {
-      const branchStock = variant.stocks ? variant.stocks.find((s) => s.branchId === branchId) : null;
-      const stockQuantity = branchStock ? Number(branchStock.quantity) : 0;
-      const variantImage = variant.images && variant.images.length > 0 ? variant.images[0].url : null;
-
-      const variantAttributes = (variant.attributeValues || []).map((av) => {
-        const attrId = av.attribute?.id || av.attributeId;
-        const attrName = av.attribute?.name || 'Atributo';
-        const valId = av.id;
-        const valName = av.value;
-
-        if (attrId) {
-          if (!attributesMap.has(attrId)) {
-            attributesMap.set(attrId, {
-              id: attrId,
-              name: attrName,
-              valuesMap: new Map(),
-            });
-          }
-          if (valId && valName) {
-            attributesMap.get(attrId)!.valuesMap.set(valId, valName);
-          }
-        }
-
-        return {
-          attributeId: attrId,
-          attributeName: attrName,
-          valueId: valId,
-          valueName: valName,
-        };
-      });
-
+    const productImage = product.images?.[0]?.url ?? null;
+    const items = variants.map((variant) => {
+      const item = toPosSaleVariant(variant);
       return {
-        id: variant.id,
-        sku: variant.sku,
-        barcode: variant.barcode,
-        purchasePrice: variant.purchasePrice,
-        salePrice: variant.salePrice,
-        wholesalePrice: variant.wholesalePrice !== null ? Number(variant.wholesalePrice) : null,
-        stock: stockQuantity,
-        imageUrl: variantImage || (product.images && product.images.length > 0 ? product.images[0].url : null),
-        attributes: variantAttributes.map((va) => ({
-          name: va.attributeName,
-          value: va.valueName,
-        })),
-        attributeValues: variantAttributes,
+        ...item,
+        imageUrl: item.imageUrl ?? productImage,
+        attributeValues: sortCombination(variant.attributeValues ?? []).map((option) => ({ attributeId: option.attributeId, valueId: option.id })),
       };
     });
-
-    const attributes: PosVariableProductAttribute[] = Array.from(attributesMap.values()).map((attr) => ({
-      id: attr.id,
-      name: attr.name,
-      values: Array.from(attr.valuesMap.entries()).map(([id, value]) => ({ id, value })),
-    }));
-
-    const primaryImage =
-      (product.images && product.images.length > 0 ? product.images[0].url : null) ||
-      (mappedVariants.find((v) => v.imageUrl)?.imageUrl || null);
 
     return {
       productId: product.id,
       productName: product.name,
       productType: product.type,
       baseSku: product.baseSku,
-      description: product.description,
-      imageUrl: primaryImage,
-      attributes,
-      variants: mappedVariants,
+      imageUrl: productImage ?? items.find((item) => item.imageUrl)?.imageUrl ?? null,
+      attributes: buildSelectorAttributes(variants.map((variant) => variant.attributeValues ?? [])),
+      variants: items,
     };
   }
 }

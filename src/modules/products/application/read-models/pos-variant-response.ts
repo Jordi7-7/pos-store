@@ -1,20 +1,23 @@
 import { AttributeValue } from '../../domain/entities/attribute-value.entity';
 import { ProductType } from '../../domain/enums/product-type.enum';
 
-/** Variante encontrada por SKU o código de barras para vender en el POS. */
-export interface PosVariantResponse {
+/** Lo que el POS necesita de una variante al escanear. Nunca lleva el precio de compra. */
+export interface PosSaleVariant {
   id: string;
   sku: string;
   barcode: string;
-  purchasePrice: number;
   salePrice: number;
   wholesalePrice: number | null;
-  productName: string;
-  productType: ProductType;
+  /** Existencia en la sucursal pedida. */
   stock: number;
   attributes: Array<{ name: string; value: string }>;
-  attributeValues: AttributeValue[];
   imageUrl: string | null;
+}
+
+/** Variante encontrada por SKU o código de barras para vender en el POS. */
+export interface PosVariantResponse extends PosSaleVariant {
+  productName: string;
+  productType: ProductType;
 }
 
 /** Variante del listado del POS (sin código de barras ni imagen). */

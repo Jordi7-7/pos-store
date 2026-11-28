@@ -1,8 +1,9 @@
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
 import { EntityManager } from 'typeorm';
 import { GetPosVariantBySkuQuery } from './get-pos-variant-by-sku.query';
-import { ProductVariant } from '../../../domain/entities/product-variant.entity';
 import { PosVariantResponse } from '../../read-models/pos-variant-response';
+import { posSaleVariantQuery, toPosSaleVariant } from '../../services/pos-sale-variant';
+import { sortBySku } from '../../../domain/services/pos-variant-view';
 import { normalizeSku } from '../../../domain/sku';
 
 @QueryHandler(GetPosVariantBySkuQuery)
@@ -11,44 +12,18 @@ export class GetPosVariantBySkuHandler implements IQueryHandler<GetPosVariantByS
 
   async execute(query: GetPosVariantBySkuQuery): Promise<PosVariantResponse[]> {
     const { tenantId, sku, branchId } = query;
-    const repo = this.entityManager.getRepository(ProductVariant);
-    const searchString = sku.trim();
 
-    const variants = await repo.createQueryBuilder('variant')
-      .innerJoinAndSelect('variant.product', 'product')
-      .leftJoinAndSelect('variant.images', 'variantImages')
-      .leftJoinAndSelect('variant.attributeValues', 'attributeValue')
-      .leftJoinAndSelect('attributeValue.attribute', 'attribute')
-      .leftJoinAndSelect('variant.stocks', 'stock', 'stock.branchId = :branchId', { branchId })
+    const variants = await posSaleVariantQuery(this.entityManager, branchId)
+      .innerJoin('variant.product', 'product')
+      .addSelect(['product.id', 'product.name', 'product.type'])
       .where('variant.tenantId = :tenantId', { tenantId })
-      .andWhere(
-        '(variant.sku = :sku OR variant.barcode = :searchString)',
-        { sku: normalizeSku(sku), searchString }
-      )
+      .andWhere('(variant.sku = :sku OR variant.barcode = :barcode)', { sku: normalizeSku(sku), barcode: sku.trim() })
       .getMany();
 
-    return variants.map(variant => {
-      const branchStock = variant.stocks ? variant.stocks.find(s => s.branchId === branchId) : null;
-      const stockQuantity = branchStock ? Number(branchStock.quantity) : 0;
-      const firstImage = variant.images && variant.images.length > 0 ? variant.images[0] : null;
-
-      return {
-        id: variant.id,
-        sku: variant.sku,
-        barcode: variant.barcode,
-        purchasePrice: variant.purchasePrice,
-        salePrice: variant.salePrice,
-        wholesalePrice: variant.wholesalePrice !== null ? Number(variant.wholesalePrice) : null,
-        productName: variant.product.name,
-        productType: variant.product.type,
-        stock: stockQuantity,
-        attributes: (variant.attributeValues || []).map((av) => ({
-          name: av.attribute?.name || 'Atributo',
-          value: av.value,
-        })),
-        attributeValues: variant.attributeValues || [],
-        imageUrl: firstImage ? firstImage.url : null,
-      };
-    });
+    return sortBySku(variants).map((variant) => ({
+      ...toPosSaleVariant(variant),
+      productName: variant.product.name,
+      productType: variant.product.type,
+    }));
   }
 }
